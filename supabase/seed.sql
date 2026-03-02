@@ -1,0 +1,60 @@
+-- 1. Insert Corridors (Hardcoded UUIDs for easy relation)
+INSERT INTO public.corridors (id, name, accent_color) VALUES
+('10000000-0000-0000-0000-000000000001', 'Kasarani/Thika Road', '#EF4444'),
+('10000000-0000-0000-0000-000000000002', 'Rongai', '#3B82F6'),
+('10000000-0000-0000-0000-000000000003', 'Ngong Road', '#10B981'),
+('10000000-0000-0000-0000-000000000004', 'Umoja', '#F59E0B'),
+('10000000-0000-0000-0000-000000000005', 'Embakasi', '#8B5CF6'),
+('10000000-0000-0000-0000-000000000006', 'Kiambu Road', '#EC4899')
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Insert Stages (2 per corridor)
+INSERT INTO public.stages (corridor_id, name, aliases, location) VALUES
+-- Kasarani/Thika Road
+('10000000-0000-0000-0000-000000000001', 'Roysambu', '{"TRM", "Roy"}', ST_SetSRID(ST_MakePoint(36.8872, -1.2185), 4326)),
+('10000000-0000-0000-0000-000000000001', 'Allsops', '{"GSU"}', ST_SetSRID(ST_MakePoint(36.8647, -1.2483), 4326)),
+-- Rongai
+('10000000-0000-0000-0000-000000000002', 'Tuskys Rongai', '{"Cleanshelf"}', ST_SetSRID(ST_MakePoint(36.7594, -1.3945), 4326)),
+('10000000-0000-0000-0000-000000000002', 'Multimedia University', '{"MMU"}', ST_SetSRID(ST_MakePoint(36.7644, -1.3787), 4326)),
+-- Ngong
+('10000000-0000-0000-0000-000000000003', 'Ngong Town', '{"Mwisho"}', ST_SetSRID(ST_MakePoint(36.6566, -1.3615), 4326)),
+('10000000-0000-0000-0000-000000000003', 'Karen Center', '{"Crossroads"}', ST_SetSRID(ST_MakePoint(36.7032, -1.3195), 4326)),
+-- Umoja
+('10000000-0000-0000-0000-000000000004', 'Umoja Innercore', '{"Eastlands"}', ST_SetSRID(ST_MakePoint(36.8920, -1.2847), 4326)),
+('10000000-0000-0000-0000-000000000004', 'Tena Estate', '{"Tena"}', ST_SetSRID(ST_MakePoint(36.8837, -1.2882), 4326)),
+-- Embakasi
+('10000000-0000-0000-0000-000000000005', 'Pipeline / Taj Mall', '{"Outer Ring"}', ST_SetSRID(ST_MakePoint(36.8973, -1.3204), 4326)),
+('10000000-0000-0000-0000-000000000005', 'Fedha Estate', '{"Fedha"}', ST_SetSRID(ST_MakePoint(36.8997, -1.3094), 4326)),
+-- Kiambu
+('10000000-0000-0000-0000-000000000006', 'Kiambu Town', '{"Kiambu"}', ST_SetSRID(ST_MakePoint(36.8356, -1.1718), 4326)),
+('10000000-0000-0000-0000-000000000006', 'Ridgeways', '{"CID"}', ST_SetSRID(ST_MakePoint(36.8504, -1.2139), 4326))
+ON CONFLICT DO NOTHING;
+
+-- 3. Insert Nganyas (Linked to Corridors)
+INSERT INTO public.nganyas (id, corridor_id, name, tags, is_verified) VALUES
+-- Kasarani
+('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Bumblebee', '{"NEW_BUILD", "BASS_HEAVY"}', true),
+('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Neo Matrix', '{"CLEAN_SOUND", "SCREENS"}', false),
+-- Rongai
+('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', 'Catalyst', '{"VIP_SEATS", "WIFI"}', true),
+('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'Inferno', '{"SPEED", "BASS_HEAVY"}', true),
+-- Ngong
+('20000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000003', 'Rocker', '{"CLEAN_SOUND"}', true),
+('20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000003', 'Vanguard', '{"NEW_BUILD"}', false),
+-- Umoja
+('20000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000004', 'Rude Boy', '{"BASS_HEAVY", "LOUD"}', true),
+('20000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000004', 'Smooth', '{"VIP_SEATS"}', false),
+-- Embakasi
+('20000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000005', 'Skyline', '{"SCREENS", "WIFI"}', true),
+('20000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000005', 'Air Force', '{"SPEED"}', false),
+-- Kiambu
+('20000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000006', 'Highlander', '{"NEW_BUILD", "CLEAN_SOUND"}', true),
+('20000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000006', 'Trailblazer', '{"BASS_HEAVY", "SCREENS"}', true)
+ON CONFLICT DO NOTHING;
+
+-- 4. Insert sample Nganya Media (using realistic placeholders or loreum pixel imagery)
+INSERT INTO public.nganya_media (nganya_id, media_url, media_type) VALUES
+('20000000-0000-0000-0000-000000000001', 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80', 'image'),
+('20000000-0000-0000-0000-000000000003', 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800&q=80', 'image'),
+('20000000-0000-0000-0000-000000000007', 'https://images.unsplash.com/photo-1623517923412-cd53a9483dc4?w=800&q=80', 'image')
+ON CONFLICT DO NOTHING;
