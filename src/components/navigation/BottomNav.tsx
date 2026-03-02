@@ -4,15 +4,16 @@
  * Glass background, active state with neon accent, safe area aware.
  */
 
-import { Compass, Heart, User } from 'lucide-react'
+import { Compass, Search, Heart, User } from 'lucide-react'
 import { Link, useMatches } from '@tanstack/react-router'
 import FAB from '../ui/FAB'
 
 /* Tab configuration */
 const tabs = [
-    { to: '/', icon: Compass, label: 'Discover' },
-    { to: '/following', icon: Heart, label: 'Following' },
+    { to: '/', icon: Compass, label: 'Feed' },
+    { to: '/discover', icon: Search, label: 'Discover' },
     // FAB goes here (center)
+    { to: '/following', icon: Heart, label: 'Following' },
     { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
@@ -29,17 +30,17 @@ export default function BottomNav() {
             <div className="absolute inset-0 bg-[var(--color-bg-base)]/90 backdrop-blur-lg border-t border-[var(--glass-border)]" />
 
             {/* Tab bar */}
-            <div className="relative flex items-center justify-around px-2 h-[var(--bottom-nav-height)] pb-[env(safe-area-inset-bottom)]">
-                {/* First two tabs */}
+            <div className="relative grid grid-cols-5 items-center px-2 h-[var(--bottom-nav-height)] pb-[env(safe-area-inset-bottom)]">
+                {/* Left side tabs */}
                 {tabs.slice(0, 2).map((tab) => {
-                    const isActive = currentPath === tab.to || (tab.to === '/' && currentPath === '/discover')
+                    const isActive = currentPath === tab.to
                     return (
                         <Link
                             key={tab.to}
                             to={tab.to}
-                            className={`flex flex-col items-center justify-center gap-1 w-16 h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${isActive
-                                    ? 'text-[var(--color-accent)]'
-                                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                            className={`flex flex-col items-center justify-center gap-1 w-full h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${isActive
+                                ? 'text-[var(--color-accent)]'
+                                : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
                                 }`}
                             aria-label={tab.label}
                         >
@@ -50,20 +51,20 @@ export default function BottomNav() {
                 })}
 
                 {/* Center FAB */}
-                <div className="relative -mt-5">
+                <div className="flex justify-center -mt-6">
                     <FAB />
                 </div>
 
-                {/* Last tab */}
+                {/* Right side tabs */}
                 {tabs.slice(2).map((tab) => {
                     const isActive = currentPath === tab.to
                     return (
                         <Link
                             key={tab.to}
                             to={tab.to}
-                            className={`flex flex-col items-center justify-center gap-1 w-16 h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${isActive
-                                    ? 'text-[var(--color-accent)]'
-                                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                            className={`flex flex-col items-center justify-center gap-1 w-full h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${isActive
+                                ? 'text-[var(--color-accent)]'
+                                : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
                                 }`}
                             aria-label={tab.label}
                         >

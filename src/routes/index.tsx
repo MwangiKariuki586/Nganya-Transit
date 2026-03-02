@@ -38,7 +38,7 @@ function HomeScreen() {
   }
 
   return (
-    <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10 md:space-y-14">
+    <div className="page-container py-8 md:py-12 space-y-12 md:space-y-16">
 
       {/* ─── Hero Section ─────────────────────────────────── */}
       <section className="space-y-2">
