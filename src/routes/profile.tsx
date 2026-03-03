@@ -4,14 +4,16 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from '../components/ui/Button'
 import BottomSheet from '../components/ui/BottomSheet'
 import Modal from '../components/ui/Modal'
 import Card from '../components/ui/Card'
-import { currentUser, nganyas, recentSightings } from '../lib/mockData'
-import { Settings, Camera, Eye, Heart, Calendar, MapPin, Clock } from 'lucide-react'
+import { currentUser } from '../lib/mockData'
+import { Settings, Camera, MapPin, Clock, Calendar } from 'lucide-react'
 import ConfidenceBadge from '../components/ui/ConfidenceBadge'
+import { getMyFollows } from '../lib/queries/follows'
+import { getLiveNow } from '../lib/queries/live'
 
 export const Route = createFileRoute('/profile')({
     component: ProfileScreen,
@@ -19,13 +21,70 @@ export const Route = createFileRoute('/profile')({
 
 function ProfileScreen() {
     const [editOpen, setEditOpen] = useState(false)
-    const [following] = useState<Set<string>>(new Set(['1', '2', '6']))
-
-    // Determine if mobile for sheet vs modal
     const useSheet = typeof window !== 'undefined' && window.innerWidth < 768
 
-    const userSightings = recentSightings.filter((s) => s.spottedBy === currentUser.username)
-    const followedNganyas = nganyas.filter((n) => following.has(n.id))
+    // DB State
+    const [followedNganyas, setFollowedNganyas] = useState<any[]>([])
+    const [liveNganyas, setLiveNganyas] = useState<any[]>([])
+    const [userSightings, setUserSightings] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+        async function loadProfile() {
+            setIsLoading(true)
+            try {
+                const [myFollowsRes, activeLives] = await Promise.all([
+                    getMyFollows().catch(() => []),
+                    getLiveNow()
+                ])
+
+                setLiveNganyas(activeLives || [])
+
+                // Map the resolved follows
+                const mappedFollows = myFollowsRes.map((f: any) => ({
+                    ...f.nganyas,
+                    is_following: true
+                }))
+                setFollowedNganyas(mappedFollows)
+
+                // For MVP, user sightings are hard to fetch without auth setup, so we gracefully keep them empty 
+                setUserSightings([])
+
+            } catch (err) {
+                console.error(err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        loadProfile()
+    }, [])
+
+    // Map Supabase models to the exact Card component props expectation
+    const mapSupabaseToCardProps = (dbNganya: any) => {
+        if (!dbNganya) return null;
+
+        const isLive = liveNganyas.some(ln => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE';
+
+        return {
+            id: dbNganya.nganya_id || dbNganya.id,
+            slug: dbNganya.slug || dbNganya.nganya_slug || '',
+            name: dbNganya.nganya_name || dbNganya.name,
+            corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
+            vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
+            imageUrl: dbNganya.nganya_media?.[0]?.media_url || dbNganya.image_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
+            isLive: isLive,
+            isNewBuild: dbNganya.tags?.includes('NEW_BUILD') || dbNganya.is_new_build,
+            isVerified: dbNganya.is_verified,
+            followers: dbNganya.follower_count || 0,
+            sightingsToday: dbNganya.sighting_count_today || 0,
+            lastSeen: dbNganya.last_seen || 'Recently'
+        }
+    }
+
+    if (isLoading) {
+        return <div className="page-container py-12 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
+    }
 
     return (
         <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10">
@@ -53,12 +112,12 @@ function ProfileScreen() {
                     {/* Stats */}
                     <div className="flex items-center justify-center md:justify-start gap-6">
                         <div className="text-center">
-                            <span className="text-h4 text-[var(--color-text-primary)] block">{currentUser.sightingsCount}</span>
+                            <span className="text-h4 text-[var(--color-text-primary)] block">{userSightings.length || currentUser.sightingsCount}</span>
                             <span className="text-caption text-[var(--color-text-tertiary)]">Sightings</span>
                         </div>
                         <div className="w-px h-8 bg-[var(--color-line)]" />
                         <div className="text-center">
-                            <span className="text-h4 text-[var(--color-text-primary)] block">{currentUser.followingCount}</span>
+                            <span className="text-h4 text-[var(--color-text-primary)] block">{followedNganyas.length || currentUser.followingCount}</span>
                             <span className="text-caption text-[var(--color-text-tertiary)]">Following</span>
                         </div>
                         <div className="w-px h-8 bg-[var(--color-line)]" />
@@ -90,16 +149,16 @@ function ProfileScreen() {
                             >
                                 <Camera className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">{s.nganyaName}</span>
+                                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">{s.nganya_name || 'Nganya'}</span>
                                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                                         <MapPin className="w-3 h-3" />
-                                        <span>{s.corridor}</span>
+                                        <span>{s.corridor || 'Unknown'}</span>
                                         <span>·</span>
                                         <Clock className="w-3 h-3" />
-                                        <span>{s.time}</span>
+                                        <span>{s.time || 'agoo'}</span>
                                     </div>
                                 </div>
-                                <ConfidenceBadge level={s.confidence} />
+                                <ConfidenceBadge level={s.confidence?.confidence_level || 'HIGH'} />
                             </div>
                         ))}
                     </div>
@@ -113,11 +172,21 @@ function ProfileScreen() {
             {/* ─── Following ────────────────────────────────────── */}
             <section>
                 <h2 className="text-h3 mb-4">Following</h2>
-                <div className="space-y-2">
-                    {followedNganyas.map((n) => (
-                        <Card key={n.id} nganya={n} variant="compact" isFollowing={true} />
-                    ))}
-                </div>
+                {followedNganyas.length > 0 ? (
+                    <div className="space-y-2">
+                        {followedNganyas.map((n) => {
+                            const cardProps = mapSupabaseToCardProps(n)
+                            if (!cardProps) return null
+                            return (
+                                <Card key={cardProps.id} nganya={cardProps as any} variant="compact" isFollowing={true} />
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
+                        Not following any nganyas currently.
+                    </div>
+                )}
             </section>
 
             {/* ─── Edit Profile Sheet/Modal ─────────────────────── */}

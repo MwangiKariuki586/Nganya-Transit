@@ -11,6 +11,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'ghost'
     size?: 'sm' | 'md' | 'lg'
     iconOnly?: boolean
+    isLoading?: boolean
     children: ReactNode
 }
 
@@ -54,6 +55,7 @@ export default function Button({
     variant = 'primary',
     size = 'md',
     iconOnly = false,
+    isLoading = false,
     children,
     className = '',
     ...props
@@ -63,10 +65,15 @@ export default function Button({
 
     return (
         <button
-            className={`${base} ${variantStyles[variant]} ${sizes} ${className}`}
+            className={`${base} ${variantStyles[variant]} ${sizes} ${className} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+            disabled={isLoading || props.disabled}
             {...props}
         >
-            {children}
+            {isLoading && (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
+            {!isLoading && children}
+            {isLoading && typeof children === 'string' && 'Processing...'}
         </button>
     )
 }

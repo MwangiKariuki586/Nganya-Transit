@@ -63,8 +63,8 @@ function StandardCard({ nganya, isFollowing, onFollow, className }: CardProps) {
                 <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFollow?.(nganya.id) }}
                     className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-150 cursor-pointer ${isFollowing
-                            ? 'bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]'
-                            : 'bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70'
+                        ? 'bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]'
+                        : 'bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70'
                         }`}
                     aria-label={isFollowing ? 'Unfollow' : 'Follow'}
                 >
@@ -87,7 +87,7 @@ function StandardCard({ nganya, isFollowing, onFollow, className }: CardProps) {
 
                 {/* Vibe tags */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                    {nganya.vibeTags.slice(0, 3).map((tag) => (
+                    {nganya.vibeTags?.slice(0, 3).map((tag) => (
                         <Chip
                             key={tag}
                             label={tag}
@@ -101,11 +101,11 @@ function StandardCard({ nganya, isFollowing, onFollow, className }: CardProps) {
                 <div className="flex items-center gap-4 text-[var(--color-text-tertiary)] text-xs">
                     <span className="flex items-center gap-1">
                         <Heart className="w-3 h-3" />
-                        {nganya.followers.toLocaleString()}
+                        {nganya.followers?.toLocaleString() ?? 0}
                     </span>
                     <span className="flex items-center gap-1">
                         <Eye className="w-3 h-3" />
-                        {nganya.sightingsToday} today
+                        {nganya.sightingsToday ?? 0} today
                     </span>
                     <span className="flex items-center gap-1 ml-auto">
                         <Clock className="w-3 h-3" />
@@ -142,7 +142,7 @@ function CompactCard({ nganya, isFollowing, onFollow, className }: CardProps) {
                 </h4>
                 <p className="text-xs text-[var(--color-text-tertiary)] truncate">{nganya.corridor}</p>
                 <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--color-text-tertiary)]">
-                    <span>{nganya.followers.toLocaleString()} followers</span>
+                    <span>{nganya.followers?.toLocaleString() ?? 0} followers</span>
                     <span>·</span>
                     <span>{nganya.lastSeen}</span>
                 </div>
@@ -152,8 +152,8 @@ function CompactCard({ nganya, isFollowing, onFollow, className }: CardProps) {
             <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFollow?.(nganya.id) }}
                 className={`shrink-0 p-2 rounded-full transition-all cursor-pointer ${isFollowing
-                        ? 'text-[var(--color-accent)]'
-                        : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]'
+                    ? 'text-[var(--color-accent)]'
+                    : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]'
                     }`}
                 aria-label={isFollowing ? 'Unfollow' : 'Follow'}
             >
@@ -194,8 +194,8 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
             <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFollow?.(nganya.id) }}
                 className={`absolute top-4 right-4 p-2.5 rounded-full transition-all duration-150 cursor-pointer ${isFollowing
-                        ? 'bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]'
-                        : 'bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70'
+                    ? 'bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]'
+                    : 'bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70'
                     }`}
                 aria-label={isFollowing ? 'Unfollow' : 'Follow'}
             >
@@ -205,7 +205,7 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
             {/* Bottom content */}
             <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                    {nganya.vibeTags.map((tag) => (
+                    {nganya.vibeTags?.map((tag) => (
                         <Chip key={tag} label={tag} variant="vibe" color={vibeTagColors[tag]} />
                     ))}
                 </div>
@@ -214,11 +214,11 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
                 <div className="flex items-center gap-4 text-white/60 text-xs">
                     <span className="flex items-center gap-1">
                         <Heart className="w-3.5 h-3.5" />
-                        {nganya.followers.toLocaleString()} followers
+                        {nganya.followers?.toLocaleString() ?? 0} followers
                     </span>
                     <span className="flex items-center gap-1">
                         <Eye className="w-3.5 h-3.5" />
-                        {nganya.sightingsToday} spotted today
+                        {nganya.sightingsToday ?? 0} spotted today
                     </span>
                 </div>
             </div>

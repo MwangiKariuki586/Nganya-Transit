@@ -10,15 +10,28 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SpotRouteImport } from './routes/spot'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SigninRouteImport } from './routes/signin'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as FollowingRouteImport } from './routes/following'
 import { Route as DiscoverRouteImport } from './routes/discover'
+import { Route as CreateNganyaRouteImport } from './routes/create-nganya'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NganyaSlugRouteImport } from './routes/nganya.$slug'
 
 const SpotRoute = SpotRouteImport.update({
   id: '/spot',
   path: '/spot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -36,6 +49,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
   path: '/discover',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreateNganyaRoute = CreateNganyaRouteImport.update({
+  id: '/create-nganya',
+  path: '/create-nganya',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,26 +67,35 @@ const NganyaSlugRoute = NganyaSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/create-nganya': typeof CreateNganyaRoute
   '/discover': typeof DiscoverRoute
   '/following': typeof FollowingRoute
   '/profile': typeof ProfileRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
   '/spot': typeof SpotRoute
   '/nganya/$slug': typeof NganyaSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/create-nganya': typeof CreateNganyaRoute
   '/discover': typeof DiscoverRoute
   '/following': typeof FollowingRoute
   '/profile': typeof ProfileRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
   '/spot': typeof SpotRoute
   '/nganya/$slug': typeof NganyaSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/create-nganya': typeof CreateNganyaRoute
   '/discover': typeof DiscoverRoute
   '/following': typeof FollowingRoute
   '/profile': typeof ProfileRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
   '/spot': typeof SpotRoute
   '/nganya/$slug': typeof NganyaSlugRoute
 }
@@ -76,28 +103,46 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/create-nganya'
     | '/discover'
     | '/following'
     | '/profile'
+    | '/signin'
+    | '/signup'
     | '/spot'
     | '/nganya/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/discover' | '/following' | '/profile' | '/spot' | '/nganya/$slug'
-  id:
-    | '__root__'
+  to:
     | '/'
+    | '/create-nganya'
     | '/discover'
     | '/following'
     | '/profile'
+    | '/signin'
+    | '/signup'
+    | '/spot'
+    | '/nganya/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/create-nganya'
+    | '/discover'
+    | '/following'
+    | '/profile'
+    | '/signin'
+    | '/signup'
     | '/spot'
     | '/nganya/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreateNganyaRoute: typeof CreateNganyaRoute
   DiscoverRoute: typeof DiscoverRoute
   FollowingRoute: typeof FollowingRoute
   ProfileRoute: typeof ProfileRoute
+  SigninRoute: typeof SigninRoute
+  SignupRoute: typeof SignupRoute
   SpotRoute: typeof SpotRoute
   NganyaSlugRoute: typeof NganyaSlugRoute
 }
@@ -109,6 +154,20 @@ declare module '@tanstack/react-router' {
       path: '/spot'
       fullPath: '/spot'
       preLoaderRoute: typeof SpotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -132,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiscoverRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/create-nganya': {
+      id: '/create-nganya'
+      path: '/create-nganya'
+      fullPath: '/create-nganya'
+      preLoaderRoute: typeof CreateNganyaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -151,9 +217,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreateNganyaRoute: CreateNganyaRoute,
   DiscoverRoute: DiscoverRoute,
   FollowingRoute: FollowingRoute,
   ProfileRoute: ProfileRoute,
+  SigninRoute: SigninRoute,
+  SignupRoute: SignupRoute,
   SpotRoute: SpotRoute,
   NganyaSlugRoute: NganyaSlugRoute,
 }

@@ -4,13 +4,16 @@
  */
 
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from '../components/ui/Button'
 import Chip from '../components/ui/Chip'
 import Card from '../components/ui/Card'
 import LiveBadge from '../components/ui/LiveBadge'
 import ConfidenceBadge from '../components/ui/ConfidenceBadge'
-import { nganyas, vibeTagColors, recentSightings } from '../lib/mockData'
+import { vibeTagColors } from '../lib/mockData'
+import { getNganya } from '../lib/queries/discover'
+import { getLiveNow } from '../lib/queries/live'
+import { getCorridorSightings } from '../lib/queries/sightings'
 import { Heart, Bell, Share2, Eye, Clock, MapPin, Camera, ChevronLeft, Users } from 'lucide-react'
 
 export const Route = createFileRoute('/nganya/$slug')({
@@ -19,16 +22,53 @@ export const Route = createFileRoute('/nganya/$slug')({
 
 function NganyaDetailScreen() {
     const { slug } = Route.useParams()
-    const nganya = nganyas.find((n) => n.slug === slug)
+    const [nganya, setNganya] = useState<any>(null)
     const [isFollowing, setIsFollowing] = useState(false)
     const [isNotifying, setIsNotifying] = useState(false)
+
+    // related data
+    const [nganyaSightings, setNganyaSightings] = useState<any[]>([])
+    const [relatedNganyas, setRelatedNganyas] = useState<any[]>([])
+    const [isLive, setIsLive] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+        async function loadNganya() {
+            setIsLoading(true)
+            try {
+                const data = await getNganya(slug)
+                if (data) {
+                    setNganya(data)
+                    // Check live status
+                    const liveRes = await getLiveNow()
+                    setIsLive(liveRes.some(ln => ln.nganya_id === data.id) || data.status === 'LIVE')
+
+                    // fetch recent sightings in corridor for now to simulate. 
+                    if (data.corridor_id) {
+                        const recents = await getCorridorSightings(data.corridor_id)
+                        setNganyaSightings(recents.filter(s => s.nganya_id === data.id))
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load nganya data", err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        loadNganya()
+    }, [slug])
+
+    if (isLoading) {
+        return <div className="page-container py-16 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
+    }
 
     if (!nganya) {
         return (
             <div className="page-container py-16 text-center">
                 <h2 className="text-h2 text-[var(--color-text-primary)] mb-2">Nganya not found</h2>
                 <p className="text-body text-[var(--color-text-secondary)] mb-6">
-                    This nganya might have ghosted. 👻
+                    This nganya might have ghosted. 👻 Or we're fetching by ID and need to decode slug correctly...
                 </p>
                 <Link to="/">
                     <Button variant="secondary">Back to Discover</Button>
@@ -37,8 +77,10 @@ function NganyaDetailScreen() {
         )
     }
 
-    const nganyaSightings = recentSightings.filter((s) => s.nganyaId === nganya.id)
-    const relatedNganyas = nganyas.filter((n) => n.id !== nganya.id && n.corridor === nganya.corridor).slice(0, 3)
+    const corridorName = nganya.corridors?.name || 'Unknown Route'
+    const imageUrl = nganya.nganya_media?.[0]?.media_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80'
+    const tags = nganya.tags || []
+    const isNewBuild = tags.includes('NEW_BUILD')
 
     return (
         <div className="animate-slide-up">
@@ -46,7 +88,7 @@ function NganyaDetailScreen() {
             {/* ─── Hero Image ───────────────────────────────────── */}
             <div className="relative h-[280px] md:h-[400px] overflow-hidden">
                 <img
-                    src={nganya.imageUrl}
+                    src={imageUrl}
                     alt={nganya.name}
                     className="w-full h-full object-cover"
                 />
@@ -72,13 +114,13 @@ function NganyaDetailScreen() {
                 <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 pt-8 md:px-8 md:pb-8 md:pt-12 lg:px-12">
                     <div>
                         <div className="flex flex-wrap gap-1.5 mb-3">
-                            {nganya.isLive && <LiveBadge />}
-                            {nganya.isNewBuild && (
+                            {isLive && <LiveBadge />}
+                            {isNewBuild && (
                                 <span className="animate-shimmer px-2.5 py-1 rounded-[var(--radius-full)] bg-[var(--color-green-soft)] text-[var(--color-green)] text-[10px] font-bold tracking-wider uppercase border border-[rgba(57,255,20,0.2)]">
                                     New Build
                                 </span>
                             )}
-                            <ConfidenceBadge level={nganya.confidence} />
+                            {nganya.is_verified && <ConfidenceBadge level="HIGH" />}
                         </div>
                         <h1 className="text-display text-white">{nganya.name}</h1>
                     </div>
@@ -117,28 +159,28 @@ function NganyaDetailScreen() {
                     <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-[var(--color-accent)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{nganya.followers.toLocaleString()}</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">--</span>
                             <span className="text-xs text-[var(--color-text-tertiary)] ml-1">followers</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Eye className="w-4 h-4 text-[var(--color-cyan)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{nganya.sightingsToday}</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">--</span>
                             <span className="text-xs text-[var(--color-text-tertiary)] ml-1">spotted today</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-[var(--color-text-tertiary)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{nganya.lastSeen}</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">recently</span>
                             <span className="text-xs text-[var(--color-text-tertiary)] ml-1">last seen</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-[var(--color-warning)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{nganya.corridor}</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{corridorName}</span>
                         </div>
                     </div>
                 </div>
@@ -147,19 +189,21 @@ function NganyaDetailScreen() {
                 <div>
                     <h2 className="text-h3 mb-3">About</h2>
                     <p className="text-body text-[var(--color-text-secondary)] leading-relaxed">
-                        {nganya.description}
+                        Plate: {nganya.registration_number || 'Unknown'} - Operated as {nganya.status}. Active on the {corridorName} transit corridor.
                     </p>
                 </div>
 
                 {/* Vibe tags */}
-                <div>
-                    <h2 className="text-h3 mb-3">Vibes</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {nganya.vibeTags.map((tag) => (
-                            <Chip key={tag} label={tag} variant="vibe" color={vibeTagColors[tag]} />
-                        ))}
+                {tags.length > 0 && (
+                    <div>
+                        <h2 className="text-h3 mb-3">Vibes</h2>
+                        <div className="flex flex-wrap gap-2">
+                            {tags.map((tag: string) => (
+                                <Chip key={tag} label={tag} variant="vibe" color={vibeTagColors[tag] || undefined} />
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Media Gallery (placeholder grid) */}
                 <div>
@@ -171,7 +215,7 @@ function NganyaDetailScreen() {
                                 className="aspect-square rounded-[var(--radius-md)] overflow-hidden bg-[var(--glass-bg)] border border-[var(--glass-border)]"
                             >
                                 <img
-                                    src={nganya.imageUrl}
+                                    src={imageUrl}
                                     alt={`${nganya.name} gallery ${i + 1}`}
                                     className="w-full h-full object-cover opacity-70 hover:opacity-100 transition-opacity"
                                 />
@@ -193,12 +237,12 @@ function NganyaDetailScreen() {
                                     <div className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm text-[var(--color-text-primary)]">{s.spottedBy}</span>
-                                            <ConfidenceBadge level={s.confidence} />
+                                            <span className="text-sm text-[var(--color-text-primary)]">{s.user?.handle || 'Anonymous'}</span>
+                                            <ConfidenceBadge level={s.confidence?.confidence_level || 'HIGH'} />
                                         </div>
-                                        <span className="text-xs text-[var(--color-text-tertiary)]">{s.corridor} · {s.time}</span>
+                                        <span className="text-xs text-[var(--color-text-tertiary)]">{corridorName} · {s.time || 'agoo'}</span>
                                     </div>
-                                    {s.hasMedia && <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)]" />}
+                                    {s.media_urls?.length > 0 && <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)]" />}
                                 </div>
                             ))}
                         </div>
@@ -212,7 +256,7 @@ function NganyaDetailScreen() {
                 {/* Related Nganyas */}
                 {relatedNganyas.length > 0 && (
                     <div>
-                        <h2 className="text-h3 mb-3">More from {nganya.corridor}</h2>
+                        <h2 className="text-h3 mb-3">More from {corridorName}</h2>
                         <div className="grid-cards">
                             {relatedNganyas.map((n) => (
                                 <Card key={n.id} nganya={n} variant="standard" />

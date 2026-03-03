@@ -1,12 +1,10 @@
-/**
- * BottomNav — Mobile bottom tab bar.
- * Tabs: Discover | Following | [FAB Spot] | Profile.
- * Glass background, active state with neon accent, safe area aware.
- */
-
-import { Compass, Search, Heart, User } from 'lucide-react'
+import { Compass, Search, Heart, User, LogIn } from 'lucide-react'
 import { Link, useMatches } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
+import type { Session } from '@supabase/supabase-js'
 import FAB from '../ui/FAB'
+import { getProfile } from '../../lib/queries/profile'
 
 /* Tab configuration */
 const tabs = [
@@ -20,6 +18,31 @@ const tabs = [
 export default function BottomNav() {
     const matches = useMatches()
     const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
+    const [session, setSession] = useState<Session | null>(null)
+    const [profile, setProfile] = useState<any>(null)
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session)
+            if (session?.user) fetchProfile(session.user.id)
+        })
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session)
+            if (session?.user) {
+                fetchProfile(session.user.id)
+            } else {
+                setProfile(null)
+            }
+        })
+
+        return () => subscription.unsubscribe()
+    }, [])
+
+    const fetchProfile = async (userId: string) => {
+        const data = await getProfile(userId)
+        setProfile(data)
+    }
 
     return (
         <nav
@@ -58,18 +81,33 @@ export default function BottomNav() {
                 {/* Right side tabs */}
                 {tabs.slice(2).map((tab) => {
                     const isActive = currentPath === tab.to
+                    const isProfile = tab.to === '/profile'
+                    const targetTo = isProfile && !session ? '/signin' : tab.to
+
                     return (
                         <Link
                             key={tab.to}
-                            to={tab.to}
+                            to={targetTo as any}
                             className={`flex flex-col items-center justify-center gap-1 w-full h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${isActive
                                 ? 'text-[var(--color-accent)]'
                                 : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
                                 }`}
                             aria-label={tab.label}
                         >
-                            <tab.icon className="w-5 h-5" />
-                            <span className="text-[10px] font-medium">{tab.label}</span>
+                            {isProfile && session ? (
+                                <div className={`w-5 h-5 rounded-full overflow-hidden border ${isActive ? 'border-[var(--color-accent)] shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.5)]' : 'border-[var(--glass-border)]'}`}>
+                                    {profile?.avatar_url ? (
+                                        <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
+                                    ) : (
+                                        <div className="w-full h-full bg-[var(--glass-bg)] flex items-center justify-center text-[8px] font-bold">
+                                            {profile?.handle?.substring(0, 2).toUpperCase() || 'U'}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                isProfile && !session ? <LogIn className="w-5 h-5" /> : <tab.icon className="w-5 h-5" />
+                            )}
+                            <span className="text-[10px] font-medium">{isProfile && !session ? 'Sign In' : tab.label}</span>
                         </Link>
                     )
                 })}

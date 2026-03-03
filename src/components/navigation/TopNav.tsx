@@ -4,8 +4,12 @@
  * Glass header with backdrop blur.
  */
 
-import { Compass, Heart, Camera, User, Zap } from 'lucide-react'
-import { Link, useMatches } from '@tanstack/react-router'
+import { Compass, Heart, Camera, User, Zap, LogOut } from 'lucide-react'
+import { Link, useMatches, useNavigate } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
+import type { Session } from '@supabase/supabase-js'
+import { getProfile } from '../../lib/queries/profile'
 
 const navItems = [
     { to: '/', icon: Compass, label: 'Discover' },
@@ -16,7 +20,40 @@ const navItems = [
 
 export default function TopNav() {
     const matches = useMatches()
+    const navigate = useNavigate()
     const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
+    const [session, setSession] = useState<Session | null>(null)
+    const [profile, setProfile] = useState<any>(null)
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session)
+            if (session?.user) {
+                fetchProfile(session.user.id)
+            }
+        })
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session)
+            if (session?.user) {
+                fetchProfile(session.user.id)
+            } else {
+                setProfile(null)
+            }
+        })
+
+        return () => subscription.unsubscribe()
+    }, [])
+
+    const fetchProfile = async (userId: string) => {
+        const data = await getProfile(userId)
+        setProfile(data)
+    }
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        navigate({ to: '/' })
+    }
 
     return (
         <header
@@ -64,8 +101,8 @@ export default function TopNav() {
                                 key={item.to}
                                 to={item.to}
                                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-all duration-150 no-underline ${isActive
-                                        ? 'text-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)]'
+                                    ? 'text-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)]'
                                     }`}
                             >
                                 <item.icon className="w-4 h-4" />
@@ -73,6 +110,54 @@ export default function TopNav() {
                             </Link>
                         )
                     })}
+
+                    {/* Auth Status */}
+                    <div className="ml-4 pl-4 border-l border-[var(--glass-border)] flex items-center gap-3">
+                        {session ? (
+                            <div className="flex items-center gap-3">
+                                <Link
+                                    to="/profile"
+                                    className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"
+                                >
+                                    <div className="w-7 h-7 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
+                                        {profile?.avatar_url ? (
+                                            <img src={profile.avatar_url} alt={profile.handle} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
+                                                {profile?.handle?.substring(0, 2).toUpperCase() || '??'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-xs font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">
+                                        @{profile?.handle || 'user'}
+                                    </span>
+                                </Link>
+
+                                <button
+                                    onClick={handleSignOut}
+                                    className="p-2 rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
+                                    title="Sign Out"
+                                >
+                                    <LogOut className="w-4.5 h-4.5" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <Link
+                                    to="/signin"
+                                    className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all no-underline"
+                                >
+                                    Sign In
+                                </Link>
+                                <Link
+                                    to="/signup"
+                                    className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] bg-[var(--glass-bg-strong)] border border-[var(--glass-border-hover)] text-white text-sm font-bold hover:bg-[var(--color-accent)] hover:border-transparent transition-all shadow-[var(--shadow-sm)] no-underline"
+                                >
+                                    Join
+                                </Link>
+                            </div>
+                        )}
+                    </div>
                 </nav>
             </div>
         </header>

@@ -4,12 +4,14 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import SearchInput from '../components/ui/SearchInput'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
 import EmptyState from '../components/ui/EmptyState'
-import { nganyas, corridors, vibeTagColors } from '../lib/mockData'
+import { vibeTagColors } from '../lib/mockData'
+import { getCorridors, searchNganyas } from '../lib/queries/discover'
+import { getLiveNow } from '../lib/queries/live'
 import { SlidersHorizontal } from 'lucide-react'
 
 export const Route = createFileRoute('/discover')({
@@ -24,22 +26,44 @@ function DiscoverScreen() {
     const [activeVibe, setActiveVibe] = useState<string | null>(null)
     const [following, setFollowing] = useState<Set<string>>(new Set())
 
+    // Remote data states
+    const [corridors, setCorridors] = useState<any[]>([])
+    const [nganyas, setNganyas] = useState<any[]>([])
+    const [liveNganyas, setLiveNganyas] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+
+    // Load data
+    useEffect(() => {
+        async function loadData() {
+            setIsLoading(true)
+            try {
+                // We use searchNganyas with no search term initially to get the whole list, 
+                // but one could also hook it to search-as-you-type in the query directly.
+                const [fetchedCorridors, fetchedNganyas, fetchedLive] = await Promise.all([
+                    getCorridors(),
+                    searchNganyas(search),
+                    getLiveNow()
+                ])
+                setCorridors(fetchedCorridors || [])
+                setNganyas(fetchedNganyas || [])
+                setLiveNganyas(fetchedLive || [])
+            } catch (err) {
+                console.error("Failed to load initial discover data", err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        loadData()
+    }, [search])
+
     const filtered = useMemo(() => {
         return nganyas.filter((n) => {
-            const matchesSearch = !search ||
-                n.name.toLowerCase().includes(search.toLowerCase()) ||
-                n.corridor.toLowerCase().includes(search.toLowerCase()) ||
-                n.vibeTags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
-
-            const matchesCorridor = !activeCorridor ||
-                corridors.find((c) => c.id === activeCorridor)?.name === n.corridor
-
-            const matchesVibe = !activeVibe ||
-                n.vibeTags.includes(activeVibe)
-
-            return matchesSearch && matchesCorridor && matchesVibe
+            const matchesCorridor = !activeCorridor || n.corridor_id === activeCorridor
+            const matchesVibe = !activeVibe || (n.tags && n.tags.includes(activeVibe))
+            return matchesCorridor && matchesVibe
         })
-    }, [search, activeCorridor, activeVibe])
+    }, [nganyas, activeCorridor, activeVibe])
 
     const toggleFollow = (id: string) => {
         setFollowing((prev) => {
@@ -54,6 +78,28 @@ function DiscoverScreen() {
         setSearch('')
         setActiveCorridor(null)
         setActiveVibe(null)
+    }
+
+    // Map Supabase models to the exact Card component props expectation
+    const mapSupabaseToCardProps = (dbNganya: any) => {
+        if (!dbNganya) return null;
+
+        const isLive = liveNganyas.some(ln => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE';
+
+        return {
+            id: dbNganya.nganya_id || dbNganya.id,
+            slug: dbNganya.slug || dbNganya.nganya_slug || '',
+            name: dbNganya.nganya_name || dbNganya.name,
+            corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
+            vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
+            imageUrl: dbNganya.nganya_media?.[0]?.media_url || dbNganya.image_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
+            isLive: isLive,
+            isNewBuild: dbNganya.tags?.includes('NEW_BUILD') || dbNganya.is_new_build,
+            isVerified: dbNganya.is_verified,
+            followers: dbNganya.follower_count || 0,
+            sightingsToday: dbNganya.sighting_count_today || 0,
+            lastSeen: dbNganya.last_seen || 'Recently'
+        }
     }
 
     return (
@@ -87,7 +133,6 @@ function DiscoverScreen() {
                                         }`}
                                 >
                                     <span>{c.name}</span>
-                                    <span className="float-right text-xs opacity-60">{c.nganyaCount}</span>
                                 </button>
                             ))}
                         </div>
@@ -129,7 +174,7 @@ function DiscoverScreen() {
                         {corridors.map((c) => (
                             <Chip
                                 key={c.id}
-                                label={c.shortName}
+                                label={c.name}
                                 variant="route"
                                 isActive={activeCorridor === c.id}
                                 onClick={() => setActiveCorridor(activeCorridor === c.id ? null : c.id)}
@@ -151,29 +196,37 @@ function DiscoverScreen() {
                     </div>
 
                     {/* Results count */}
-                    <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
-                        {filtered.length} nganya{filtered.length !== 1 ? 's' : ''} found
-                    </p>
+                    {isLoading ? (
+                        <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4 animate-pulse">Loading nganyas...</p>
+                    ) : (
+                        <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
+                            {filtered.length} nganya{filtered.length !== 1 ? 's' : ''} found
+                        </p>
+                    )}
 
                     {/* Grid of cards */}
                     {filtered.length > 0 ? (
                         <div className="grid-cards">
-                            {filtered.map((n) => (
-                                <Card
-                                    key={n.id}
-                                    nganya={n}
-                                    variant="standard"
-                                    isFollowing={following.has(n.id)}
-                                    onFollow={toggleFollow}
-                                />
-                            ))}
+                            {filtered.map((n) => {
+                                const cardProps = mapSupabaseToCardProps(n)
+                                if (!cardProps) return null
+                                return (
+                                    <Card
+                                        key={cardProps.id}
+                                        nganya={cardProps as any}
+                                        variant="standard"
+                                        isFollowing={following.has(cardProps.id)}
+                                        onFollow={toggleFollow}
+                                    />
+                                )
+                            })}
                         </div>
-                    ) : (
+                    ) : !isLoading ? (
                         <EmptyState
                             variant="no-results"
                             onAction={clearFilters}
                         />
-                    )}
+                    ) : null}
                 </div>
             </div>
         </div>
