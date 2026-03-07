@@ -76,3 +76,58 @@ export async function createNganya(nganyaData: {
 
     return nganya
 }
+
+export async function searchNganyaJourney(params: {
+    corridorId: string
+    pickupStageId: string
+    preferredNganyaId?: string | null
+    vibeTags?: string[] | null
+    maxResults?: number
+}) {
+    const {
+        corridorId,
+        pickupStageId,
+        preferredNganyaId,
+        vibeTags,
+        maxResults = 12
+    } = params
+
+    // Preferred corridor-first contract.
+    const v2 = await supabase.rpc('search_nganyas_v2', {
+        p_corridor_id: corridorId,
+        p_pickup_stage_id: pickupStageId,
+        p_preferred_nganya_id: preferredNganyaId || null,
+        p_vibe_tags: vibeTags || null,
+        p_max_results: maxResults
+    })
+
+    if (!v2.error) return v2.data
+
+    // Backward-compatible fallback for older environments.
+    const legacy = await supabase.rpc('search_nganyas', {
+        p_pickup_stage_id: pickupStageId,
+        p_destination_place_id: corridorId,
+        p_preferred_nganya_id: preferredNganyaId || null,
+        p_vibe_tags: vibeTags || null,
+        p_max_results: maxResults
+    })
+
+    if (legacy.error) throw legacy.error
+    return legacy.data
+}
+
+export async function getStages(corridorId?: string) {
+    let query = supabase.from('stages').select('*').order('name')
+    if (corridorId) {
+        query = query.eq('corridor_id', corridorId)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return data
+}
+
+export async function getPlaces() {
+    const { data, error } = await supabase.from('places').select('*').order('name')
+    if (error) throw error
+    return data
+}

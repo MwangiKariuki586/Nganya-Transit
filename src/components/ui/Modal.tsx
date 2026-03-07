@@ -4,6 +4,7 @@
  */
 
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -38,8 +39,9 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     }, [isOpen, onClose])
 
     if (!isOpen) return null
+    if (typeof document === 'undefined') return null
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-modal="true">
             {/* Backdrop */}
             <div
@@ -69,6 +71,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }

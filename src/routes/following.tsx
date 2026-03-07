@@ -12,6 +12,7 @@ import { getMyFollows, followNganya, unfollowNganya } from '../lib/queries/follo
 import { searchNganyas } from '../lib/queries/discover'
 import { Sparkles } from 'lucide-react'
 import { getLiveNow } from '../lib/queries/live'
+import Button from '../components/ui/Button'
 
 export const Route = createFileRoute('/following')({
     component: FollowingScreen,
@@ -108,11 +109,16 @@ function FollowingScreen() {
         <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10 md:space-y-14">
 
             {/* Header */}
-            <div>
-                <h1 className="text-h1 mb-2">Following</h1>
-                <p className="text-body-sm text-[var(--color-text-secondary)]">
-                    Your picks · {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
-                </p>
+            <div className="flex items-center justify-between mb-2">
+                <div>
+                    <h1 className="text-h1 mb-2">Following</h1>
+                    <p className="text-body-sm text-[var(--color-text-secondary)]">
+                        Your picks · {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
+                    </p>
+                </div>
+                <Button variant="primary" onClick={() => navigate({ to: '/' })}>
+                    Plan a ride
+                </Button>
             </div>
 
             {/* ─── Followed Nganyas ─────────────────────────────── */}

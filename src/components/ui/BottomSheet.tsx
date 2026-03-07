@@ -5,6 +5,7 @@
  */
 
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 interface BottomSheetProps {
@@ -32,8 +33,9 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
     }, [isOpen, onClose])
 
     if (!isOpen) return null
+    if (typeof document === 'undefined') return null
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[var(--z-modal)]" role="dialog" aria-modal="true">
             {/* Backdrop */}
             <div
@@ -68,6 +70,7 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }

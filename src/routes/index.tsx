@@ -1,20 +1,19 @@
 /**
- * Home / Feed Screen — The landing page.
- * Sections: Hero, Live Now (horizontal scroll), Featured build,
- * Routes/Corridors filter, and vertical feed of nganyas.
+ * Home / Feed Screen â€” route-first planning + culture context.
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/ui/Card'
-import Chip from '../components/ui/Chip'
 import LiveBadge from '../components/ui/LiveBadge'
 import { getCorridors, searchNganyas } from '../lib/queries/discover'
 import { getLiveNow } from '../lib/queries/live'
 import { getCorridorSightings } from '../lib/queries/sightings'
-import { corridors as mockCorridors, recentSightings as mockRecentSightings } from '../lib/mockData'
+import { recentSightings as mockRecentSightings } from '../lib/mockData'
 import { Clock, Eye, TrendingUp, ChevronRight } from 'lucide-react'
 import ConfidenceBadge from '../components/ui/ConfidenceBadge'
+import WhereToCard, { type RideSearchPayload } from '../components/features/WhereToCard'
+import SearchResultsOverlay from '../components/features/SearchResultsOverlay'
 
 export const Route = createFileRoute('/')({
   component: HomeScreen,
@@ -22,14 +21,13 @@ export const Route = createFileRoute('/')({
 
 function HomeScreen() {
   const [activeCorridor, setActiveCorridor] = useState<string | null>(null)
+  const [plannerSearch, setPlannerSearch] = useState<RideSearchPayload | null>(null)
   const [following, setFollowing] = useState<Set<string>>(new Set())
 
-  // Real data states
   const [corridors, setCorridors] = useState<any[]>([])
   const [nganyas, setNganyas] = useState<any[]>([])
   const [liveNganyas, setLiveNganyas] = useState<any[]>([])
-  const [recentSightings, setRecentSightings] = useState<any[]>(mockRecentSightings) // fallback partially for MVP demo
-
+  const [recentSightings, setRecentSightings] = useState<any[]>(mockRecentSightings)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -38,24 +36,14 @@ function HomeScreen() {
       try {
         const [fetchedCorridors, fetchedNganyas, fetchedLive] = await Promise.all([
           getCorridors(),
-          searchNganyas(''), // load all
+          searchNganyas(''),
           getLiveNow()
         ])
         setCorridors(fetchedCorridors || [])
         setNganyas(fetchedNganyas || [])
         setLiveNganyas(fetchedLive || [])
-
-        // As a quick preview, mapping the first corridor sightings
-        if (fetchedCorridors && fetchedCorridors.length > 0) {
-          const sightings = await getCorridorSightings(fetchedCorridors[0].id)
-          if (sightings && sightings.length > 0) {
-            // Map DB shape to UI shape temporarily if needed, or use as is
-            setRecentSightings(sightings)
-          }
-        }
-
       } catch (err) {
-        console.error("Failed to load initial data", err)
+        console.error('Failed to load initial data', err)
       } finally {
         setIsLoading(false)
       }
@@ -63,12 +51,22 @@ function HomeScreen() {
     loadData()
   }, [])
 
-  // Currently we use a dummy fallback if no nganyas are seeded
-  const featuredNganya = nganyas.find((n) => n.tags?.includes("NEW_BUILD")) ?? nganyas[0]
-
-  const filteredNganyas = activeCorridor
-    ? nganyas.filter((n) => n.corridor_id === activeCorridor)
-    : nganyas
+  useEffect(() => {
+    async function loadSightings() {
+      try {
+        if (!corridors.length) return
+        const corridorId = activeCorridor || corridors[0]?.id
+        if (!corridorId) return
+        const sightings = await getCorridorSightings(corridorId)
+        if (sightings && sightings.length > 0) {
+          setRecentSightings(sightings)
+        }
+      } catch (err) {
+        console.error('Failed to load sightings', err)
+      }
+    }
+    loadSightings()
+  }, [activeCorridor, corridors])
 
   const toggleFollow = (id: string) => {
     setFollowing((prev) => {
@@ -79,13 +77,37 @@ function HomeScreen() {
     })
   }
 
-  // Map Supabase models to the exact Card component props expectation
+  const activeCorridorName = useMemo(
+    () => corridors.find((c) => c.id === activeCorridor)?.name || null,
+    [corridors, activeCorridor]
+  )
+
+  const filteredNganyas = useMemo(
+    () => (activeCorridor ? nganyas.filter((n) => n.corridor_id === activeCorridor) : nganyas),
+    [nganyas, activeCorridor]
+  )
+
+  const filteredLiveNganyas = useMemo(
+    () => (activeCorridor ? liveNganyas.filter((n) => n.corridor_id === activeCorridor) : liveNganyas),
+    [liveNganyas, activeCorridor]
+  )
+
+  const filteredRecentSightings = useMemo(() => {
+    if (!activeCorridor) return recentSightings
+    const routeName = (activeCorridorName || '').toLowerCase()
+    return recentSightings.filter((s: any) => {
+      if (s.corridor_id) return s.corridor_id === activeCorridor
+      const label = (s.corridor || s.corridor_name || '').toLowerCase()
+      if (!routeName) return false
+      return label.includes(routeName) || routeName.includes(label)
+    })
+  }, [recentSightings, activeCorridor, activeCorridorName])
+
+  const featuredNganya = filteredNganyas.find((n) => n.tags?.includes('NEW_BUILD')) ?? filteredNganyas[0] ?? nganyas[0]
+
   const mapSupabaseToCardProps = (dbNganya: any) => {
-    if (!dbNganya) return null;
-
-    // Detect if it is currently live natively from our view
-    const isLive = liveNganyas.some(ln => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE';
-
+    if (!dbNganya) return null
+    const isLive = filteredLiveNganyas.some((ln) => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE'
     return {
       id: dbNganya.nganya_id || dbNganya.id,
       slug: dbNganya.slug || dbNganya.nganya_slug || '',
@@ -93,7 +115,7 @@ function HomeScreen() {
       corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
       imageUrl: dbNganya.nganya_media?.[0]?.media_url || dbNganya.image_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
-      isLive: isLive,
+      isLive,
       isNewBuild: dbNganya.tags?.includes('NEW_BUILD') || dbNganya.is_new_build,
       isVerified: dbNganya.is_verified,
       followers: dbNganya.follower_count || 0,
@@ -102,31 +124,108 @@ function HomeScreen() {
     }
   }
 
+  const handlePlannerSearch = (payload: RideSearchPayload) => {
+    setPlannerSearch(payload)
+    setActiveCorridor(payload.toPlace.corridor_id || payload.toPlace.id)
+  }
+
+  const handlePlannerRouteChange = (corridorId: string | null) => {
+    setActiveCorridor(corridorId)
+    setPlannerSearch(null)
+  }
+
   if (isLoading) {
     return <div className="page-container py-12 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
   }
 
   return (
-    <div className="page-container py-8 md:py-12 space-y-12 md:space-y-16">
-
-      {/* ─── Hero Section ─────────────────────────────────── */}
+    <div className="page-container py-8 md:py-10 space-y-10 md:space-y-12">
       <section className="space-y-2">
         <p className="text-tag text-[var(--color-accent)]">Nairobi Streets</p>
-        <h1 className="text-display">
-          What's <span className="text-[var(--color-accent)]">live</span> right now
+        <h1 className="text-h1">
+          Plan fast, catch faster
         </h1>
-        <p className="text-body text-[var(--color-text-secondary)] max-w-lg">
-          Discover, follow, and spot the dopest nganyas on Nairobi streets.
+        <p className="text-body text-[var(--color-text-secondary)] max-w-2xl">
+          Choose terminal route, pickup stage, and optionally your nganya. Everything below syncs to your selected route.
         </p>
       </section>
 
-      {/* ─── Live Now — Horizontal Scroll ─────────────────── */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
+        <div className="lg:col-span-4 lg:sticky lg:top-[84px] space-y-3">
+          <WhereToCard
+            onCorridorChange={handlePlannerRouteChange}
+            onSearch={handlePlannerSearch}
+            onClear={() => {
+              setPlannerSearch(null)
+              setActiveCorridor(null)
+            }}
+          />
+          {activeCorridorName && (
+            <div className="text-xs text-[var(--color-text-tertiary)] px-2">
+              Synced route filter: <span className="text-[var(--color-text-primary)] font-medium">{activeCorridorName}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-8">
+          <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-h3">Top Answers</h2>
+                <p className="text-xs text-[var(--color-text-tertiary)]">
+                  Route-scoped options with ETA and confidence
+                </p>
+              </div>
+            </div>
+
+            {plannerSearch ? (
+              <SearchResultsOverlay
+                inline
+                isOpen
+                onClose={() => setPlannerSearch(null)}
+                fromStage={plannerSearch.fromStage}
+                toPlace={plannerSearch.toPlace}
+                preference={plannerSearch.preference}
+                preferredNganya={plannerSearch.preferredNganya}
+              />
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  Set route and pickup stage to get ranked matches instantly.
+                </p>
+                {filteredLiveNganyas.length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredLiveNganyas.slice(0, 3).map((n) => {
+                      const cardData = mapSupabaseToCardProps(n)
+                      if (!cardData) return null
+                      return (
+                        <Card
+                          key={cardData.id}
+                          nganya={cardData as any}
+                          variant="compact"
+                          isFollowing={following.has(cardData.id)}
+                          onFollow={toggleFollow}
+                        />
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[var(--color-text-secondary)] border border-dashed border-[var(--color-line)] rounded-[var(--radius-md)] p-4">
+                    No live sessions right now. Use recent sightings below while planning.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <LiveBadge />
             <span className="text-h4 text-[var(--color-text-primary)]">
-              {liveNganyas.length} on the road
+              {filteredLiveNganyas.length} on the road
             </span>
           </div>
           <button className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer">
@@ -134,43 +233,30 @@ function HomeScreen() {
           </button>
         </div>
 
-        <div className="flex gap-4 overflow-x-auto scroll-hidden pb-2 -mx-5 px-5 md:-mx-8 md:px-8">
-          {liveNganyas.length > 0 ? liveNganyas.map((n) => {
-            const cardData = mapSupabaseToCardProps(n)
-            if (!cardData) return null
-            return (
-              <div key={cardData.id} className="shrink-0 w-[260px] md:w-[300px]">
-                <Card
-                  nganya={cardData as any}
-                  variant="standard"
-                  isFollowing={following.has(cardData.id)}
-                  onFollow={toggleFollow}
-                />
-              </div>
-            )
-          }) : (
-            <div className="text-sm text-[var(--color-text-secondary)] italic p-4">No live sessions currently...</div>
-          )}
-        </div>
+        {filteredLiveNganyas.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto scroll-hidden pb-2 -mx-5 px-5 md:-mx-8 md:px-8">
+            {filteredLiveNganyas.map((n) => {
+              const cardData = mapSupabaseToCardProps(n)
+              if (!cardData) return null
+              return (
+                <div key={cardData.id} className="shrink-0 w-[260px] md:w-[300px]">
+                  <Card
+                    nganya={cardData as any}
+                    variant="standard"
+                    isFollowing={following.has(cardData.id)}
+                    onFollow={toggleFollow}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
+            No live sessions on this route. Check recently spotted below for actionable alternatives.
+          </div>
+        )}
       </section>
 
-      {/* ─── Featured Build ───────────────────────────────── */}
-      {featuredNganya && (
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-[var(--color-green)]" />
-            <span className="text-tag text-[var(--color-green)]">Featured</span>
-          </div>
-          <Card
-            nganya={mapSupabaseToCardProps(featuredNganya) as any}
-            variant="feature"
-            isFollowing={following.has(featuredNganya.id)}
-            onFollow={toggleFollow}
-          />
-        </section>
-      )}
-
-      {/* ─── Recent Sightings ─────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-h3">Recently Spotted</h2>
@@ -180,13 +266,12 @@ function HomeScreen() {
         </div>
 
         <div className="space-y-2">
-          {recentSightings.slice(0, 4).map((s) => {
-            // Map DB structure to mock if from fallback, otherwise render Supabase layout.
-            const isSupabase = s.nganya !== undefined;
-            const title = isSupabase ? s.nganya.name : s.nganyaName;
-            const corridorLabel = isSupabase ? "Current Corridor" : s.corridor;
-            const author = isSupabase ? s.user?.handle : s.spottedBy;
-            const hasMedia = isSupabase ? (s.media_urls?.length > 0) : s.hasMedia;
+          {(filteredRecentSightings.length > 0 ? filteredRecentSightings : recentSightings).slice(0, 4).map((s: any) => {
+            const isSupabase = s.nganya !== undefined
+            const title = isSupabase ? s.nganya.name : s.nganyaName
+            const corridorLabel = isSupabase ? (activeCorridorName || 'Current Route') : s.corridor
+            const author = isSupabase ? s.user?.handle : s.spottedBy
+            const hasMedia = isSupabase ? (s.media_urls?.length > 0) : s.hasMedia
 
             return (
               <div
@@ -201,7 +286,7 @@ function HomeScreen() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                     <span>{corridorLabel}</span>
-                    <span>·</span>
+                    <span>-</span>
                     <span>{author || 'Anonymous'}</span>
                   </div>
                 </div>
@@ -218,29 +303,39 @@ function HomeScreen() {
         </div>
       </section>
 
-      {/* ─── Routes / Corridors Filter ────────────────────── */}
-      <section>
-        <h2 className="text-h3 mb-4">Browse by Route</h2>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Chip
-            label="All"
-            variant="route"
-            isActive={!activeCorridor}
-            onClick={() => setActiveCorridor(null)}
-          />
-          {corridors.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.name}
-              variant="route"
-              isActive={activeCorridor === c.id}
-              onClick={() => setActiveCorridor(activeCorridor === c.id ? null : c.id)}
+      {featuredNganya && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-[var(--color-green)]" />
+            <span className="text-tag text-[var(--color-green)]">Featured on this route</span>
+          </div>
+          <div className="hidden md:block">
+            <Card
+              nganya={mapSupabaseToCardProps(featuredNganya) as any}
+              variant="feature"
+              isFollowing={following.has(featuredNganya.id)}
+              onFollow={toggleFollow}
             />
-          ))}
+          </div>
+          <div className="md:hidden">
+            <Card
+              nganya={mapSupabaseToCardProps(featuredNganya) as any}
+              variant="standard"
+              isFollowing={following.has(featuredNganya.id)}
+              onFollow={toggleFollow}
+            />
+          </div>
+        </section>
+      )}
+
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-h3">Browse Builds</h2>
+          <span className="text-xs text-[var(--color-text-tertiary)]">
+            {activeCorridorName ? activeCorridorName : 'All routes'}
+          </span>
         </div>
 
-        {/* Card grid */}
         <div className="grid-cards">
           {filteredNganyas.map((n) => {
             const cardData = mapSupabaseToCardProps(n)
