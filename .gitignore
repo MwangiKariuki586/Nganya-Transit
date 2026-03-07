@@ -12,3 +12,6 @@ dist-ssr
 __unconfig*
 todos.json
 migrations
+
+# Ignore Cursor MCP configs (contains sensitive token)
+.cursor/mcp.json

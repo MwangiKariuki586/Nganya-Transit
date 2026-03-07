@@ -26,12 +26,12 @@ function SignUpScreen() {
 
         try {
             const { error: signUpError } = await supabase.auth.signUp({
-                email,
+                email: email.trim(),
                 password,
                 options: {
                     data: {
-                        full_name: fullName,
-                        handle: handle,
+                        full_name: fullName.trim(),
+                        handle: handle.trim(),
                         intent: accountType, // Intent, not the final role
                     },
                 },
