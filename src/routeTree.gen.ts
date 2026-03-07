@@ -9,21 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SpotRouteImport } from './routes/spot'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as FollowingRouteImport } from './routes/following'
-import { Route as DiscoverRouteImport } from './routes/discover'
-import { Route as CreateNganyaRouteImport } from './routes/create-nganya'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as NganyaSlugRouteImport } from './routes/nganya.$slug'
+import { Route as fanIndexRouteImport } from './routes/(fan)/index'
+import { Route as fanSpotRouteImport } from './routes/(fan)/spot'
+import { Route as fanProfileRouteImport } from './routes/(fan)/profile'
+import { Route as fanFollowingRouteImport } from './routes/(fan)/following'
+import { Route as fanDiscoverRouteImport } from './routes/(fan)/discover'
+import { Route as fanCreateNganyaRouteImport } from './routes/(fan)/create-nganya'
+import { Route as fanLayoutRouteImport } from './routes/(fan)/_layout'
+import { Route as crewCrewIndexRouteImport } from './routes/(crew)/crew/index'
+import { Route as adminAdminIndexRouteImport } from './routes/(admin)/admin/index'
+import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
+import { Route as crewCrewLayoutRouteImport } from './routes/(crew)/crew/_layout'
+import { Route as adminAdminLayoutRouteImport } from './routes/(admin)/admin/_layout'
 
-const SpotRoute = SpotRouteImport.update({
-  id: '/spot',
-  path: '/spot',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -34,128 +34,177 @@ const SigninRoute = SigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FollowingRoute = FollowingRouteImport.update({
-  id: '/following',
-  path: '/following',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiscoverRoute = DiscoverRouteImport.update({
-  id: '/discover',
-  path: '/discover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CreateNganyaRoute = CreateNganyaRouteImport.update({
-  id: '/create-nganya',
-  path: '/create-nganya',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
+const fanIndexRoute = fanIndexRouteImport.update({
+  id: '/(fan)/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NganyaSlugRoute = NganyaSlugRouteImport.update({
-  id: '/nganya/$slug',
+const fanSpotRoute = fanSpotRouteImport.update({
+  id: '/(fan)/spot',
+  path: '/spot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanProfileRoute = fanProfileRouteImport.update({
+  id: '/(fan)/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanFollowingRoute = fanFollowingRouteImport.update({
+  id: '/(fan)/following',
+  path: '/following',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanDiscoverRoute = fanDiscoverRouteImport.update({
+  id: '/(fan)/discover',
+  path: '/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanCreateNganyaRoute = fanCreateNganyaRouteImport.update({
+  id: '/(fan)/create-nganya',
+  path: '/create-nganya',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanLayoutRoute = fanLayoutRouteImport.update({
+  id: '/(fan)/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const crewCrewIndexRoute = crewCrewIndexRouteImport.update({
+  id: '/(crew)/crew/',
+  path: '/crew/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const adminAdminIndexRoute = adminAdminIndexRouteImport.update({
+  id: '/(admin)/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const fanNganyaSlugRoute = fanNganyaSlugRouteImport.update({
+  id: '/(fan)/nganya/$slug',
   path: '/nganya/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const crewCrewLayoutRoute = crewCrewLayoutRouteImport.update({
+  id: '/(crew)/crew/_layout',
+  path: '/crew',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const adminAdminLayoutRoute = adminAdminLayoutRouteImport.update({
+  id: '/(admin)/admin/_layout',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/create-nganya': typeof CreateNganyaRoute
-  '/discover': typeof DiscoverRoute
-  '/following': typeof FollowingRoute
-  '/profile': typeof ProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/spot': typeof SpotRoute
-  '/nganya/$slug': typeof NganyaSlugRoute
+  '/create-nganya': typeof fanCreateNganyaRoute
+  '/discover': typeof fanDiscoverRoute
+  '/following': typeof fanFollowingRoute
+  '/profile': typeof fanProfileRoute
+  '/spot': typeof fanSpotRoute
+  '/': typeof fanIndexRoute
+  '/admin': typeof adminAdminLayoutRoute
+  '/crew': typeof crewCrewLayoutRoute
+  '/nganya/$slug': typeof fanNganyaSlugRoute
+  '/admin/': typeof adminAdminIndexRoute
+  '/crew/': typeof crewCrewIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/create-nganya': typeof CreateNganyaRoute
-  '/discover': typeof DiscoverRoute
-  '/following': typeof FollowingRoute
-  '/profile': typeof ProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/spot': typeof SpotRoute
-  '/nganya/$slug': typeof NganyaSlugRoute
+  '/create-nganya': typeof fanCreateNganyaRoute
+  '/discover': typeof fanDiscoverRoute
+  '/following': typeof fanFollowingRoute
+  '/profile': typeof fanProfileRoute
+  '/spot': typeof fanSpotRoute
+  '/': typeof fanIndexRoute
+  '/admin': typeof adminAdminIndexRoute
+  '/crew': typeof crewCrewIndexRoute
+  '/nganya/$slug': typeof fanNganyaSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/create-nganya': typeof CreateNganyaRoute
-  '/discover': typeof DiscoverRoute
-  '/following': typeof FollowingRoute
-  '/profile': typeof ProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/spot': typeof SpotRoute
-  '/nganya/$slug': typeof NganyaSlugRoute
+  '/(fan)/_layout': typeof fanLayoutRoute
+  '/(fan)/create-nganya': typeof fanCreateNganyaRoute
+  '/(fan)/discover': typeof fanDiscoverRoute
+  '/(fan)/following': typeof fanFollowingRoute
+  '/(fan)/profile': typeof fanProfileRoute
+  '/(fan)/spot': typeof fanSpotRoute
+  '/(fan)/': typeof fanIndexRoute
+  '/(admin)/admin/_layout': typeof adminAdminLayoutRoute
+  '/(crew)/crew/_layout': typeof crewCrewLayoutRoute
+  '/(fan)/nganya/$slug': typeof fanNganyaSlugRoute
+  '/(admin)/admin/': typeof adminAdminIndexRoute
+  '/(crew)/crew/': typeof crewCrewIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
+    | '/signin'
+    | '/signup'
     | '/create-nganya'
     | '/discover'
     | '/following'
     | '/profile'
-    | '/signin'
-    | '/signup'
     | '/spot'
+    | '/'
+    | '/admin'
+    | '/crew'
     | '/nganya/$slug'
+    | '/admin/'
+    | '/crew/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
+    | '/signin'
+    | '/signup'
     | '/create-nganya'
     | '/discover'
     | '/following'
     | '/profile'
-    | '/signin'
-    | '/signup'
     | '/spot'
+    | '/'
+    | '/admin'
+    | '/crew'
     | '/nganya/$slug'
   id:
     | '__root__'
-    | '/'
-    | '/create-nganya'
-    | '/discover'
-    | '/following'
-    | '/profile'
     | '/signin'
     | '/signup'
-    | '/spot'
-    | '/nganya/$slug'
+    | '/(fan)/_layout'
+    | '/(fan)/create-nganya'
+    | '/(fan)/discover'
+    | '/(fan)/following'
+    | '/(fan)/profile'
+    | '/(fan)/spot'
+    | '/(fan)/'
+    | '/(admin)/admin/_layout'
+    | '/(crew)/crew/_layout'
+    | '/(fan)/nganya/$slug'
+    | '/(admin)/admin/'
+    | '/(crew)/crew/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  CreateNganyaRoute: typeof CreateNganyaRoute
-  DiscoverRoute: typeof DiscoverRoute
-  FollowingRoute: typeof FollowingRoute
-  ProfileRoute: typeof ProfileRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
-  SpotRoute: typeof SpotRoute
-  NganyaSlugRoute: typeof NganyaSlugRoute
+  fanLayoutRoute: typeof fanLayoutRoute
+  fanCreateNganyaRoute: typeof fanCreateNganyaRoute
+  fanDiscoverRoute: typeof fanDiscoverRoute
+  fanFollowingRoute: typeof fanFollowingRoute
+  fanProfileRoute: typeof fanProfileRoute
+  fanSpotRoute: typeof fanSpotRoute
+  fanIndexRoute: typeof fanIndexRoute
+  adminAdminLayoutRoute: typeof adminAdminLayoutRoute
+  crewCrewLayoutRoute: typeof crewCrewLayoutRoute
+  fanNganyaSlugRoute: typeof fanNganyaSlugRoute
+  adminAdminIndexRoute: typeof adminAdminIndexRoute
+  crewCrewIndexRoute: typeof crewCrewIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/spot': {
-      id: '/spot'
-      path: '/spot'
-      fullPath: '/spot'
-      preLoaderRoute: typeof SpotRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -170,61 +219,108 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/following': {
-      id: '/following'
-      path: '/following'
-      fullPath: '/following'
-      preLoaderRoute: typeof FollowingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/discover': {
-      id: '/discover'
-      path: '/discover'
-      fullPath: '/discover'
-      preLoaderRoute: typeof DiscoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/create-nganya': {
-      id: '/create-nganya'
-      path: '/create-nganya'
-      fullPath: '/create-nganya'
-      preLoaderRoute: typeof CreateNganyaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/(fan)/': {
+      id: '/(fan)/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof fanIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/nganya/$slug': {
-      id: '/nganya/$slug'
+    '/(fan)/spot': {
+      id: '/(fan)/spot'
+      path: '/spot'
+      fullPath: '/spot'
+      preLoaderRoute: typeof fanSpotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/profile': {
+      id: '/(fan)/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof fanProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/following': {
+      id: '/(fan)/following'
+      path: '/following'
+      fullPath: '/following'
+      preLoaderRoute: typeof fanFollowingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/discover': {
+      id: '/(fan)/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof fanDiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/create-nganya': {
+      id: '/(fan)/create-nganya'
+      path: '/create-nganya'
+      fullPath: '/create-nganya'
+      preLoaderRoute: typeof fanCreateNganyaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/_layout': {
+      id: '/(fan)/_layout'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof fanLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(crew)/crew/': {
+      id: '/(crew)/crew/'
+      path: '/crew'
+      fullPath: '/crew/'
+      preLoaderRoute: typeof crewCrewIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(admin)/admin/': {
+      id: '/(admin)/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof adminAdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(fan)/nganya/$slug': {
+      id: '/(fan)/nganya/$slug'
       path: '/nganya/$slug'
       fullPath: '/nganya/$slug'
-      preLoaderRoute: typeof NganyaSlugRouteImport
+      preLoaderRoute: typeof fanNganyaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(crew)/crew/_layout': {
+      id: '/(crew)/crew/_layout'
+      path: '/crew'
+      fullPath: '/crew'
+      preLoaderRoute: typeof crewCrewLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(admin)/admin/_layout': {
+      id: '/(admin)/admin/_layout'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof adminAdminLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  CreateNganyaRoute: CreateNganyaRoute,
-  DiscoverRoute: DiscoverRoute,
-  FollowingRoute: FollowingRoute,
-  ProfileRoute: ProfileRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
-  SpotRoute: SpotRoute,
-  NganyaSlugRoute: NganyaSlugRoute,
+  fanLayoutRoute: fanLayoutRoute,
+  fanCreateNganyaRoute: fanCreateNganyaRoute,
+  fanDiscoverRoute: fanDiscoverRoute,
+  fanFollowingRoute: fanFollowingRoute,
+  fanProfileRoute: fanProfileRoute,
+  fanSpotRoute: fanSpotRoute,
+  fanIndexRoute: fanIndexRoute,
+  adminAdminLayoutRoute: adminAdminLayoutRoute,
+  crewCrewLayoutRoute: crewCrewLayoutRoute,
+  fanNganyaSlugRoute: fanNganyaSlugRoute,
+  adminAdminIndexRoute: adminAdminIndexRoute,
+  crewCrewIndexRoute: crewCrewIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

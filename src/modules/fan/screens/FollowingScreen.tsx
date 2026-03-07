@@ -1,24 +1,20 @@
-/**
- * Following Screen — Your followed nganyas + recommendations.
+﻿/**
+ * Following Screen â€” Your followed nganyas + recommendations.
  * Shows followed picks and a recommended section.
  * Empty state when no nganyas are followed.
  */
 
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import Card from '../components/ui/Card'
-import EmptyState from '../components/ui/EmptyState'
-import { getMyFollows, followNganya, unfollowNganya } from '../lib/queries/follows'
-import { searchNganyas } from '../lib/queries/discover'
+import Card from '@/components/ui/Card'
+import EmptyState from '@/components/ui/EmptyState'
+import { getMyFollows, followNganya, unfollowNganya } from '@/lib/queries/follows'
+import { searchNganyas } from '@/lib/queries/discover'
 import { Sparkles } from 'lucide-react'
-import { getLiveNow } from '../lib/queries/live'
-import Button from '../components/ui/Button'
+import { getLiveNow } from '@/lib/queries/live'
+import Button from '@/components/ui/Button'
 
-export const Route = createFileRoute('/following')({
-    component: FollowingScreen,
-})
-
-function FollowingScreen() {
+export default function FollowingScreen() {
     const navigate = useNavigate()
 
     const [followedNganyas, setFollowedNganyas] = useState<any[]>([])
@@ -113,7 +109,7 @@ function FollowingScreen() {
                 <div>
                     <h1 className="text-h1 mb-2">Following</h1>
                     <p className="text-body-sm text-[var(--color-text-secondary)]">
-                        Your picks · {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
+                        Your picks Â· {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
                     </p>
                 </div>
                 <Button variant="primary" onClick={() => navigate({ to: '/' })}>
@@ -121,7 +117,7 @@ function FollowingScreen() {
                 </Button>
             </div>
 
-            {/* ─── Followed Nganyas ─────────────────────────────── */}
+            {/* â”€â”€â”€ Followed Nganyas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {followedNganyas.length > 0 ? (
                 <section>
                     <div className="grid-cards">
@@ -147,7 +143,7 @@ function FollowingScreen() {
                 />
             )}
 
-            {/* ─── Recommended ──────────────────────────────────── */}
+            {/* â”€â”€â”€ Recommended â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {recommended.length > 0 && (
                 <section>
                     <div className="flex items-center gap-2 mb-4">
@@ -174,3 +170,5 @@ function FollowingScreen() {
         </div>
     )
 }
+
+

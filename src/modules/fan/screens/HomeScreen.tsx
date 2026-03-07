@@ -1,25 +1,20 @@
-/**
- * Home / Feed Screen â€” route-first planning + culture context.
+﻿/**
+ * Home / Feed Screen Ã¢â‚¬â€ route-first planning + culture context.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import Card from '../components/ui/Card'
-import LiveBadge from '../components/ui/LiveBadge'
-import { getCorridors, searchNganyas } from '../lib/queries/discover'
-import { getLiveNow } from '../lib/queries/live'
-import { getCorridorSightings } from '../lib/queries/sightings'
-import { recentSightings as mockRecentSightings } from '../lib/mockData'
+import Card from '@/components/ui/Card'
+import LiveBadge from '@/components/ui/LiveBadge'
+import { getCorridors, searchNganyas } from '@/lib/queries/discover'
+import { getLiveNow } from '@/lib/queries/live'
+import { getCorridorSightings } from '@/lib/queries/sightings'
+import { recentSightings as mockRecentSightings } from '@/lib/mockData'
 import { Clock, Eye, TrendingUp, ChevronRight } from 'lucide-react'
-import ConfidenceBadge from '../components/ui/ConfidenceBadge'
-import WhereToCard, { type RideSearchPayload } from '../components/features/WhereToCard'
-import SearchResultsOverlay from '../components/features/SearchResultsOverlay'
+import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
+import WhereToCard, { type RideSearchPayload } from '@/components/features/WhereToCard'
+import SearchResultsOverlay from '@/components/features/SearchResultsOverlay'
 
-export const Route = createFileRoute('/')({
-  component: HomeScreen,
-})
-
-function HomeScreen() {
+export default function HomeScreen() {
   const [activeCorridor, setActiveCorridor] = useState<string | null>(null)
   const [plannerSearch, setPlannerSearch] = useState<RideSearchPayload | null>(null)
   const [following, setFollowing] = useState<Set<string>>(new Set())
@@ -355,3 +350,5 @@ function HomeScreen() {
     </div>
   )
 }
+
+

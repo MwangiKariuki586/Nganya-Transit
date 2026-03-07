@@ -1,20 +1,16 @@
-/**
- * Create Nganya Page — Submission form for new builds.
+﻿/**
+ * Create Nganya Page â€” Submission form for new builds.
  * Allows users (crew/admins) to add a new nganya to the directory.
  */
 
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
+import { useNavigate, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import Button from '../components/ui/Button'
-import { getCorridors, createNganya } from '../lib/queries/discover'
+import Button from '@/components/ui/Button'
+import { getCorridors, createNganya } from '@/lib/queries/discover'
 import { ChevronLeft, Camera, Plus, X } from 'lucide-react'
-import { vibeTagColors } from '../lib/mockData'
+import { vibeTagColors } from '@/lib/mockData'
 
-export const Route = createFileRoute('/create-nganya')({
-    component: CreateNganyaScreen,
-})
-
-function CreateNganyaScreen() {
+export default function CreateNganyaScreen() {
     const navigate = useNavigate()
     const [corridors, setCorridors] = useState<any[]>([])
     const [isLoadingCorridors, setIsLoadingCorridors] = useState(true)
@@ -242,3 +238,5 @@ function CreateNganyaScreen() {
         </div>
     )
 }
+
+

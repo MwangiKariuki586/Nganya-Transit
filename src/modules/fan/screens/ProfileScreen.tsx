@@ -1,25 +1,20 @@
-/**
- * Profile Screen — User profile view + edit.
+﻿/**
+ * Profile Screen â€” User profile view + edit.
  * Shows avatar, stats, activity. Edit via bottom sheet (mobile) or modal (desktop).
  */
 
-import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import Button from '../components/ui/Button'
-import BottomSheet from '../components/ui/BottomSheet'
-import Modal from '../components/ui/Modal'
-import Card from '../components/ui/Card'
-import { currentUser } from '../lib/mockData'
+import Button from '@/components/ui/Button'
+import BottomSheet from '@/components/ui/BottomSheet'
+import Modal from '@/components/ui/Modal'
+import Card from '@/components/ui/Card'
+import { currentUser } from '@/lib/mockData'
 import { Settings, Camera, MapPin, Clock, Calendar } from 'lucide-react'
-import ConfidenceBadge from '../components/ui/ConfidenceBadge'
-import { getMyFollows } from '../lib/queries/follows'
-import { getLiveNow } from '../lib/queries/live'
+import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
+import { getMyFollows } from '@/lib/queries/follows'
+import { getLiveNow } from '@/lib/queries/live'
 
-export const Route = createFileRoute('/profile')({
-    component: ProfileScreen,
-})
-
-function ProfileScreen() {
+export default function ProfileScreen() {
     const [editOpen, setEditOpen] = useState(false)
     const useSheet = typeof window !== 'undefined' && window.innerWidth < 768
 
@@ -89,7 +84,7 @@ function ProfileScreen() {
     return (
         <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10">
 
-            {/* ─── Profile Header ───────────────────────────────── */}
+            {/* â”€â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
                 {/* Avatar */}
                 <div className="relative">
@@ -137,7 +132,7 @@ function ProfileScreen() {
                 </Button>
             </div>
 
-            {/* ─── Recent Activity ──────────────────────────────── */}
+            {/* â”€â”€â”€ Recent Activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <section>
                 <h2 className="text-h3 mb-4">Your Sightings</h2>
                 {userSightings.length > 0 ? (
@@ -153,7 +148,7 @@ function ProfileScreen() {
                                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                                         <MapPin className="w-3 h-3" />
                                         <span>{s.corridor || 'Unknown'}</span>
-                                        <span>·</span>
+                                        <span>Â·</span>
                                         <Clock className="w-3 h-3" />
                                         <span>{s.time || 'agoo'}</span>
                                     </div>
@@ -164,12 +159,12 @@ function ProfileScreen() {
                     </div>
                 ) : (
                     <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
-                        No sightings yet. Go spot some nganyas! 🔥
+                        No sightings yet. Go spot some nganyas! ðŸ”¥
                     </div>
                 )}
             </section>
 
-            {/* ─── Following ────────────────────────────────────── */}
+            {/* â”€â”€â”€ Following â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <section>
                 <h2 className="text-h3 mb-4">Following</h2>
                 {followedNganyas.length > 0 ? (
@@ -189,7 +184,7 @@ function ProfileScreen() {
                 )}
             </section>
 
-            {/* ─── Edit Profile Sheet/Modal ─────────────────────── */}
+            {/* â”€â”€â”€ Edit Profile Sheet/Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {useSheet ? (
                 <BottomSheet isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Profile">
                     <EditProfileForm onClose={() => setEditOpen(false)} />
@@ -203,7 +198,7 @@ function ProfileScreen() {
     )
 }
 
-/* ─── Edit Profile Form ─────────────────────────────────── */
+/* â”€â”€â”€ Edit Profile Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function EditProfileForm({ onClose }: { onClose: () => void }) {
     return (
         <div className="space-y-5">
@@ -260,3 +255,5 @@ function EditProfileForm({ onClose }: { onClose: () => void }) {
         </div>
     )
 }
+
+

@@ -1,27 +1,23 @@
-/**
- * Nganya Detail Page — Profile for a single nganya.
+﻿/**
+ * Nganya Detail Page â€” Profile for a single nganya.
  * Hero image, tags, follow/notify, media gallery, sightings, related.
  */
 
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import Button from '../components/ui/Button'
-import Chip from '../components/ui/Chip'
-import Card from '../components/ui/Card'
-import LiveBadge from '../components/ui/LiveBadge'
-import ConfidenceBadge from '../components/ui/ConfidenceBadge'
-import { vibeTagColors } from '../lib/mockData'
-import { getNganya } from '../lib/queries/discover'
-import { getLiveNow } from '../lib/queries/live'
-import { getCorridorSightings } from '../lib/queries/sightings'
+import Button from '@/components/ui/Button'
+import Chip from '@/components/ui/Chip'
+import Card from '@/components/ui/Card'
+import LiveBadge from '@/components/ui/LiveBadge'
+import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
+import { vibeTagColors } from '@/lib/mockData'
+import { getNganya } from '@/lib/queries/discover'
+import { getLiveNow } from '@/lib/queries/live'
+import { getCorridorSightings } from '@/lib/queries/sightings'
 import { Heart, Bell, Share2, Eye, Clock, MapPin, Camera, ChevronLeft, Users } from 'lucide-react'
 
-export const Route = createFileRoute('/nganya/$slug')({
-    component: NganyaDetailScreen,
-})
-
-function NganyaDetailScreen() {
-    const { slug } = Route.useParams()
+export default function NganyaDetailScreen() {
+    const { slug } = useParams({ from: '/(fan)/nganya/$slug' })
     const [nganya, setNganya] = useState<any>(null)
     const [isFollowing, setIsFollowing] = useState(false)
     const [isNotifying, setIsNotifying] = useState(false)
@@ -68,7 +64,7 @@ function NganyaDetailScreen() {
             <div className="page-container py-16 text-center">
                 <h2 className="text-h2 text-[var(--color-text-primary)] mb-2">Nganya not found</h2>
                 <p className="text-body text-[var(--color-text-secondary)] mb-6">
-                    This nganya might have ghosted. 👻 Or we're fetching by ID and need to decode slug correctly...
+                    This nganya might have ghosted. ðŸ‘» Or we're fetching by ID and need to decode slug correctly...
                 </p>
                 <Link to="/">
                     <Button variant="secondary">Back to Discover</Button>
@@ -85,7 +81,7 @@ function NganyaDetailScreen() {
     return (
         <div className="animate-slide-up">
 
-            {/* ─── Hero Image ───────────────────────────────────── */}
+            {/* â”€â”€â”€ Hero Image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="relative h-[280px] md:h-[400px] overflow-hidden">
                 <img
                     src={imageUrl}
@@ -127,7 +123,7 @@ function NganyaDetailScreen() {
                 </div>
             </div>
 
-            {/* ─── Content ──────────────────────────────────────── */}
+            {/* â”€â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="page-container pt-8 pb-10 md:pt-10 md:pb-16 space-y-8 md:space-y-10">
 
                 {/* Action bar */}
@@ -240,7 +236,7 @@ function NganyaDetailScreen() {
                                             <span className="text-sm text-[var(--color-text-primary)]">{s.user?.handle || 'Anonymous'}</span>
                                             <ConfidenceBadge level={s.confidence?.confidence_level || 'HIGH'} />
                                         </div>
-                                        <span className="text-xs text-[var(--color-text-tertiary)]">{corridorName} · {s.time || 'agoo'}</span>
+                                        <span className="text-xs text-[var(--color-text-tertiary)]">{corridorName} Â· {s.time || 'agoo'}</span>
                                     </div>
                                     {s.media_urls?.length > 0 && <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)]" />}
                                 </div>
@@ -248,7 +244,7 @@ function NganyaDetailScreen() {
                         </div>
                     ) : (
                         <p className="text-body-sm text-[var(--color-text-tertiary)] py-4">
-                            No recent sightings. Be the first to spot! 👀
+                            No recent sightings. Be the first to spot! ðŸ‘€
                         </p>
                     )}
                 </div>
@@ -268,3 +264,6 @@ function NganyaDetailScreen() {
         </div>
     )
 }
+
+
+

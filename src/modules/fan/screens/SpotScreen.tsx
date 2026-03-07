@@ -1,25 +1,21 @@
-/**
- * Spot Screen — Submit a sighting flow.
- * Steps: 1) Choose nganya → 2) Confirm corridor → 3) Add media → 4) Submit
+﻿/**
+ * Spot Screen â€” Submit a sighting flow.
+ * Steps: 1) Choose nganya â†’ 2) Confirm corridor â†’ 3) Add media â†’ 4) Submit
  * Bottom sheet-like multi-step on mobile, centered form on desktop.
  */
 
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import SearchInput from '../components/ui/SearchInput'
-import Button from '../components/ui/Button'
-import Chip from '../components/ui/Chip'
+import SearchInput from '@/components/ui/SearchInput'
+import Button from '@/components/ui/Button'
+import Chip from '@/components/ui/Chip'
 import { Camera, MapPin, CheckCircle, ChevronLeft, Upload } from 'lucide-react'
-import { getCorridors, searchNganyas } from '../lib/queries/discover'
-import { postSighting } from '../lib/queries/sightings'
-
-export const Route = createFileRoute('/spot')({
-    component: SpotScreen,
-})
+import { getCorridors, searchNganyas } from '@/lib/queries/discover'
+import { postSighting } from '@/lib/queries/sightings'
 
 type SpotStep = 'select' | 'location' | 'media' | 'confirm'
 
-function SpotScreen() {
+export default function SpotScreen() {
     const navigate = useNavigate()
     const [step, setStep] = useState<SpotStep>('select')
     const [searchQuery, setSearchQuery] = useState('')
@@ -87,7 +83,7 @@ function SpotScreen() {
                 <div className="w-20 h-20 rounded-full bg-[var(--color-green-soft)] flex items-center justify-center mb-6 animate-scale-in">
                     <CheckCircle className="w-10 h-10 text-[var(--color-success)]" />
                 </div>
-                <h2 className="text-h2 text-[var(--color-text-primary)] mb-2">Sighting posted! 🔥</h2>
+                <h2 className="text-h2 text-[var(--color-text-primary)] mb-2">Sighting posted! ðŸ”¥</h2>
                 <p className="text-body text-[var(--color-text-secondary)]">
                     Thanks for spotting <strong>{selectedNganyaData?.name}</strong>. The streets know.
                 </p>
@@ -140,7 +136,7 @@ function SpotScreen() {
                 ))}
             </div>
 
-            {/* ─── Step 1: Select Nganya ─────────────────────────── */}
+            {/* â”€â”€â”€ Step 1: Select Nganya â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 'select' && (
                 <div className="space-y-3">
                     <SearchInput
@@ -173,7 +169,7 @@ function SpotScreen() {
                 </div>
             )}
 
-            {/* ─── Step 2: Location / Corridor ───────────────────── */}
+            {/* â”€â”€â”€ Step 2: Location / Corridor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 'location' && (
                 <div className="space-y-4">
                     <div className="p-4 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center gap-3">
@@ -210,7 +206,7 @@ function SpotScreen() {
                 </div>
             )}
 
-            {/* ─── Step 3: Media Upload ──────────────────────────── */}
+            {/* â”€â”€â”€ Step 3: Media Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 'media' && (
                 <div className="space-y-6">
                     {/* Upload zone */}
@@ -223,7 +219,7 @@ function SpotScreen() {
                                 Tap to add a photo
                             </p>
                             <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                                JPG, PNG · Max 10MB · Optional
+                                JPG, PNG Â· Max 10MB Â· Optional
                             </p>
                         </div>
                         <input type="file" accept="image/*" className="hidden" />
@@ -259,7 +255,7 @@ function SpotScreen() {
                 </div>
             )}
 
-            {/* ─── Step 4: Confirm ───────────────────────────────── */}
+            {/* â”€â”€â”€ Step 4: Confirm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 'confirm' && (
                 <div className="space-y-6">
                     {/* Summary */}
@@ -295,3 +291,5 @@ function SpotScreen() {
         </div>
     )
 }
+
+

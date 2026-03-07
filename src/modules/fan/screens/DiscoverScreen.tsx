@@ -1,26 +1,21 @@
-/**
- * Discover Screen — Search, filters, and card grid.
+﻿/**
+ * Discover Screen â€” Search, filters, and card grid.
  * Desktop: persistent sidebar filters. Mobile: horizontal chip scroll.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
 import { useState, useMemo, useEffect } from 'react'
-import SearchInput from '../components/ui/SearchInput'
-import Card from '../components/ui/Card'
-import Chip from '../components/ui/Chip'
-import EmptyState from '../components/ui/EmptyState'
-import { vibeTagColors } from '../lib/mockData'
-import { getCorridors, searchNganyas } from '../lib/queries/discover'
-import { getLiveNow } from '../lib/queries/live'
+import SearchInput from '@/components/ui/SearchInput'
+import Card from '@/components/ui/Card'
+import Chip from '@/components/ui/Chip'
+import EmptyState from '@/components/ui/EmptyState'
+import { vibeTagColors } from '@/lib/mockData'
+import { getCorridors, searchNganyas } from '@/lib/queries/discover'
+import { getLiveNow } from '@/lib/queries/live'
 import { SlidersHorizontal } from 'lucide-react'
-
-export const Route = createFileRoute('/discover')({
-    component: DiscoverScreen,
-})
 
 const allVibeTags = Object.keys(vibeTagColors)
 
-function DiscoverScreen() {
+export default function DiscoverScreen() {
     const [search, setSearch] = useState('')
     const [activeCorridor, setActiveCorridor] = useState<string | null>(null)
     const [activeVibe, setActiveVibe] = useState<string | null>(null)
@@ -115,7 +110,7 @@ function DiscoverScreen() {
             {/* Layout: sidebar on desktop, stacked on mobile */}
             <div className="flex gap-8">
 
-                {/* ─── Desktop Sidebar Filters ────────────────────── */}
+                {/* â”€â”€â”€ Desktop Sidebar Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <aside className="hidden lg:block w-60 shrink-0 space-y-6">
                     <div>
                         <h3 className="text-caption text-[var(--color-text-tertiary)] mb-3">
@@ -154,7 +149,7 @@ function DiscoverScreen() {
                     </div>
                 </aside>
 
-                {/* ─── Main Content ───────────────────────────────── */}
+                {/* â”€â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <div className="flex-1 min-w-0">
                     {/* Search */}
                     <SearchInput
@@ -163,7 +158,7 @@ function DiscoverScreen() {
                         className="mb-4"
                     />
 
-                    {/* Mobile filters — horizontal scroll */}
+                    {/* Mobile filters â€” horizontal scroll */}
                     <div className="lg:hidden flex gap-2 overflow-x-auto scroll-hidden pb-3 mb-4 -mx-5 px-5">
                         <Chip
                             label="All Routes"
@@ -232,3 +227,5 @@ function DiscoverScreen() {
         </div>
     )
 }
+
+
