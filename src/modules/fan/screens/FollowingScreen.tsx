@@ -1,11 +1,5 @@
-﻿/**
- * Following Screen â€” Your followed nganyas + recommendations.
- * Shows followed picks and a recommended section.
- * Empty state when no nganyas are followed.
- */
-
 import { useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import { getMyFollows, followNganya, unfollowNganya } from '@/lib/queries/follows'
@@ -13,44 +7,49 @@ import { searchNganyas } from '@/lib/queries/discover'
 import { Sparkles } from 'lucide-react'
 import { getLiveNow } from '@/lib/queries/live'
 import Button from '@/components/ui/Button'
+import { supabase } from '@/lib/supabase'
+import { toNganyaSlug } from '@/lib/formatters'
 
 export default function FollowingScreen() {
     const navigate = useNavigate()
-
     const [followedNganyas, setFollowedNganyas] = useState<any[]>([])
     const [recommended, setRecommended] = useState<any[]>([])
     const [liveNganyas, setLiveNganyas] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
 
     const fetchFollowingData = async () => {
         setIsLoading(true)
         try {
-            // Because no auth is actively implemented out-of-the-box (RLS fails on myFollows if logged out), 
-            // we will gracefully degrade to simulated local view for this MVP preview if auth fails.
+            const { data: { session } } = await supabase.auth.getSession()
+            const hasSession = Boolean(session?.user?.id)
+            setIsAuthenticated(hasSession)
+
+            if (!hasSession) {
+                setFollowedNganyas([])
+                setRecommended([])
+                setLiveNganyas([])
+                return
+            }
+
             const [myFollowsRes, allNganyas, activeLives] = await Promise.all([
-                getMyFollows().catch(() => []),
+                getMyFollows(),
                 searchNganyas(''),
-                getLiveNow()
+                getLiveNow(),
             ])
 
             setLiveNganyas(activeLives || [])
 
-            const followedIds = new Set(myFollowsRes.map((f: any) => f.nganya_id))
-
-            // Map the resolved follows
-            const mappedFollows = myFollowsRes.map((f: any) => ({
-                ...f.nganyas,
-                is_following: true
+            const followedIds = new Set((myFollowsRes || []).map((follow: any) => follow.nganya_id))
+            const mappedFollows = (myFollowsRes || []).map((follow: any) => ({
+                ...follow.nganyas,
+                is_following: true,
             }))
 
             setFollowedNganyas(mappedFollows)
-
-            // Recommend anything not followed
-            const recs = (allNganyas || []).filter(n => !followedIds.has(n.id)).slice(0, 4)
-            setRecommended(recs)
-
-        } catch (err) {
-            console.error(err)
+            setRecommended((allNganyas || []).filter((nganya) => !followedIds.has(nganya.id)).slice(0, 4))
+        } catch (error) {
+            console.error('Failed to load following data', error)
         } finally {
             setIsLoading(false)
         }
@@ -60,26 +59,27 @@ export default function FollowingScreen() {
         fetchFollowingData()
     }, [])
 
-    // Map Supabase models to the exact Card component props expectation
     const mapSupabaseToCardProps = (dbNganya: any) => {
-        if (!dbNganya) return null;
+        if (!dbNganya) return null
 
-        const isLive = liveNganyas.some(ln => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE';
+        const isLive = liveNganyas.some((liveNganya) => liveNganya.nganya_id === dbNganya.id)
 
         return {
             id: dbNganya.nganya_id || dbNganya.id,
+            slug: dbNganya.slug || dbNganya.nganya_slug || toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
             name: dbNganya.nganya_name || dbNganya.name,
             corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
-            tags: dbNganya.tags || [],
-            image: dbNganya.nganya_media?.[0]?.media_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
-            isLive: isLive,
-            isNewBuild: dbNganya.tags?.includes('NEW_BUILD'),
+            vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
+            imageUrl:
+                dbNganya.nganya_media?.[0]?.media_url ||
+                dbNganya.image_url ||
+                'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
+            isLive,
+            isNewBuild: dbNganya.tags?.includes('NEW_BUILD') || dbNganya.is_new_build,
             isVerified: dbNganya.is_verified,
-            stats: {
-                rating: "4.8",
-                reviews: 120,
-                followers: "2.5k"
-            }
+            followers: dbNganya.follower_count || 0,
+            sightingsToday: dbNganya.sighting_count_today || 0,
+            lastSeen: isLive ? 'Live now' : 'Recently',
         }
     }
 
@@ -90,26 +90,42 @@ export default function FollowingScreen() {
             } else {
                 await followNganya(id)
             }
-            fetchFollowingData() // refresh lists
-        } catch (e) {
-            console.error("Auth required to edit real follows.", e)
-            alert("Sign in required to follow real instances.")
+            await fetchFollowingData()
+        } catch (error) {
+            console.error('Follow update failed', error)
+            navigate({ to: '/signin' })
         }
     }
 
     if (isLoading) {
-        return <div className="page-container py-12 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
+        return (
+            <div className="page-container py-12 flex justify-center">
+                <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]" />
+            </div>
+        )
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="page-container pt-8 pb-12 md:pt-12 md:pb-16">
+                <EmptyState
+                    variant="no-following"
+                    title="Sign in to follow nganyas"
+                    message="Your real follow list is tied to your account. Sign in to save builds and get back to them fast."
+                    actionLabel="Sign In"
+                    onAction={() => navigate({ to: '/signin' })}
+                />
+            </div>
+        )
     }
 
     return (
         <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10 md:space-y-14">
-
-            {/* Header */}
             <div className="flex items-center justify-between mb-2">
                 <div>
                     <h1 className="text-h1 mb-2">Following</h1>
                     <p className="text-body-sm text-[var(--color-text-secondary)]">
-                        Your picks Â· {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
+                        Your picks - {followedNganyas.length} nganya{followedNganyas.length !== 1 ? 's' : ''}
                     </p>
                 </div>
                 <Button variant="primary" onClick={() => navigate({ to: '/' })}>
@@ -117,19 +133,19 @@ export default function FollowingScreen() {
                 </Button>
             </div>
 
-            {/* â”€â”€â”€ Followed Nganyas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {followedNganyas.length > 0 ? (
                 <section>
                     <div className="grid-cards">
-                        {followedNganyas.map((n) => {
-                            const cardProps = mapSupabaseToCardProps(n)
+                        {followedNganyas.map((nganya) => {
+                            const cardProps = mapSupabaseToCardProps(nganya)
                             if (!cardProps) return null
+
                             return (
                                 <Card
                                     key={cardProps.id}
                                     nganya={cardProps as any}
                                     variant="standard"
-                                    isFollowing={true}
+                                    isFollowing
                                     onFollow={() => toggleFollow(cardProps.id, true)}
                                 />
                             )
@@ -139,11 +155,10 @@ export default function FollowingScreen() {
             ) : (
                 <EmptyState
                     variant="no-following"
-                    onAction={() => navigate({ to: '/' })}
+                    onAction={() => navigate({ to: '/discover' })}
                 />
             )}
 
-            {/* â”€â”€â”€ Recommended â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {recommended.length > 0 && (
                 <section>
                     <div className="flex items-center gap-2 mb-4">
@@ -151,9 +166,10 @@ export default function FollowingScreen() {
                         <h2 className="text-h3">Recommended for you</h2>
                     </div>
                     <div className="grid-cards">
-                        {recommended.map((n) => {
-                            const cardProps = mapSupabaseToCardProps(n)
+                        {recommended.map((nganya) => {
+                            const cardProps = mapSupabaseToCardProps(nganya)
                             if (!cardProps) return null
+
                             return (
                                 <Card
                                     key={cardProps.id}
@@ -170,5 +186,3 @@ export default function FollowingScreen() {
         </div>
     )
 }
-
-

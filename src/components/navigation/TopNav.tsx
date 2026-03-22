@@ -10,12 +10,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { getProfile } from '../../lib/queries/profile'
+import { clearAuthSessionCookie } from '@/shared/auth/session-cookie'
 
 const navItems = [
     { to: '/', icon: Compass, label: 'Discover' },
     { to: '/following', icon: Heart, label: 'Following' },
     { to: '/spot', icon: Camera, label: 'Spot' },
-    { to: '/profile', icon: User, label: 'Profile' },
+   // { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
 export default function TopNav() {
@@ -52,6 +53,7 @@ export default function TopNav() {
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
+        clearAuthSessionCookie()
         navigate({ to: '/' })
     }
 

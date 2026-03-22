@@ -8,6 +8,7 @@ import SearchInput from '@/components/ui/SearchInput'
 import Card from '@/components/ui/Card'
 import Chip from '@/components/ui/Chip'
 import EmptyState from '@/components/ui/EmptyState'
+import { toNganyaSlug } from '@/lib/formatters'
 import { vibeTagColors } from '@/lib/mockData'
 import { getCorridors, searchNganyas } from '@/lib/queries/discover'
 import { getLiveNow } from '@/lib/queries/live'
@@ -83,7 +84,7 @@ export default function DiscoverScreen() {
 
         return {
             id: dbNganya.nganya_id || dbNganya.id,
-            slug: dbNganya.slug || dbNganya.nganya_slug || '',
+            slug: dbNganya.slug || dbNganya.nganya_slug || toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
             name: dbNganya.nganya_name || dbNganya.name,
             corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
             vibeTags: dbNganya.vibeTags || dbNganya.tags || [],

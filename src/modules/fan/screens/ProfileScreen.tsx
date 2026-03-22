@@ -1,227 +1,328 @@
-﻿/**
- * Profile Screen â€” User profile view + edit.
- * Shows avatar, stats, activity. Edit via bottom sheet (mobile) or modal (desktop).
- */
-
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import BottomSheet from '@/components/ui/BottomSheet'
 import Modal from '@/components/ui/Modal'
 import Card from '@/components/ui/Card'
-import { currentUser } from '@/lib/mockData'
+import EmptyState from '@/components/ui/EmptyState'
 import { Settings, Camera, MapPin, Clock, Calendar } from 'lucide-react'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import { getMyFollows } from '@/lib/queries/follows'
 import { getLiveNow } from '@/lib/queries/live'
+import {
+    getCurrentAuthUser,
+    getCurrentUserProfile,
+    updateCurrentUserProfile,
+} from '@/lib/queries/profile'
+import { getMySightings } from '@/lib/queries/sightings'
+import {
+    formatHandle,
+    formatMonthYear,
+    formatRelativeTime,
+    getInitials,
+    toNganyaSlug,
+} from '@/lib/formatters'
+import { useNavigate } from '@tanstack/react-router'
 
 export default function ProfileScreen() {
+    const navigate = useNavigate()
     const [editOpen, setEditOpen] = useState(false)
     const useSheet = typeof window !== 'undefined' && window.innerWidth < 768
 
-    // DB State
+    const [authUser, setAuthUser] = useState<any>(null)
+    const [profile, setProfile] = useState<any>(null)
     const [followedNganyas, setFollowedNganyas] = useState<any[]>([])
     const [liveNganyas, setLiveNganyas] = useState<any[]>([])
     const [userSightings, setUserSightings] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
-    useEffect(() => {
-        async function loadProfile() {
-            setIsLoading(true)
-            try {
-                const [myFollowsRes, activeLives] = await Promise.all([
-                    getMyFollows().catch(() => []),
-                    getLiveNow()
-                ])
+    const loadProfile = async () => {
+        setIsLoading(true)
+        try {
+            const user = await getCurrentAuthUser()
+            setAuthUser(user)
 
-                setLiveNganyas(activeLives || [])
-
-                // Map the resolved follows
-                const mappedFollows = myFollowsRes.map((f: any) => ({
-                    ...f.nganyas,
-                    is_following: true
-                }))
-                setFollowedNganyas(mappedFollows)
-
-                // For MVP, user sightings are hard to fetch without auth setup, so we gracefully keep them empty 
+            if (!user) {
+                setProfile(null)
+                setFollowedNganyas([])
                 setUserSightings([])
-
-            } catch (err) {
-                console.error(err)
-            } finally {
-                setIsLoading(false)
+                setLiveNganyas([])
+                return
             }
-        }
 
+            const [profileRes, myFollowsRes, activeLives, sightingsRes] = await Promise.all([
+                getCurrentUserProfile(),
+                getMyFollows(),
+                getLiveNow(),
+                getMySightings(),
+            ])
+
+            setProfile(profileRes)
+            setLiveNganyas(activeLives || [])
+            setFollowedNganyas((myFollowsRes || []).map((follow: any) => ({
+                ...follow.nganyas,
+                is_following: true,
+            })))
+            setUserSightings(sightingsRes || [])
+        } catch (error) {
+            console.error('Failed to load profile data', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
         loadProfile()
     }, [])
 
-    // Map Supabase models to the exact Card component props expectation
-    const mapSupabaseToCardProps = (dbNganya: any) => {
-        if (!dbNganya) return null;
+    const displayName = useMemo(
+        () => profile?.full_name || authUser?.user_metadata?.full_name || 'Matwana Member',
+        [profile, authUser],
+    )
+    const handle = useMemo(
+        () => formatHandle(profile?.handle || authUser?.user_metadata?.handle),
+        [profile, authUser],
+    )
+    const avatarUrl = profile?.avatar_url || authUser?.user_metadata?.avatar_url || null
+    const joinedLabel = formatMonthYear(profile?.created_at || authUser?.created_at)
 
-        const isLive = liveNganyas.some(ln => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE';
+    const mapSupabaseToCardProps = (dbNganya: any) => {
+        if (!dbNganya) return null
+
+        const isLive = liveNganyas.some((liveNganya) => liveNganya.nganya_id === dbNganya.id)
 
         return {
             id: dbNganya.nganya_id || dbNganya.id,
-            slug: dbNganya.slug || dbNganya.nganya_slug || '',
+            slug: dbNganya.slug || dbNganya.nganya_slug || toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
             name: dbNganya.nganya_name || dbNganya.name,
             corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
             vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
-            imageUrl: dbNganya.nganya_media?.[0]?.media_url || dbNganya.image_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
-            isLive: isLive,
+            imageUrl:
+                dbNganya.nganya_media?.[0]?.media_url ||
+                dbNganya.image_url ||
+                'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
+            isLive,
             isNewBuild: dbNganya.tags?.includes('NEW_BUILD') || dbNganya.is_new_build,
             isVerified: dbNganya.is_verified,
             followers: dbNganya.follower_count || 0,
             sightingsToday: dbNganya.sighting_count_today || 0,
-            lastSeen: dbNganya.last_seen || 'Recently'
+            lastSeen: isLive ? 'Live now' : 'Recently',
         }
     }
 
     if (isLoading) {
-        return <div className="page-container py-12 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
+        return (
+            <div className="page-container py-12 flex justify-center">
+                <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]" />
+            </div>
+        )
+    }
+
+    if (!authUser) {
+        return (
+            <div className="page-container pt-8 pb-12 md:pt-12 md:pb-16">
+                <EmptyState
+                    variant="no-following"
+                    title="Sign in to open your profile"
+                    message="Your follows, sightings, and account settings live here once you sign in."
+                    actionLabel="Sign In"
+                    onAction={() => navigate({ to: '/signin' })}
+                />
+            </div>
+        )
     }
 
     return (
         <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10">
-
-            {/* â”€â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
-                {/* Avatar */}
                 <div className="relative">
-                    <img
-                        src={currentUser.avatarUrl}
-                        alt={currentUser.displayName}
-                        className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-[var(--glass-border)]"
-                    />
+                    {avatarUrl ? (
+                        <img
+                            src={avatarUrl}
+                            alt={displayName}
+                            className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-[var(--glass-border)] object-cover"
+                        />
+                    ) : (
+                        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-[var(--glass-border)] bg-[var(--glass-bg)] flex items-center justify-center text-xl font-bold text-[var(--color-text-primary)]">
+                            {getInitials(displayName)}
+                        </div>
+                    )}
                     <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-accent)] flex items-center justify-center border-2 border-[var(--color-bg-base)]">
                         <Camera className="w-3 h-3 text-white" />
                     </div>
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 text-center md:text-left">
-                    <h1 className="text-h2 text-[var(--color-text-primary)]">{currentUser.displayName}</h1>
-                    <p className="text-body-sm text-[var(--color-text-secondary)] mb-1">{currentUser.username}</p>
-                    <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">{currentUser.bio}</p>
+                    <h1 className="text-h2 text-[var(--color-text-primary)]">{displayName}</h1>
+                    <p className="text-body-sm text-[var(--color-text-secondary)] mb-1">{handle}</p>
+                    <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
+                        Role: {profile?.role || 'fan'}
+                    </p>
 
-                    {/* Stats */}
                     <div className="flex items-center justify-center md:justify-start gap-6">
                         <div className="text-center">
-                            <span className="text-h4 text-[var(--color-text-primary)] block">{userSightings.length || currentUser.sightingsCount}</span>
+                            <span className="text-h4 text-[var(--color-text-primary)] block">{userSightings.length}</span>
                             <span className="text-caption text-[var(--color-text-tertiary)]">Sightings</span>
                         </div>
                         <div className="w-px h-8 bg-[var(--color-line)]" />
                         <div className="text-center">
-                            <span className="text-h4 text-[var(--color-text-primary)] block">{followedNganyas.length || currentUser.followingCount}</span>
+                            <span className="text-h4 text-[var(--color-text-primary)] block">{followedNganyas.length}</span>
                             <span className="text-caption text-[var(--color-text-tertiary)]">Following</span>
                         </div>
                         <div className="w-px h-8 bg-[var(--color-line)]" />
                         <div className="text-center">
                             <span className="text-h4 text-[var(--color-text-primary)] block flex items-center gap-1">
-                                <Calendar className="w-3 h-3" /> {currentUser.joinedDate}
+                                <Calendar className="w-3 h-3" /> {joinedLabel}
                             </span>
                             <span className="text-caption text-[var(--color-text-tertiary)]">Joined</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Edit button */}
                 <Button variant="secondary" onClick={() => setEditOpen(true)}>
                     <Settings className="w-4 h-4" />
                     Edit Profile
                 </Button>
             </div>
 
-            {/* â”€â”€â”€ Recent Activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <section>
                 <h2 className="text-h3 mb-4">Your Sightings</h2>
                 {userSightings.length > 0 ? (
                     <div className="space-y-2">
-                        {userSightings.map((s) => (
+                        {userSightings.map((sighting) => (
                             <div
-                                key={s.id}
+                                key={sighting.id}
                                 className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)]"
                             >
                                 <Camera className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">{s.nganya_name || 'Nganya'}</span>
+                                    <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                                        {sighting.nganya?.name || 'Nganya'}
+                                    </span>
                                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                                         <MapPin className="w-3 h-3" />
-                                        <span>{s.corridor || 'Unknown'}</span>
-                                        <span>Â·</span>
+                                        <span>{sighting.stage?.name || sighting.nganya?.corridors?.name || 'Unknown route'}</span>
+                                        <span>-</span>
                                         <Clock className="w-3 h-3" />
-                                        <span>{s.time || 'agoo'}</span>
+                                        <span>{formatRelativeTime(sighting.created_at)}</span>
                                     </div>
                                 </div>
-                                <ConfidenceBadge level={s.confidence?.confidence_level || 'HIGH'} />
+                                <ConfidenceBadge level={sighting.confidence?.confidence_level || 'HIGH'} />
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
-                        No sightings yet. Go spot some nganyas! ðŸ”¥
+                        No sightings yet. Hit Spot when you see one outside.
                     </div>
                 )}
             </section>
 
-            {/* â”€â”€â”€ Following â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <section>
                 <h2 className="text-h3 mb-4">Following</h2>
                 {followedNganyas.length > 0 ? (
                     <div className="space-y-2">
-                        {followedNganyas.map((n) => {
-                            const cardProps = mapSupabaseToCardProps(n)
+                        {followedNganyas.map((nganya) => {
+                            const cardProps = mapSupabaseToCardProps(nganya)
                             if (!cardProps) return null
-                            return (
-                                <Card key={cardProps.id} nganya={cardProps as any} variant="compact" isFollowing={true} />
-                            )
+                            return <Card key={cardProps.id} nganya={cardProps as any} variant="compact" isFollowing />
                         })}
                     </div>
                 ) : (
                     <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
-                        Not following any nganyas currently.
+                        You are not following any nganyas yet.
                     </div>
                 )}
             </section>
 
-            {/* â”€â”€â”€ Edit Profile Sheet/Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {useSheet ? (
                 <BottomSheet isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Profile">
-                    <EditProfileForm onClose={() => setEditOpen(false)} />
+                    <EditProfileForm
+                        fullName={displayName}
+                        handle={handle.replace(/^@/, '')}
+                        avatarUrl={avatarUrl}
+                        onClose={() => setEditOpen(false)}
+                        onSaved={async (payload) => {
+                            await updateCurrentUserProfile(payload)
+                            await loadProfile()
+                            setEditOpen(false)
+                        }}
+                    />
                 </BottomSheet>
             ) : (
                 <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Profile">
-                    <EditProfileForm onClose={() => setEditOpen(false)} />
+                    <EditProfileForm
+                        fullName={displayName}
+                        handle={handle.replace(/^@/, '')}
+                        avatarUrl={avatarUrl}
+                        onClose={() => setEditOpen(false)}
+                        onSaved={async (payload) => {
+                            await updateCurrentUserProfile(payload)
+                            await loadProfile()
+                            setEditOpen(false)
+                        }}
+                    />
                 </Modal>
             )}
         </div>
     )
 }
 
-/* â”€â”€â”€ Edit Profile Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-function EditProfileForm({ onClose }: { onClose: () => void }) {
+function EditProfileForm({
+    fullName,
+    handle,
+    avatarUrl,
+    onClose,
+    onSaved,
+}: {
+    fullName: string
+    handle: string
+    avatarUrl: string | null
+    onClose: () => void
+    onSaved: (payload: { full_name: string, handle: string }) => Promise<void>
+}) {
+    const [displayName, setDisplayName] = useState(fullName)
+    const [username, setUsername] = useState(handle)
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    const handleSave = async () => {
+        setIsSaving(true)
+        setError(null)
+
+        try {
+            await onSaved({
+                full_name: displayName,
+                handle: username,
+            })
+        } catch (saveError: any) {
+            setError(saveError?.message || 'Failed to save profile changes.')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     return (
         <div className="space-y-5">
-            {/* Avatar change */}
             <div className="flex items-center gap-4">
-                <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.displayName}
-                    className="w-16 h-16 rounded-full"
-                />
-                <Button variant="secondary" size="sm">
-                    <Camera className="w-3.5 h-3.5" />
-                    Change photo
-                </Button>
+                {avatarUrl ? (
+                    <img src={avatarUrl} alt={displayName} className="w-16 h-16 rounded-full object-cover" />
+                ) : (
+                    <div className="w-16 h-16 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center text-sm font-bold text-[var(--color-text-primary)]">
+                        {getInitials(displayName)}
+                    </div>
+                )}
+                <div className="text-sm text-[var(--color-text-tertiary)]">
+                    Avatar upload stays on the current auth/profile storage backlog.
+                </div>
             </div>
 
-            {/* Form fields */}
             <div className="space-y-4">
                 <div>
                     <label className="text-caption text-[var(--color-text-tertiary)] mb-1.5 block">Display Name</label>
                     <input
                         type="text"
-                        defaultValue={currentUser.displayName}
+                        value={displayName}
+                        onChange={(event) => setDisplayName(event.target.value)}
                         className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
                     />
                 </div>
@@ -229,31 +330,27 @@ function EditProfileForm({ onClose }: { onClose: () => void }) {
                     <label className="text-caption text-[var(--color-text-tertiary)] mb-1.5 block">Username</label>
                     <input
                         type="text"
-                        defaultValue={currentUser.username}
+                        value={username}
+                        onChange={(event) => setUsername(event.target.value.replace(/\s+/g, ''))}
                         className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
-                    />
-                </div>
-                <div>
-                    <label className="text-caption text-[var(--color-text-tertiary)] mb-1.5 block">Bio</label>
-                    <textarea
-                        defaultValue={currentUser.bio}
-                        rows={3}
-                        className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] resize-none focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
                     />
                 </div>
             </div>
 
-            {/* Actions */}
+            {error && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-md)] px-3 py-2">
+                    {error}
+                </div>
+            )}
+
             <div className="flex gap-3 pt-2">
                 <Button variant="ghost" className="flex-1" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={onClose}>
+                <Button variant="primary" className="flex-1" isLoading={isSaving} onClick={handleSave}>
                     Save Changes
                 </Button>
             </div>
         </div>
     )
 }
-
-

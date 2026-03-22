@@ -3,8 +3,12 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Button from '../components/ui/Button'
 import { UserPlus, Mail, Lock, User, AtSign, ChevronLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { enforceGuestOnlyRoute } from '@/shared/auth/guards'
 
 export const Route = createFileRoute('/signup')({
+    beforeLoad: async () => {
+        await enforceGuestOnlyRoute()
+    },
     component: SignUpScreen,
 })
 
@@ -32,7 +36,8 @@ function SignUpScreen() {
                     data: {
                         full_name: fullName.trim(),
                         handle: handle.trim(),
-                        intent: accountType, // Intent, not the final role
+                        intent: accountType,
+                        role: accountType,
                     },
                 },
             })

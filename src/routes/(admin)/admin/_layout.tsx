@@ -1,9 +1,9 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
-import { enforceClientRole } from '@/shared/auth/guards'
+import { requireAdminRouteAccess } from '@/modules/admin/services/route-access'
 
 export const Route = createFileRoute('/(admin)/admin/_layout')({
   beforeLoad: async () => {
-    await enforceClientRole(['admin'])
+    await requireAdminRouteAccess()
   },
   component: AdminLayout,
 })

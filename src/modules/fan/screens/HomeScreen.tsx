@@ -8,7 +8,7 @@ import LiveBadge from '@/components/ui/LiveBadge'
 import { getCorridors, searchNganyas } from '@/lib/queries/discover'
 import { getLiveNow } from '@/lib/queries/live'
 import { getCorridorSightings } from '@/lib/queries/sightings'
-import { recentSightings as mockRecentSightings } from '@/lib/mockData'
+import { formatRelativeTime, toNganyaSlug } from '@/lib/formatters'
 import { Clock, Eye, TrendingUp, ChevronRight } from 'lucide-react'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import WhereToCard, { type RideSearchPayload } from '@/components/features/WhereToCard'
@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const [corridors, setCorridors] = useState<any[]>([])
   const [nganyas, setNganyas] = useState<any[]>([])
   const [liveNganyas, setLiveNganyas] = useState<any[]>([])
-  const [recentSightings, setRecentSightings] = useState<any[]>(mockRecentSightings)
+  const [recentSightings, setRecentSightings] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -53,9 +53,7 @@ export default function HomeScreen() {
         const corridorId = activeCorridor || corridors[0]?.id
         if (!corridorId) return
         const sightings = await getCorridorSightings(corridorId)
-        if (sightings && sightings.length > 0) {
-          setRecentSightings(sightings)
-        }
+        setRecentSightings(sightings || [])
       } catch (err) {
         console.error('Failed to load sightings', err)
       }
@@ -105,7 +103,7 @@ export default function HomeScreen() {
     const isLive = filteredLiveNganyas.some((ln) => ln.nganya_id === dbNganya.id) || dbNganya.status === 'LIVE'
     return {
       id: dbNganya.nganya_id || dbNganya.id,
-      slug: dbNganya.slug || dbNganya.nganya_slug || '',
+      slug: dbNganya.slug || dbNganya.nganya_slug || toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
       name: dbNganya.nganya_name || dbNganya.name,
       corridor: dbNganya.corridor_name || dbNganya.corridors?.name || 'Unknown Route',
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
@@ -264,9 +262,10 @@ export default function HomeScreen() {
           {(filteredRecentSightings.length > 0 ? filteredRecentSightings : recentSightings).slice(0, 4).map((s: any) => {
             const isSupabase = s.nganya !== undefined
             const title = isSupabase ? s.nganya.name : s.nganyaName
-            const corridorLabel = isSupabase ? (activeCorridorName || 'Current Route') : s.corridor
+            const corridorLabel = isSupabase ? (s.nganya?.corridors?.name || activeCorridorName || 'Current Route') : s.corridor
             const author = isSupabase ? s.user?.handle : s.spottedBy
             const hasMedia = isSupabase ? (s.media_urls?.length > 0) : s.hasMedia
+            const sightingTime = isSupabase ? formatRelativeTime(s.created_at) : s.time
 
             return (
               <div
@@ -287,7 +286,7 @@ export default function HomeScreen() {
                 </div>
                 <div className="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)] shrink-0">
                   <Clock className="w-3 h-3" />
-                  {s.time || 'agoo'}
+                  {sightingTime}
                 </div>
                 {hasMedia && (
                   <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)] shrink-0" />

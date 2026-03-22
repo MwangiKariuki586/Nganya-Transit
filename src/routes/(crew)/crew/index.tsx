@@ -1,6 +1,18 @@
-import { createFileRoute } from '@tanstack/react-router'
-import CrewHomeScreen from '@/modules/crew/screens/CrewHomeScreen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { requireCrewRouteAccess, resolveCrewEntryRedirect } from '@/modules/crew/services/route-access'
 
 export const Route = createFileRoute('/(crew)/crew/')({
-  component: CrewHomeScreen,
+  beforeLoad: async () => {
+    await requireCrewRouteAccess()
+
+    if (typeof window !== 'undefined') {
+      const nextRoute = await resolveCrewEntryRedirect()
+      if (nextRoute) {
+        throw redirect(nextRoute)
+      }
+    }
+
+    throw redirect({ to: '/crew/live' })
+  },
+  component: () => null,
 })

@@ -3,7 +3,8 @@ import { supabase } from '../supabase'
 export async function getMyFollows() {
     const { data, error } = await supabase
         .from('follows')
-        .select('*, nganyas(*, corridors(name))')
+        .select('*, nganyas(*, corridors(name), nganya_media(media_url, media_type))')
+        .order('created_at', { ascending: false })
     if (error) throw error
     return data
 }
@@ -14,7 +15,10 @@ export async function followNganya(nganyaId: string) {
 
     const { data, error } = await supabase
         .from('follows')
-        .insert({ user_id: session.user.id, nganya_id: nganyaId, notify_live: true })
+        .upsert(
+            { user_id: session.user.id, nganya_id: nganyaId, notify_live: true },
+            { onConflict: 'user_id,nganya_id' }
+        )
 
     if (error) throw error
     return data

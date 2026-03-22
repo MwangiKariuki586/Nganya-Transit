@@ -1,9 +1,9 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
-import { enforceClientRole } from '@/shared/auth/guards'
+import { requireFanRouteAccess } from '@/modules/fan/services/route-access'
 
 export const Route = createFileRoute('/(fan)/_layout')({
   beforeLoad: async () => {
-    await enforceClientRole(['fan', 'crew', 'admin'])
+    await requireFanRouteAccess()
   },
   component: FanLayout,
 })

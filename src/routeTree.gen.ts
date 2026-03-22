@@ -21,8 +21,13 @@ import { Route as fanLayoutRouteImport } from './routes/(fan)/_layout'
 import { Route as crewCrewIndexRouteImport } from './routes/(crew)/crew/index'
 import { Route as adminAdminIndexRouteImport } from './routes/(admin)/admin/index'
 import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
+import { Route as crewCrewRegisterRouteImport } from './routes/(crew)/crew/register'
+import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
+import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
 import { Route as crewCrewLayoutRouteImport } from './routes/(crew)/crew/_layout'
+import { Route as adminAdminRegistrationsRouteImport } from './routes/(admin)/admin/registrations'
 import { Route as adminAdminLayoutRouteImport } from './routes/(admin)/admin/_layout'
+import { Route as crewCrewSessionIdRouteImport } from './routes/(crew)/crew/session.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -83,14 +88,39 @@ const fanNganyaSlugRoute = fanNganyaSlugRouteImport.update({
   path: '/nganya/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const crewCrewRegisterRoute = crewCrewRegisterRouteImport.update({
+  id: '/(crew)/crew/register',
+  path: '/crew/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const crewCrewLiveRoute = crewCrewLiveRouteImport.update({
+  id: '/(crew)/crew/live',
+  path: '/crew/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const crewCrewHistoryRoute = crewCrewHistoryRouteImport.update({
+  id: '/(crew)/crew/history',
+  path: '/crew/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const crewCrewLayoutRoute = crewCrewLayoutRouteImport.update({
   id: '/(crew)/crew/_layout',
   path: '/crew',
   getParentRoute: () => rootRouteImport,
 } as any)
+const adminAdminRegistrationsRoute = adminAdminRegistrationsRouteImport.update({
+  id: '/(admin)/admin/registrations',
+  path: '/admin/registrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const adminAdminLayoutRoute = adminAdminLayoutRouteImport.update({
   id: '/(admin)/admin/_layout',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const crewCrewSessionIdRoute = crewCrewSessionIdRouteImport.update({
+  id: '/(crew)/crew/session/$id',
+  path: '/crew/session/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -104,10 +134,15 @@ export interface FileRoutesByFullPath {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin': typeof adminAdminLayoutRoute
+  '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/crew': typeof crewCrewLayoutRoute
+  '/crew/history': typeof crewCrewHistoryRoute
+  '/crew/live': typeof crewCrewLiveRoute
+  '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
   '/admin/': typeof adminAdminIndexRoute
   '/crew/': typeof crewCrewIndexRoute
+  '/crew/session/$id': typeof crewCrewSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
@@ -119,8 +154,13 @@ export interface FileRoutesByTo {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin': typeof adminAdminIndexRoute
+  '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/crew': typeof crewCrewIndexRoute
+  '/crew/history': typeof crewCrewHistoryRoute
+  '/crew/live': typeof crewCrewLiveRoute
+  '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
+  '/crew/session/$id': typeof crewCrewSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,10 +174,15 @@ export interface FileRoutesById {
   '/(fan)/spot': typeof fanSpotRoute
   '/(fan)/': typeof fanIndexRoute
   '/(admin)/admin/_layout': typeof adminAdminLayoutRoute
+  '/(admin)/admin/registrations': typeof adminAdminRegistrationsRoute
   '/(crew)/crew/_layout': typeof crewCrewLayoutRoute
+  '/(crew)/crew/history': typeof crewCrewHistoryRoute
+  '/(crew)/crew/live': typeof crewCrewLiveRoute
+  '/(crew)/crew/register': typeof crewCrewRegisterRoute
   '/(fan)/nganya/$slug': typeof fanNganyaSlugRoute
   '/(admin)/admin/': typeof adminAdminIndexRoute
   '/(crew)/crew/': typeof crewCrewIndexRoute
+  '/(crew)/crew/session/$id': typeof crewCrewSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,10 +196,15 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin'
+    | '/admin/registrations'
     | '/crew'
+    | '/crew/history'
+    | '/crew/live'
+    | '/crew/register'
     | '/nganya/$slug'
     | '/admin/'
     | '/crew/'
+    | '/crew/session/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/signin'
@@ -166,8 +216,13 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin'
+    | '/admin/registrations'
     | '/crew'
+    | '/crew/history'
+    | '/crew/live'
+    | '/crew/register'
     | '/nganya/$slug'
+    | '/crew/session/$id'
   id:
     | '__root__'
     | '/signin'
@@ -180,10 +235,15 @@ export interface FileRouteTypes {
     | '/(fan)/spot'
     | '/(fan)/'
     | '/(admin)/admin/_layout'
+    | '/(admin)/admin/registrations'
     | '/(crew)/crew/_layout'
+    | '/(crew)/crew/history'
+    | '/(crew)/crew/live'
+    | '/(crew)/crew/register'
     | '/(fan)/nganya/$slug'
     | '/(admin)/admin/'
     | '/(crew)/crew/'
+    | '/(crew)/crew/session/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,10 +257,15 @@ export interface RootRouteChildren {
   fanSpotRoute: typeof fanSpotRoute
   fanIndexRoute: typeof fanIndexRoute
   adminAdminLayoutRoute: typeof adminAdminLayoutRoute
+  adminAdminRegistrationsRoute: typeof adminAdminRegistrationsRoute
   crewCrewLayoutRoute: typeof crewCrewLayoutRoute
+  crewCrewHistoryRoute: typeof crewCrewHistoryRoute
+  crewCrewLiveRoute: typeof crewCrewLiveRoute
+  crewCrewRegisterRoute: typeof crewCrewRegisterRoute
   fanNganyaSlugRoute: typeof fanNganyaSlugRoute
   adminAdminIndexRoute: typeof adminAdminIndexRoute
   crewCrewIndexRoute: typeof crewCrewIndexRoute
+  crewCrewSessionIdRoute: typeof crewCrewSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -289,6 +354,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof fanNganyaSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(crew)/crew/register': {
+      id: '/(crew)/crew/register'
+      path: '/crew/register'
+      fullPath: '/crew/register'
+      preLoaderRoute: typeof crewCrewRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(crew)/crew/live': {
+      id: '/(crew)/crew/live'
+      path: '/crew/live'
+      fullPath: '/crew/live'
+      preLoaderRoute: typeof crewCrewLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(crew)/crew/history': {
+      id: '/(crew)/crew/history'
+      path: '/crew/history'
+      fullPath: '/crew/history'
+      preLoaderRoute: typeof crewCrewHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(crew)/crew/_layout': {
       id: '/(crew)/crew/_layout'
       path: '/crew'
@@ -296,11 +382,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof crewCrewLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(admin)/admin/registrations': {
+      id: '/(admin)/admin/registrations'
+      path: '/admin/registrations'
+      fullPath: '/admin/registrations'
+      preLoaderRoute: typeof adminAdminRegistrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(admin)/admin/_layout': {
       id: '/(admin)/admin/_layout'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof adminAdminLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(crew)/crew/session/$id': {
+      id: '/(crew)/crew/session/$id'
+      path: '/crew/session/$id'
+      fullPath: '/crew/session/$id'
+      preLoaderRoute: typeof crewCrewSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -317,10 +417,15 @@ const rootRouteChildren: RootRouteChildren = {
   fanSpotRoute: fanSpotRoute,
   fanIndexRoute: fanIndexRoute,
   adminAdminLayoutRoute: adminAdminLayoutRoute,
+  adminAdminRegistrationsRoute: adminAdminRegistrationsRoute,
   crewCrewLayoutRoute: crewCrewLayoutRoute,
+  crewCrewHistoryRoute: crewCrewHistoryRoute,
+  crewCrewLiveRoute: crewCrewLiveRoute,
+  crewCrewRegisterRoute: crewCrewRegisterRoute,
   fanNganyaSlugRoute: fanNganyaSlugRoute,
   adminAdminIndexRoute: adminAdminIndexRoute,
   crewCrewIndexRoute: crewCrewIndexRoute,
+  crewCrewSessionIdRoute: crewCrewSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

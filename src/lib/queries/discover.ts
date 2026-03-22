@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { toNganyaSlug } from '../formatters'
 
 export async function getCorridors() {
     const { data, error } = await supabase.from('corridors').select('*')
@@ -30,6 +31,33 @@ export async function getNganya(id: string) {
         .eq('id', id)
         .single()
 
+    if (error) throw error
+    return data
+}
+
+export async function getNganyaBySlug(slug: string) {
+    const { data, error } = await supabase
+        .from('nganyas')
+        .select('*, corridors(*), nganya_media(*)')
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).find((nganya) => toNganyaSlug(nganya.name) === slug) || null
+}
+
+export async function getNganyasByCorridor(corridorId: string, excludeNganyaId?: string) {
+    let query = supabase
+        .from('nganyas')
+        .select('*, corridors(*), nganya_media(*)')
+        .eq('corridor_id', corridorId)
+        .order('created_at', { ascending: false })
+
+    if (excludeNganyaId) {
+        query = query.neq('id', excludeNganyaId)
+    }
+
+    const { data, error } = await query.limit(4)
     if (error) throw error
     return data
 }

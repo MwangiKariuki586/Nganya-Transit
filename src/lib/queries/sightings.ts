@@ -18,6 +18,25 @@ export async function getCorridorSightings(corridorId: string) {
     return data
 }
 
+export async function getMySightings() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user?.id) throw new Error("Not authenticated")
+
+    const { data, error } = await supabase
+        .from('sightings')
+        .select(`
+      *,
+      stage:stages(name),
+      nganya:nganyas(name, corridors(name)),
+      confidence:v_sighting_confidence(*)
+    `)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data
+}
+
 export async function postSighting(payload: {
     nganya_id: string;
     corridor_id: string;

@@ -1,5 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import AppShell from '../components/layout/AppShell'
+import { AuthSessionBridge } from '@/shared/auth/AuthSessionBridge'
+import { RoleAccessBoundary } from '@/shared/auth/RoleAccessBoundary'
 
 import appCss from '../styles.css?url'
 
@@ -8,13 +10,15 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'MATWANA — Nairobi Nganya Culture' },
-      { name: 'description', content: 'Discover, follow, and spot the dopest nganyas on Nairobi streets. MATWANA is the Gen Z hub for nganya culture.' },
+      { title: 'MATWANA - Nairobi Nganya Culture' },
+      {
+        name: 'description',
+        content:
+          'Discover, follow, and spot the dopest nganyas on Nairobi streets. MATWANA is the Gen Z hub for nganya culture.',
+      },
       { name: 'theme-color', content: '#0A0A0F' },
     ],
-    links: [
-      { rel: 'stylesheet', href: appCss },
-    ],
+    links: [{ rel: 'stylesheet', href: appCss }],
   }),
   component: RootComponent,
   shellComponent: RootDocument,
@@ -22,11 +26,16 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <AppShell>
-      <div className="animate-slide-up">
-        <Outlet />
-      </div>
-    </AppShell>
+    <>
+      <AuthSessionBridge />
+      <RoleAccessBoundary>
+        <AppShell>
+          <div className="animate-slide-up">
+            <Outlet />
+          </div>
+        </AppShell>
+      </RoleAccessBoundary>
+    </>
   )
 }
 

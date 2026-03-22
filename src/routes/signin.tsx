@@ -3,8 +3,13 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Button from '../components/ui/Button'
 import { LogIn, Mail, Lock, ChevronLeft, AlertCircle } from 'lucide-react'
+import { enforceGuestOnlyRoute, getHomePathForRole, resolveClientRole } from '@/shared/auth/guards'
+import { syncAuthSessionCookie } from '@/shared/auth/session-cookie'
 
 export const Route = createFileRoute('/signin')({
+    beforeLoad: async () => {
+        await enforceGuestOnlyRoute()
+    },
     component: SignInScreen,
 })
 
@@ -21,14 +26,17 @@ function SignInScreen() {
         setError(null)
 
         try {
-            const { error: signInError } = await supabase.auth.signInWithPassword({
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             })
 
             if (signInError) throw signInError
 
-            navigate({ to: '/' })
+            syncAuthSessionCookie(data.session ?? null)
+
+            const role = await resolveClientRole()
+            navigate({ to: role ? getHomePathForRole(role) : '/' })
         } catch (err: any) {
             setError(err.message || 'Failed to sign in. Please check your credentials.')
         } finally {
@@ -39,7 +47,6 @@ function SignInScreen() {
     return (
         <div className="min-h-[calc(100vh-var(--top-nav-height)-var(--bottom-nav-height))] flex flex-col items-center justify-center p-5">
             <div className="w-full max-w-md space-y-8 animate-slide-up">
-                {/* Header */}
                 <div className="text-center space-y-2">
                     <div className="flex justify-center mb-4">
                         <div className="w-12 h-12 rounded-2xl bg-(--color-accent) flex items-center justify-center shadow-(--glow-accent) rotate-3">
@@ -50,7 +57,6 @@ function SignInScreen() {
                     <p className="text-body text-(--color-text-secondary)">Sign in to your Matwana account</p>
                 </div>
 
-                {/* Form */}
                 <div className="p-8 rounded-xl bg-(--glass-bg) border border-(--glass-border) backdrop-blur-xl">
                     <form onSubmit={handleSignIn} className="space-y-6">
                         {error && (
@@ -88,7 +94,7 @@ function SignInScreen() {
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
+                                        placeholder="********"
                                         className="w-full pl-11 pr-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-card)] border border-[var(--glass-border)] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
                                         required
                                     />

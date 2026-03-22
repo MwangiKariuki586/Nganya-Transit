@@ -1,28 +1,34 @@
-﻿/**
- * Nganya Detail Page â€” Profile for a single nganya.
- * Hero image, tags, follow/notify, media gallery, sightings, related.
- */
-
-import { Link, useParams } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Chip from '@/components/ui/Chip'
 import Card from '@/components/ui/Card'
 import LiveBadge from '@/components/ui/LiveBadge'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
 import { vibeTagColors } from '@/lib/mockData'
-import { getNganya } from '@/lib/queries/discover'
+import { getNganyaBySlug, getNganyasByCorridor } from '@/lib/queries/discover'
 import { getLiveNow } from '@/lib/queries/live'
 import { getCorridorSightings } from '@/lib/queries/sightings'
-import { Heart, Bell, Share2, Eye, Clock, MapPin, Camera, ChevronLeft, Users } from 'lucide-react'
+import { followNganya, getMyFollows, unfollowNganya } from '@/lib/queries/follows'
+import { formatRelativeTime, toNganyaSlug } from '@/lib/formatters'
+import {
+    Heart,
+    Bell,
+    Share2,
+    Eye,
+    Clock,
+    MapPin,
+    Camera,
+    ChevronLeft,
+    Users,
+} from 'lucide-react'
 
 export default function NganyaDetailScreen() {
+    const navigate = useNavigate()
     const { slug } = useParams({ from: '/(fan)/nganya/$slug' })
     const [nganya, setNganya] = useState<any>(null)
     const [isFollowing, setIsFollowing] = useState(false)
     const [isNotifying, setIsNotifying] = useState(false)
-
-    // related data
     const [nganyaSightings, setNganyaSightings] = useState<any[]>([])
     const [relatedNganyas, setRelatedNganyas] = useState<any[]>([])
     const [isLive, setIsLive] = useState(false)
@@ -32,21 +38,30 @@ export default function NganyaDetailScreen() {
         async function loadNganya() {
             setIsLoading(true)
             try {
-                const data = await getNganya(slug)
-                if (data) {
-                    setNganya(data)
-                    // Check live status
-                    const liveRes = await getLiveNow()
-                    setIsLive(liveRes.some(ln => ln.nganya_id === data.id) || data.status === 'LIVE')
-
-                    // fetch recent sightings in corridor for now to simulate. 
-                    if (data.corridor_id) {
-                        const recents = await getCorridorSightings(data.corridor_id)
-                        setNganyaSightings(recents.filter(s => s.nganya_id === data.id))
-                    }
+                const data = await getNganyaBySlug(slug)
+                if (!data) {
+                    setNganya(null)
+                    return
                 }
-            } catch (err) {
-                console.error("Failed to load nganya data", err)
+
+                setNganya(data)
+
+                const [liveRes, corridorSightings, related, myFollows] = await Promise.all([
+                    getLiveNow(data.corridor_id),
+                    getCorridorSightings(data.corridor_id),
+                    getNganyasByCorridor(data.corridor_id, data.id),
+                    getMyFollows().catch(() => []),
+                ])
+
+                setIsLive(
+                    (liveRes || []).some((liveNganya) => liveNganya.nganya_id === data.id) ||
+                    data.status === 'LIVE'
+                )
+                setNganyaSightings((corridorSightings || []).filter((sighting) => sighting.nganya_id === data.id))
+                setRelatedNganyas(related || [])
+                setIsFollowing((myFollows || []).some((follow) => follow.nganya_id === data.id))
+            } catch (error) {
+                console.error('Failed to load nganya data', error)
             } finally {
                 setIsLoading(false)
             }
@@ -55,8 +70,29 @@ export default function NganyaDetailScreen() {
         loadNganya()
     }, [slug])
 
+    const handleFollowToggle = async () => {
+        if (!nganya) return
+
+        try {
+            if (isFollowing) {
+                await unfollowNganya(nganya.id)
+                setIsFollowing(false)
+            } else {
+                await followNganya(nganya.id)
+                setIsFollowing(true)
+            }
+        } catch (error) {
+            console.error('Follow action requires authentication', error)
+            navigate({ to: '/signin' })
+        }
+    }
+
     if (isLoading) {
-        return <div className="page-container py-16 flex justify-center"><div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div></div>
+        return (
+            <div className="page-container py-16 flex justify-center">
+                <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]" />
+            </div>
+        )
     }
 
     if (!nganya) {
@@ -64,7 +100,7 @@ export default function NganyaDetailScreen() {
             <div className="page-container py-16 text-center">
                 <h2 className="text-h2 text-[var(--color-text-primary)] mb-2">Nganya not found</h2>
                 <p className="text-body text-[var(--color-text-secondary)] mb-6">
-                    This nganya might have ghosted. ðŸ‘» Or we're fetching by ID and need to decode slug correctly...
+                    The route exists, but this build is not resolving from the current slug.
                 </p>
                 <Link to="/">
                     <Button variant="secondary">Back to Discover</Button>
@@ -74,23 +110,18 @@ export default function NganyaDetailScreen() {
     }
 
     const corridorName = nganya.corridors?.name || 'Unknown Route'
-    const imageUrl = nganya.nganya_media?.[0]?.media_url || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80'
+    const imageUrl =
+        nganya.nganya_media?.[0]?.media_url ||
+        'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80'
     const tags = nganya.tags || []
     const isNewBuild = tags.includes('NEW_BUILD')
 
     return (
         <div className="animate-slide-up">
-
-            {/* â”€â”€â”€ Hero Image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="relative h-[280px] md:h-[400px] overflow-hidden">
-                <img
-                    src={imageUrl}
-                    alt={nganya.name}
-                    className="w-full h-full object-cover"
-                />
+                <img src={imageUrl} alt={nganya.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg-base)] via-[var(--color-bg-base)]/40 to-transparent" />
 
-                {/* Back button (mobile) */}
                 <Link
                     to="/"
                     className="absolute top-4 left-4 md:top-6 md:left-6 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors no-underline"
@@ -98,7 +129,6 @@ export default function NganyaDetailScreen() {
                     <ChevronLeft className="w-5 h-5" />
                 </Link>
 
-                {/* Share button */}
                 <button
                     className="absolute top-4 right-4 md:top-6 md:right-6 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors cursor-pointer"
                     aria-label="Share"
@@ -106,7 +136,6 @@ export default function NganyaDetailScreen() {
                     <Share2 className="w-5 h-5" />
                 </button>
 
-                {/* Name + badges on hero */}
                 <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 pt-8 md:px-8 md:pb-8 md:pt-12 lg:px-12">
                     <div>
                         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -123,22 +152,13 @@ export default function NganyaDetailScreen() {
                 </div>
             </div>
 
-            {/* â”€â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="page-container pt-8 pb-10 md:pt-10 md:pb-16 space-y-8 md:space-y-10">
-
-                {/* Action bar */}
                 <div className="flex flex-wrap gap-3">
-                    <Button
-                        variant={isFollowing ? 'secondary' : 'primary'}
-                        onClick={() => setIsFollowing(!isFollowing)}
-                    >
+                    <Button variant={isFollowing ? 'secondary' : 'primary'} onClick={handleFollowToggle}>
                         <Heart className="w-4 h-4" fill={isFollowing ? 'currentColor' : 'none'} />
                         {isFollowing ? 'Following' : 'Follow'}
                     </Button>
-                    <Button
-                        variant="secondary"
-                        onClick={() => setIsNotifying(!isNotifying)}
-                    >
+                    <Button variant="secondary" onClick={() => setIsNotifying(!isNotifying)}>
                         <Bell className="w-4 h-4" fill={isNotifying ? 'currentColor' : 'none'} />
                         {isNotifying ? 'Notifying' : 'Notify'}
                     </Button>
@@ -150,46 +170,54 @@ export default function NganyaDetailScreen() {
                     </Link>
                 </div>
 
-                {/* Stats row */}
                 <div className="flex flex-wrap gap-4 md:gap-8 p-4 rounded-[var(--radius-lg)] bg-[var(--glass-bg)] border border-[var(--glass-border)]">
                     <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-[var(--color-accent)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">--</span>
-                            <span className="text-xs text-[var(--color-text-tertiary)] ml-1">followers</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                                {isFollowing ? 'Following' : 'Open'}
+                            </span>
+                            <span className="text-xs text-[var(--color-text-tertiary)] ml-1">follow status</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Eye className="w-4 h-4 text-[var(--color-cyan)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">--</span>
-                            <span className="text-xs text-[var(--color-text-tertiary)] ml-1">spotted today</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                                {nganyaSightings.length}
+                            </span>
+                            <span className="text-xs text-[var(--color-text-tertiary)] ml-1">recent sightings</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-[var(--color-text-tertiary)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">recently</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                                {nganyaSightings[0]?.created_at
+                                    ? formatRelativeTime(nganyaSightings[0].created_at)
+                                    : 'Recently'}
+                            </span>
                             <span className="text-xs text-[var(--color-text-tertiary)] ml-1">last seen</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-[var(--color-warning)]" />
                         <div>
-                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">{corridorName}</span>
+                            <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                                {corridorName}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Description */}
                 <div>
                     <h2 className="text-h3 mb-3">About</h2>
                     <p className="text-body text-[var(--color-text-secondary)] leading-relaxed">
-                        Plate: {nganya.registration_number || 'Unknown'} - Operated as {nganya.status}. Active on the {corridorName} transit corridor.
+                        Operates on the {corridorName} corridor with {nganya.is_verified ? 'verified' : 'community'}
+                        {' '}status and a culture profile shaped by recent sightings.
                     </p>
                 </div>
 
-                {/* Vibe tags */}
                 {tags.length > 0 && (
                     <div>
                         <h2 className="text-h3 mb-3">Vibes</h2>
@@ -201,18 +229,17 @@ export default function NganyaDetailScreen() {
                     </div>
                 )}
 
-                {/* Media Gallery (placeholder grid) */}
                 <div>
                     <h2 className="text-h3 mb-3">Gallery</h2>
                     <div className="grid grid-cols-3 gap-2">
-                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                        {[0, 1, 2, 3, 4, 5].map((index) => (
                             <div
-                                key={i}
+                                key={index}
                                 className="aspect-square rounded-[var(--radius-md)] overflow-hidden bg-[var(--glass-bg)] border border-[var(--glass-border)]"
                             >
                                 <img
                                     src={imageUrl}
-                                    alt={`${nganya.name} gallery ${i + 1}`}
+                                    alt={`${nganya.name} gallery ${index + 1}`}
                                     className="w-full h-full object-cover opacity-70 hover:opacity-100 transition-opacity"
                                 />
                             </div>
@@ -220,42 +247,67 @@ export default function NganyaDetailScreen() {
                     </div>
                 </div>
 
-                {/* Recent Sightings */}
                 <div>
                     <h2 className="text-h3 mb-3">Recent Sightings</h2>
                     {nganyaSightings.length > 0 ? (
                         <div className="space-y-2">
-                            {nganyaSightings.map((s) => (
+                            {nganyaSightings.slice(0, 5).map((sighting) => (
                                 <div
-                                    key={s.id}
+                                    key={sighting.id}
                                     className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)]"
                                 >
                                     <div className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm text-[var(--color-text-primary)]">{s.user?.handle || 'Anonymous'}</span>
-                                            <ConfidenceBadge level={s.confidence?.confidence_level || 'HIGH'} />
+                                            <span className="text-sm text-[var(--color-text-primary)]">
+                                                {sighting.user?.handle || 'Anonymous'}
+                                            </span>
+                                            <ConfidenceBadge level={sighting.confidence?.confidence_level || 'HIGH'} />
                                         </div>
-                                        <span className="text-xs text-[var(--color-text-tertiary)]">{corridorName} Â· {s.time || 'agoo'}</span>
+                                        <span className="text-xs text-[var(--color-text-tertiary)]">
+                                            {corridorName} - {formatRelativeTime(sighting.created_at)}
+                                        </span>
                                     </div>
-                                    {s.media_urls?.length > 0 && <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)]" />}
+                                    {sighting.media_urls?.length > 0 && (
+                                        <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)]" />
+                                    )}
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <p className="text-body-sm text-[var(--color-text-tertiary)] py-4">
-                            No recent sightings. Be the first to spot! ðŸ‘€
+                            No recent sightings yet. Be the first to log one.
                         </p>
                     )}
                 </div>
 
-                {/* Related Nganyas */}
                 {relatedNganyas.length > 0 && (
                     <div>
                         <h2 className="text-h3 mb-3">More from {corridorName}</h2>
                         <div className="grid-cards">
-                            {relatedNganyas.map((n) => (
-                                <Card key={n.id} nganya={n} variant="standard" />
+                            {relatedNganyas.map((relatedNganya) => (
+                                <Card
+                                    key={relatedNganya.id}
+                                    nganya={{
+                                        id: relatedNganya.id,
+                                        slug: toNganyaSlug(relatedNganya.name),
+                                        name: relatedNganya.name,
+                                        corridor: relatedNganya.corridors?.name || corridorName,
+                                        vibeTags: relatedNganya.tags || [],
+                                        followers: 0,
+                                        sightingsToday: 0,
+                                        lastSeen: 'Recently',
+                                        lastSeenMinutes: 0,
+                                        confidence: 'high',
+                                        isLive: false,
+                                        isNewBuild: (relatedNganya.tags || []).includes('NEW_BUILD'),
+                                        imageUrl:
+                                            relatedNganya.nganya_media?.[0]?.media_url ||
+                                            'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80',
+                                        description: '',
+                                    }}
+                                    variant="standard"
+                                />
                             ))}
                         </div>
                     </div>
@@ -264,6 +316,3 @@ export default function NganyaDetailScreen() {
         </div>
     )
 }
-
-
-

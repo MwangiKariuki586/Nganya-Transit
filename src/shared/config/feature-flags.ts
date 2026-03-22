@@ -1,6 +1,6 @@
 export const featureFlags = {
   roleModulesEnabled: true,
-  crewDashboardEnabled: false,
+  crewDashboardEnabled: true,
   adminConsoleEnabled: false,
 }
 
