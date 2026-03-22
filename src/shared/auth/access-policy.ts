@@ -14,7 +14,7 @@ const FAN_EXACT_PATHS = new Set([
 export function getHomePathForRole(role: AppRole): string {
   switch (role) {
     case 'crew':
-      return '/crew/live'
+      return '/crew'
     case 'admin':
       return '/admin'
     case 'fan':

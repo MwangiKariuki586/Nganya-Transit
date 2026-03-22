@@ -410,6 +410,10 @@ export interface Database {
             }
             Returns: string
         }
+        crew_bootstrap: {
+            Args: Record<PropertyKey, never>
+            Returns: Json
+        }
     }
     Enums: {
         app_role: 'fan' | 'crew' | 'admin'

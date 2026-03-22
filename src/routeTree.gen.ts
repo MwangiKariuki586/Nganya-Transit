@@ -22,6 +22,7 @@ import { Route as crewCrewIndexRouteImport } from './routes/(crew)/crew/index'
 import { Route as adminAdminIndexRouteImport } from './routes/(admin)/admin/index'
 import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
 import { Route as crewCrewRegisterRouteImport } from './routes/(crew)/crew/register'
+import { Route as crewCrewPendingRouteImport } from './routes/(crew)/crew/pending'
 import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
 import { Route as crewCrewLayoutRouteImport } from './routes/(crew)/crew/_layout'
@@ -93,6 +94,11 @@ const crewCrewRegisterRoute = crewCrewRegisterRouteImport.update({
   path: '/crew/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const crewCrewPendingRoute = crewCrewPendingRouteImport.update({
+  id: '/(crew)/crew/pending',
+  path: '/crew/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const crewCrewLiveRoute = crewCrewLiveRouteImport.update({
   id: '/(crew)/crew/live',
   path: '/crew/live',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/crew': typeof crewCrewLayoutRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
+  '/crew/pending': typeof crewCrewPendingRoute
   '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
   '/admin/': typeof adminAdminIndexRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/crew': typeof crewCrewIndexRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
+  '/crew/pending': typeof crewCrewPendingRoute
   '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
   '/crew/session/$id': typeof crewCrewSessionIdRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/(crew)/crew/_layout': typeof crewCrewLayoutRoute
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
   '/(crew)/crew/live': typeof crewCrewLiveRoute
+  '/(crew)/crew/pending': typeof crewCrewPendingRoute
   '/(crew)/crew/register': typeof crewCrewRegisterRoute
   '/(fan)/nganya/$slug': typeof fanNganyaSlugRoute
   '/(admin)/admin/': typeof adminAdminIndexRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/crew'
     | '/crew/history'
     | '/crew/live'
+    | '/crew/pending'
     | '/crew/register'
     | '/nganya/$slug'
     | '/admin/'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/crew'
     | '/crew/history'
     | '/crew/live'
+    | '/crew/pending'
     | '/crew/register'
     | '/nganya/$slug'
     | '/crew/session/$id'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/(crew)/crew/_layout'
     | '/(crew)/crew/history'
     | '/(crew)/crew/live'
+    | '/(crew)/crew/pending'
     | '/(crew)/crew/register'
     | '/(fan)/nganya/$slug'
     | '/(admin)/admin/'
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   crewCrewLayoutRoute: typeof crewCrewLayoutRoute
   crewCrewHistoryRoute: typeof crewCrewHistoryRoute
   crewCrewLiveRoute: typeof crewCrewLiveRoute
+  crewCrewPendingRoute: typeof crewCrewPendingRoute
   crewCrewRegisterRoute: typeof crewCrewRegisterRoute
   fanNganyaSlugRoute: typeof fanNganyaSlugRoute
   adminAdminIndexRoute: typeof adminAdminIndexRoute
@@ -361,6 +374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof crewCrewRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(crew)/crew/pending': {
+      id: '/(crew)/crew/pending'
+      path: '/crew/pending'
+      fullPath: '/crew/pending'
+      preLoaderRoute: typeof crewCrewPendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(crew)/crew/live': {
       id: '/(crew)/crew/live'
       path: '/crew/live'
@@ -421,6 +441,7 @@ const rootRouteChildren: RootRouteChildren = {
   crewCrewLayoutRoute: crewCrewLayoutRoute,
   crewCrewHistoryRoute: crewCrewHistoryRoute,
   crewCrewLiveRoute: crewCrewLiveRoute,
+  crewCrewPendingRoute: crewCrewPendingRoute,
   crewCrewRegisterRoute: crewCrewRegisterRoute,
   fanNganyaSlugRoute: fanNganyaSlugRoute,
   adminAdminIndexRoute: adminAdminIndexRoute,

@@ -65,7 +65,7 @@ function extractSupabaseCookieToken(cookieValue: string | undefined): string | n
   return null
 }
 
-function getAccessTokenFromRequest(request?: Request | null): string | null {
+export function getRequestAccessToken(request?: Request | null): string | null {
   if (!request) return null
 
   const authHeader = request.headers.get('authorization')
@@ -89,7 +89,7 @@ function getAccessTokenFromRequest(request?: Request | null): string | null {
 export async function resolveSessionSnapshotFromRequest(
   request?: Request | null,
 ): Promise<ServerSessionSnapshot> {
-  const accessToken = getAccessTokenFromRequest(request)
+  const accessToken = getRequestAccessToken(request)
   const supabase = createServerSupabaseClient()
 
   if (!accessToken || !supabase) {

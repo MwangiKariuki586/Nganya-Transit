@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { CheckCircle2, MapPin, Minus, Plus, Radio, ShieldAlert } from 'lucide-react'
+import { MapPin, Minus, Plus, Radio, ShieldAlert } from 'lucide-react'
 import StagePicker from '@/components/features/StagePicker'
 import Button from '@/components/ui/Button'
 import { stageRepository } from '@/entities/stage/repository'
@@ -9,6 +9,7 @@ import { nganyaRegistrationService } from '@/features/nganya-registration/servic
 import { CrewActiveSessionBanner } from '@/modules/crew/components/CrewActiveSessionBanner'
 import { CrewReadinessCard } from '@/modules/crew/components/CrewReadinessCard'
 import { DirectionToggle, type CrewDirectionValue } from '@/modules/crew/components/DirectionToggle'
+import { useCrewBootstrap } from '@/modules/crew/context/CrewBootstrapContext'
 import { SeatsQuickButtons } from '@/modules/crew/components/SeatsQuickButtons'
 import {
   clearCrewActiveSessionId,
@@ -51,12 +52,12 @@ function formatDateTime(value: string | null | undefined) {
 
 function getDirectionLabels(corridorName: string | null | undefined) {
   return {
-    toTown: '? Town',
-    fromTown: corridorName ? `? ${corridorName}` : '? Terminal',
+    toTown: '-> Town',
+    fromTown: corridorName ? `-> ${corridorName}` : '-> Terminal',
   }
 }
 
-function parsePoint(location: unknown): { lat: number, lng: number } | null {
+function parsePoint(location: unknown): { lat: number; lng: number } | null {
   if (!location) return null
 
   if (typeof location === 'string') {
@@ -93,7 +94,7 @@ function parsePoint(location: unknown): { lat: number, lng: number } | null {
   return null
 }
 
-function getDistanceKm(from: Coords, to: { lat: number, lng: number }) {
+function getDistanceKm(from: Coords, to: { lat: number; lng: number }) {
   const toRad = (degrees: number) => degrees * (Math.PI / 180)
   const earthKm = 6371
   const dLat = toRad(to.lat - from.lat)
@@ -140,11 +141,12 @@ function getGpsQuality(accuracy: number | null): 'good' | 'weak' | null {
 
 export default function CrewLiveSetupScreen() {
   const navigate = useNavigate()
+  const { snapshot, refresh } = useCrewBootstrap()
   const permissionWatcherRef = useRef<PermissionStatus | null>(null)
+  const assignment = snapshot.bootstrap.assignment
+  const activeSession = snapshot.bootstrap.active_session
 
-  const [assignment, setAssignment] = useState<any>(null)
   const [registrationRequest, setRegistrationRequest] = useState<any>(null)
-  const [activeSession, setActiveSession] = useState<any>(null)
   const [lastLiveAt, setLastLiveAt] = useState<string | null>(null)
   const [direction, setDirection] = useState<CrewDirectionValue | null>(null)
   const [seatsLeft, setSeatsLeft] = useState(10)
@@ -160,7 +162,6 @@ export default function CrewLiveSetupScreen() {
   const [stages, setStages] = useState<StageOption[]>([])
   const [selectedStartStage, setSelectedStartStage] = useState<StartStageChoice | null>(null)
   const [showAssignmentHelp, setShowAssignmentHelp] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isStarting, setIsStarting] = useState(false)
   const [isEndingActive, setIsEndingActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -199,37 +200,36 @@ export default function CrewLiveSetupScreen() {
     })
   }, [])
 
-  const loadSetup = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const [setupData, history, requests] = await Promise.all([
-        crewLiveService.getSetupData(),
-        crewLiveService.listHistory(1),
-        nganyaRegistrationService.listMyRequests({ limit: 1 }),
-      ])
-
-      const draft = readCrewSetupDraft()
-      const nextAssignment = setupData.assignment || null
-
-      setAssignment(nextAssignment)
-      setActiveSession(setupData.activeSession || null)
-      setRegistrationRequest(requests?.[0] || null)
-      setLastLiveAt(history?.[0]?.ended_at || history?.[0]?.started_at || null)
-      setDirection(draft?.direction || null)
-      setSeatsLeft(clampSeats(draft?.seatsLeft ?? 10))
-      setShowAssignmentHelp(false)
-    } catch (loadError: any) {
-      setError(loadError?.message || 'Failed to load your assigned nganya.')
-    } finally {
-      setIsLoading(false)
-    }
+  useEffect(() => {
+    const draft = readCrewSetupDraft()
+    setDirection(draft?.direction || null)
+    setSeatsLeft(clampSeats(draft?.seatsLeft ?? 10))
   }, [])
 
   useEffect(() => {
-    void loadSetup()
-  }, [loadSetup])
+    let active = true
+
+    Promise.all([
+      crewLiveService.listHistory(1),
+      snapshot.bootstrap.request
+        ? nganyaRegistrationService.listMyRequests({ limit: 1 })
+        : Promise.resolve([]),
+    ])
+      .then(([history, requests]) => {
+        if (!active) return
+        setLastLiveAt(history?.[0]?.ended_at || history?.[0]?.started_at || null)
+        setRegistrationRequest((requests as any[])?.[0] || null)
+        setShowAssignmentHelp(false)
+      })
+      .catch((loadError: any) => {
+        if (!active) return
+        setError(loadError?.message || 'Failed to load your assigned nganya.')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [snapshot.bootstrap.request?.id])
 
   useEffect(() => {
     if (!assignment?.corridor_id) {
@@ -364,26 +364,26 @@ export default function CrewLiveSetupScreen() {
     })
   }, [autoDetectedStage])
 
-  const corridorName = assignment?.corridors?.name || registrationRequest?.corridors?.name || 'Unknown terminal'
+  const corridorName = assignment?.terminal_label || registrationRequest?.corridors?.name || 'Unknown terminal'
   const directionLabels = getDirectionLabels(corridorName)
   const controlsReady = Boolean(direction && Number.isFinite(seatsLeft))
-  const canStart = Boolean(assignment?.id && permissionStatus === 'granted' && controlsReady)
+  const canStart = Boolean(assignment?.nganya_id && permissionStatus === 'granted' && controlsReady)
   const gpsQuality = getGpsQuality(coords?.accuracy ?? null)
   const mobileReadinessCollapsed = Boolean(assignment) && !isMobileReadinessExpanded
   const stickyHelperText = !assignment
-    ? 'Assignment missing. Register or request mapping first.'
+    ? 'Complete crew setup before going Live.'
     : permissionStatus !== 'granted'
       ? 'Enable location to start Live.'
       : !direction
         ? 'Choose direction to continue.'
-        : `${assignment.name} | ${direction === 'TO_TOWN' ? directionLabels.toTown : directionLabels.fromTown} | ${seatsLeft === 0 ? 'Full' : `${seatsLeft} seats left`}`
+        : `${assignment.nganya_name} | ${direction === 'TO_TOWN' ? directionLabels.toTown : directionLabels.fromTown} | ${seatsLeft === 0 ? 'Full' : `${seatsLeft} seats left`}`
 
   const readinessItems = [
     {
       id: 'assignment',
       label: 'Assigned nganya',
       status: assignment ? 'done' : 'error',
-      detail: assignment ? `${assignment.name} on ${corridorName}` : 'Missing assignment. Register or request mapping first.',
+      detail: assignment ? `${assignment.nganya_name} on ${corridorName}` : 'Missing assignment. Complete crew setup before going Live.',
     },
     {
       id: 'location',
@@ -421,12 +421,12 @@ export default function CrewLiveSetupScreen() {
     },
   ] as const
 
-  const assignmentThumb = assignment?.nganya_media?.[0]?.media_url || registrationRequest?.nganya_registration_request_media?.[0]?.media_url || null
+  const assignmentThumb = assignment?.media_thumb_url || registrationRequest?.nganya_registration_request_media?.[0]?.media_url || null
   const assignmentPlateLast4 = registrationRequest?.plate_last4 || null
   const assignmentSacco = registrationRequest?.sacco || null
 
   const handleStart = async () => {
-    if (!assignment?.id || !assignment?.corridor_id) {
+    if (!assignment?.nganya_id || !assignment?.corridor_id) {
       setError('This crew account has no valid nganya assignment yet.')
       return
     }
@@ -447,7 +447,7 @@ export default function CrewLiveSetupScreen() {
     try {
       const liveCoords = coords || await captureLocation()
       const session = await crewLiveService.startSession({
-        nganyaId: assignment.id,
+        nganyaId: assignment.nganya_id,
         corridorId: assignment.corridor_id,
         direction,
         seatsLeft,
@@ -488,8 +488,7 @@ export default function CrewLiveSetupScreen() {
     try {
       await crewLiveService.stopSession(activeSession.id)
       clearCrewActiveSessionId()
-      setActiveSession(null)
-      await loadSetup()
+      await refresh()
     } catch (stopError: any) {
       setError(stopError?.message || 'Failed to end the active session.')
     } finally {
@@ -497,22 +496,14 @@ export default function CrewLiveSetupScreen() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="page-container py-10 text-sm text-[var(--color-text-secondary)]">
-        Loading crew preflight...
-      </div>
-    )
-  }
-
   return (
     <div className="page-container max-w-7xl py-8 md:py-10">
       <div className="mb-6 max-w-3xl">
         <p className="text-tag text-[var(--color-accent)]">Crew Live</p>
-        <h1 className="text-h1 mt-2 text-white">
-          {activeSession ? 'You�re currently Live' : 'Go live fast'}
+        <h1 className="mt-2 text-h1 text-white">
+          {activeSession ? 'You’re currently Live' : 'Go live fast'}
         </h1>
-        <p className="text-body mt-3 max-w-2xl text-[var(--color-text-secondary)]">
+        <p className="mt-3 max-w-2xl text-body text-[var(--color-text-secondary)]">
           {activeSession
             ? 'Resume your current session or end it before starting another one.'
             : 'Your assigned nganya is locked in. Set direction, confirm seats, allow location, then start broadcasting.'}
@@ -548,7 +539,7 @@ export default function CrewLiveSetupScreen() {
                 <div className="flex flex-col gap-5 md:flex-row md:items-start">
                   <div className="h-28 w-full overflow-hidden rounded-[22px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] md:h-32 md:w-44">
                     {assignmentThumb ? (
-                      <img src={assignmentThumb} alt={assignment?.name || 'Assigned nganya'} className="h-full w-full object-cover" />
+                      <img src={assignmentThumb} alt={assignment?.nganya_name || 'Assigned nganya'} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-caption text-[var(--color-text-tertiary)]">
                         No image yet
@@ -574,7 +565,7 @@ export default function CrewLiveSetupScreen() {
                     </div>
 
                     <h2 className="mt-3 text-h2 text-white">
-                      {assignment?.name || 'Assignment missing'}
+                      {assignment?.nganya_name || 'Assignment missing'}
                     </h2>
 
                     {assignment ? (
@@ -621,16 +612,15 @@ export default function CrewLiveSetupScreen() {
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-white">No assigned nganya yet</div>
                             <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                              Register or request mapping before you can start a live session.
+                              Complete crew setup before going Live.
                             </div>
                             <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                              <Button
-                                variant="secondary"
-                                className="min-h-[44px] rounded-[16px] px-4 text-sm font-semibold"
-                                onClick={() => navigate({ to: '/crew/register', search: { reason: 'mapping-required' } })}
+                              <Link
+                                to="/crew"
+                                className="inline-flex min-h-[44px] items-center justify-center rounded-[16px] border border-[var(--glass-border)] px-4 text-sm font-semibold text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]"
                               >
-                                Register / request mapping
-                              </Button>
+                                Complete crew setup
+                              </Link>
                             </div>
                           </div>
                         </div>
@@ -760,7 +750,7 @@ export default function CrewLiveSetupScreen() {
                   variant="primary"
                   className="min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
                   isLoading={isStarting}
-                  disabled={!canStart || isLoading}
+                  disabled={!canStart}
                   onClick={handleStart}
                 >
                   <Radio className="h-4 w-4" />
@@ -782,7 +772,7 @@ export default function CrewLiveSetupScreen() {
                 variant="primary"
                 className="min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
                 isLoading={isStarting}
-                disabled={!canStart || isLoading}
+                disabled={!canStart}
                 onClick={handleStart}
               >
                 <Radio className="h-4 w-4" />

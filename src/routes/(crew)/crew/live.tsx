@@ -1,27 +1,22 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import { CrewShellSkeleton } from '@/modules/crew/components/CrewShellSkeleton'
 import { CrewRouteFrame } from '@/modules/crew/components/CrewRouteFrame'
 import CrewLiveSetupScreen from '@/modules/crew/screens/CrewLiveSetupScreen'
-import { requireCrewRouteAccess, resolveCrewEntryRedirect } from '@/modules/crew/services/route-access'
+import { requireCrewRouteAccess } from '@/modules/crew/services/route-access'
 
 export const Route = createFileRoute('/(crew)/crew/live')({
   loader: async () => {
-    await requireCrewRouteAccess()
-
-    if (typeof window !== 'undefined') {
-      const nextRoute = await resolveCrewEntryRedirect()
-      if (nextRoute) {
-        throw redirect(nextRoute)
-      }
-    }
-
-    return null
+    return requireCrewRouteAccess('/crew/live')
   },
+  pendingComponent: CrewShellSkeleton,
   component: CrewLiveRoute,
 })
 
 function CrewLiveRoute() {
+  const snapshot = Route.useLoaderData()
+
   return (
-    <CrewRouteFrame>
+    <CrewRouteFrame initialSnapshot={snapshot}>
       <CrewLiveSetupScreen />
     </CrewRouteFrame>
   )

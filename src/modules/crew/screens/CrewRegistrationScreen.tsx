@@ -4,6 +4,7 @@ import { Camera, ChevronLeft, ImagePlus, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { corridorRepository } from '@/entities/corridor/repository'
 import { nganyaRegistrationService } from '@/features/nganya-registration/services/nganya-registration-service'
+import { useCrewBootstrap } from '@/modules/crew/context/CrewBootstrapContext'
 import type { NganyaRegistrationRequestStatus } from '@/shared/types/nganya-registration'
 
 const TAG_OPTIONS = ['NEW_BUILD', 'CLEAN_SOUND', 'BASS_HEAVY', 'LED_MONSTER', 'ROUTE_OG']
@@ -52,6 +53,7 @@ async function hashPlate(value: string) {
 interface CrewRegistrationScreenProps {
   initialCorridorId?: string | null
   entryReason?: string | null
+  mode?: string | null
 }
 
 function getStatusClasses(status: NganyaRegistrationRequestStatus) {
@@ -105,7 +107,9 @@ function getStatusCopy(status: NganyaRegistrationRequestStatus) {
 export default function CrewRegistrationScreen({
   initialCorridorId = null,
   entryReason = null,
+  mode = null,
 }: CrewRegistrationScreenProps) {
+  const { snapshot } = useCrewBootstrap()
   const [corridors, setCorridors] = useState<any[]>([])
   const [existingRequests, setExistingRequests] = useState<any[]>([])
   const [corridorId, setCorridorId] = useState(initialCorridorId || '')
@@ -124,8 +128,15 @@ export default function CrewRegistrationScreen({
   const [error, setError] = useState<string | null>(null)
   const latestExistingRequest = existingRequests[0] ?? null
   const activeRequest = submittedRequest ?? latestExistingRequest
+  const assignment = snapshot.bootstrap.assignment
+  const activeSession = snapshot.bootstrap.active_session
 
   useEffect(() => {
+    if (assignment || activeSession) {
+      setIsLoadingCorridors(false)
+      return
+    }
+
     let mounted = true
 
     Promise.all([
@@ -153,7 +164,7 @@ export default function CrewRegistrationScreen({
     return () => {
       mounted = false
     }
-  }, [initialCorridorId])
+  }, [activeSession, assignment, initialCorridorId])
 
   const filePreviews = useMemo(
     () => files.map((file) => ({
@@ -293,6 +304,32 @@ export default function CrewRegistrationScreen({
     }
   }
 
+  if (activeSession || assignment) {
+    return (
+      <div className="page-container max-w-3xl py-8 md:py-10">
+        <div className="rounded-[28px] border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] p-6 shadow-[var(--shadow-md)]">
+          <div className="text-tag text-[var(--color-accent)]">Crew setup resolved</div>
+          <h1 className="mt-2 text-h2 text-white">
+            {activeSession ? 'You already have a live session' : 'Your nganya is already assigned'}
+          </h1>
+          <p className="mt-3 text-body text-[var(--color-text-secondary)]">
+            {activeSession
+              ? 'Resume or end the active session from the crew resolver instead of opening registration again.'
+              : 'This account is already ready for Go Live. Head back through the crew resolver to continue.'}
+          </p>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/crew"
+              className="inline-flex min-h-[48px] items-center justify-center rounded-[18px] bg-[var(--color-accent)] px-5 text-sm font-semibold text-white no-underline shadow-[var(--glow-accent-sm)]"
+            >
+              Return to crew setup
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (activeRequest) {
     const statusCopy = getStatusCopy(activeRequest.status)
 
@@ -321,7 +358,7 @@ export default function CrewRegistrationScreen({
           {statusCopy.note ? (
             <div className="mt-5 rounded-[20px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.4)] p-4 text-sm text-[var(--color-text-secondary)]">
               <div className="font-semibold text-[var(--color-text-primary)]">
-                {activeRequest.status === 'PENDING' ? 'Processing now' : 'Next step'}
+                {activeRequest.status === 'PENDING' ? 'Processing now' : mode === 'needs_info' ? 'Needs info' : 'Next step'}
               </div>
               <div className="mt-1">{statusCopy.note}</div>
             </div>
@@ -334,7 +371,7 @@ export default function CrewRegistrationScreen({
   return (
     <div className="page-container max-w-3xl py-8 md:py-10">
       <div className="mb-6 flex items-center gap-4">
-        <Link to="/crew/live" className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
+        <Link to="/crew" className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
           <ChevronLeft className="h-4 w-4" />
         </Link>
         <div>

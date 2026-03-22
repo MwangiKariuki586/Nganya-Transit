@@ -1,39 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Radio, History, LogOut, Shield } from 'lucide-react'
 import { Link, useMatches, useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
-import { getCrewEntryState } from '@/modules/crew/services/route-access'
+import { useCrewBootstrap } from '@/modules/crew/context/CrewBootstrapContext'
+import { getCrewStatusState } from '@/modules/crew/services/route-access'
 import { clearAuthSessionCookie } from '@/shared/auth/session-cookie'
+import { clearCrewBootstrapCache } from '@/modules/crew/services/bootstrap-cache'
 
 export function CrewNav() {
   const matches = useMatches()
   const navigate = useNavigate()
   const currentPath = matches[matches.length - 1]?.fullPath ?? '/crew/live'
-  const [showRegisterEntry, setShowRegisterEntry] = useState(currentPath === '/crew/register')
+  const { snapshot } = useCrewBootstrap()
+  const crewState = getCrewStatusState(snapshot)
 
-  useEffect(() => {
-    let active = true
-
-    void getCrewEntryState()
-      .then((access) => {
-        if (!active || !access?.allowed) {
-          return
-        }
-
-        setShowRegisterEntry(access.mappedNganyasCount === 0 && !access.activeSessionId)
-      })
-      .catch(() => {
-        if (!active) {
-          return
-        }
-
-        setShowRegisterEntry(currentPath === '/crew/register')
-      })
-
-    return () => {
-      active = false
-    }
-  }, [currentPath])
+  const showRegisterEntry = crewState === 'UNREGISTERED' || crewState === 'PENDING_APPROVAL' || crewState === 'NEEDS_INFO' || crewState === 'REJECTED'
 
   const navItems = useMemo(() => {
     const primaryItem = showRegisterEntry
@@ -49,6 +30,7 @@ export function CrewNav() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     clearAuthSessionCookie()
+    clearCrewBootstrapCache(snapshot.userId)
     navigate({ to: '/signin' })
   }
 

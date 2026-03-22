@@ -1,5 +1,107 @@
 # Executed SQL Changelog
 
+## 2026-03-22 - crew_bootstrap_rpc
+
+Applied via Supabase MCP migration `crew_bootstrap_rpc`.
+
+```sql
+create index if not exists idx_nganya_registration_requests_created_by_updated_at
+  on public.nganya_registration_requests (created_by, updated_at desc, created_at desc);
+
+create index if not exists idx_live_sessions_crew_status_last_ping
+  on public.live_sessions (crew_user_id, status, last_ping_at desc, started_at desc);
+
+create or replace function public.crew_bootstrap()
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_role text;
+  v_assignment jsonb;
+  v_request jsonb;
+  v_active_session jsonb;
+begin
+  if v_user_id is null then
+    return jsonb_build_object(
+      'role', null,
+      'assignment', null,
+      'request', null,
+      'active_session', null
+    );
+  end if;
+
+  v_role := public.current_app_role();
+
+  select to_jsonb(assignment_row)
+  into v_assignment
+  from (
+    select
+      n.id as nganya_id,
+      n.name as nganya_name,
+      c.name as terminal_label,
+      c.id as corridor_id,
+      coalesce(n.is_verified, false) as is_verified,
+      (
+        select media.media_url
+        from public.nganya_media media
+        where media.nganya_id = n.id
+          and media.media_type = 'image'
+        order by media.created_at asc
+        limit 1
+      ) as media_thumb_url
+    from public.crew_nganyas crew_map
+    join public.nganyas n on n.id = crew_map.nganya_id
+    join public.corridors c on c.id = n.corridor_id
+    where crew_map.crew_user_id = v_user_id
+      and coalesce(crew_map.is_active, true) = true
+    order by crew_map.created_at desc
+    limit 1
+  ) assignment_row;
+
+  select to_jsonb(request_row)
+  into v_request
+  from (
+    select
+      req.id,
+      req.status,
+      req.updated_at,
+      req.review_notes
+    from public.nganya_registration_requests req
+    where req.created_by = v_user_id
+    order by req.updated_at desc nulls last, req.created_at desc
+    limit 1
+  ) request_row;
+
+  select to_jsonb(session_row)
+  into v_active_session
+  from (
+    select
+      live.id,
+      live.started_at
+    from public.live_sessions live
+    where live.crew_user_id = v_user_id
+      and live.status = 'LIVE'
+      and live.ended_at is null
+    order by live.last_ping_at desc nulls last, live.started_at desc
+    limit 1
+  ) session_row;
+
+  return jsonb_build_object(
+    'role', v_role,
+    'assignment', v_assignment,
+    'request', v_request,
+    'active_session', v_active_session
+  );
+end;
+$$;
+
+grant execute on function public.crew_bootstrap() to authenticated;
+```
+
 ## 2026-03-22 - single_nganya_per_account
 
 Applied via Supabase MCP migration `single_nganya_per_account`.

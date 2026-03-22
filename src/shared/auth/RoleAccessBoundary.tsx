@@ -30,6 +30,15 @@ export function RoleAccessBoundary({ children }: RoleAccessBoundaryProps) {
     void resolveClientRole().then((role) => {
       if (cancelled) return
 
+      if (!role && audience !== 'guest') {
+        void navigate({
+          to: '/signin',
+          search: { returnTo: pathname.startsWith('/crew') ? '/crew' : pathname },
+          replace: true,
+        })
+        return
+      }
+
       const redirectPath = getRedirectPathForAudience(pathname, role)
       if (redirectPath && redirectPath !== pathname) {
         void navigate({ to: redirectPath, replace: true })

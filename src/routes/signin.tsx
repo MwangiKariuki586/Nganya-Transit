@@ -7,6 +7,9 @@ import { enforceGuestOnlyRoute, getHomePathForRole, resolveClientRole } from '@/
 import { syncAuthSessionCookie } from '@/shared/auth/session-cookie'
 
 export const Route = createFileRoute('/signin')({
+    validateSearch: (search: Record<string, unknown>) => ({
+        returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
+    }),
     beforeLoad: async () => {
         await enforceGuestOnlyRoute()
     },
@@ -15,6 +18,7 @@ export const Route = createFileRoute('/signin')({
 
 function SignInScreen() {
     const navigate = useNavigate()
+    const search = Route.useSearch()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -36,6 +40,18 @@ function SignInScreen() {
             syncAuthSessionCookie(data.session ?? null)
 
             const role = await resolveClientRole()
+            const returnTo = search.returnTo
+
+            if (returnTo?.startsWith('/crew')) {
+                navigate({ to: '/crew' })
+                return
+            }
+
+            if (returnTo && returnTo.startsWith('/')) {
+                window.location.assign(returnTo)
+                return
+            }
+
             navigate({ to: role ? getHomePathForRole(role) : '/' })
         } catch (err: any) {
             setError(err.message || 'Failed to sign in. Please check your credentials.')
