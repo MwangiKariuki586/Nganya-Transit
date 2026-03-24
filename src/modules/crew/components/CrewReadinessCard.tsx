@@ -35,6 +35,8 @@ interface CrewReadinessCardProps {
   collapsed?: boolean;
   onToggle?: () => void;
   nextRequired?: "location" | "direction" | "seats" | "start";
+  readinessCount?: number;
+  readinessTotal?: number;
 }
 
 function formatFixTime(value: string | null | undefined) {
@@ -133,9 +135,13 @@ export function CrewReadinessCard({
   collapsed = false,
   onToggle,
   nextRequired,
+  readinessCount,
+  readinessTotal,
 }: CrewReadinessCardProps) {
-  const readyCount = items.filter((item) => item.status === "done").length;
-  const progress = `${Math.round((readyCount / items.length) * 100)}%`;
+  const readyCount =
+    readinessCount ?? items.filter((item) => item.status === "done").length;
+  const totalCount = readinessTotal ?? items.length;
+  const progress = `${Math.round((readyCount / totalCount) * 100)}%`;
   const fixTime = formatFixTime(lastFixAt);
   const showLocationAction =
     permissionStatus !== "granted" &&
@@ -151,7 +157,7 @@ export function CrewReadinessCard({
           <div className="text-tag text-[var(--color-accent)]">Preflight</div>
           <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
             <span>
-              Readiness {readyCount}/{items.length}
+              Readiness {readyCount}/{totalCount}
             </span>
             {onToggle ? (
               <button
@@ -176,14 +182,14 @@ export function CrewReadinessCard({
           </div>
         </div>
 
-        {showLocationAction ? (
+        {showLocationAction && collapsed ? (
           <Button
             variant="secondary"
             className={`min-h-[40px] rounded-[16px] px-3 text-sm font-semibold ${compact ? "w-auto" : ""} ${collapsed ? "self-center" : ""}`}
             onClick={onEnableLocation}
           >
             {permissionStatus === "denied"
-              ? "Open settings"
+              ? "Retry location"
               : "Enable location"}
           </Button>
         ) : null}
@@ -205,9 +211,13 @@ export function CrewReadinessCard({
 
               return (
                 <div
-                  key={item.id}
-                  className="rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-2.5"
-                >
+              key={item.id}
+              className={`rounded-[16px] border px-3 py-2.5 ${
+                item.id === nextRequired
+                  ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)]"
+                  : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)]"
+              }`}
+            >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5 text-sm">
                       {getStatusIcon(item.status)}
@@ -272,8 +282,21 @@ export function CrewReadinessCard({
                   {locationCopy}
                 </div>
               </div>
-              <div className="rounded-[var(--radius-full)] border border-[var(--glass-border)] bg-[var(--glass-bg)] px-2.5 py-1 text-caption text-[var(--color-text-tertiary)]">
-                Shared only while Live
+              <div className="flex flex-col items-end gap-2">
+                <div className="rounded-[var(--radius-full)] border border-[var(--glass-border)] bg-[var(--glass-bg)] px-2.5 py-1 text-caption text-[var(--color-text-tertiary)]">
+                  Shared only while Live
+                </div>
+                {nextRequired === "location" && showLocationAction ? (
+                  <Button
+                    variant="secondary"
+                    className="min-h-[32px] rounded-[12px] px-2 py-1 text-xs font-semibold"
+                    onClick={onEnableLocation}
+                  >
+                    {permissionStatus === "denied"
+                      ? "Retry location"
+                      : "Enable location"}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>

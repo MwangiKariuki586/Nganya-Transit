@@ -1,9 +1,10 @@
-export const CREW_ACTIVE_SESSION_STORAGE_KEY = 'matwana.crew.activeSessionId'
+﻿export const CREW_ACTIVE_SESSION_STORAGE_KEY = 'matwana.crew.activeSessionId'
 export const CREW_SETUP_DRAFT_STORAGE_KEY = 'matwana.crew.setupDraft'
 
 export interface CrewSetupDraft {
   direction: 'TO_TOWN' | 'FROM_TOWN' | null
   seatsLeft: number
+  seatsConfirmed?: boolean
 }
 
 export function readCrewActiveSessionId(): string | null {
@@ -43,3 +44,4 @@ export function clearCrewSetupDraft() {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(CREW_SETUP_DRAFT_STORAGE_KEY)
 }
+

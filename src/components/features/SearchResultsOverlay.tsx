@@ -155,7 +155,7 @@ export default function SearchResultsOverlay({ isOpen, onClose, fromStage, toPla
         if (items.length === 0) return null
         return (
             <div className="mb-6">
-                <h4 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-3">{title}</h4>
+                <h4 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-4">{title}</h4>
                 <div className="space-y-3">
                     {items.map((r) => {
                         const status = getStatusInfo(r.eta_minutes, r.confidence_level)

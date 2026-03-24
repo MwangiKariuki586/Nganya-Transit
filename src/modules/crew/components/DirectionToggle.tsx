@@ -16,7 +16,7 @@ export function DirectionToggle({
   fromTownLabel = 'From Town',
 }: DirectionToggleProps) {
   const baseClass = 'flex min-h-[48px] items-center justify-center rounded-[18px] border px-3 py-2 text-sm font-semibold transition-all duration-200'
-  const activeClass = 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-[0_0_28px_rgba(255,45,120,0.22)]'
+  const activeClass = 'border-[var(--color-accent)]  text-white shadow-[0_0_28px_rgba(255,45,120,0.22)]'
   const idleClass = 'border-[var(--glass-border)] bg-white/[0.04] text-[var(--color-text-primary)] hover:border-[var(--glass-border-hover)] hover:bg-white/[0.06]'
 
   return (

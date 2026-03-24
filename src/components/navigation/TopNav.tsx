@@ -4,13 +4,16 @@
  * Glass header with backdrop blur.
  */
 
-import { Compass, Heart, Camera, User, Zap, LogOut } from 'lucide-react'
+import { Compass, Heart, Camera, Zap, LogOut } from 'lucide-react'
 import { Link, useMatches, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
-import { getProfile } from '../../lib/queries/profile'
 import { clearAuthSessionCookie } from '@/shared/auth/session-cookie'
+
+interface NavProps {
+    session: Session | null;
+    profile: any;
+}
 
 const navItems = [
     { to: '/', icon: Compass, label: 'Discover' },
@@ -19,37 +22,10 @@ const navItems = [
    // { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
-export default function TopNav() {
+export default function TopNav({ session, profile }: NavProps) {
     const matches = useMatches()
     const navigate = useNavigate()
     const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
-    const [session, setSession] = useState<Session | null>(null)
-    const [profile, setProfile] = useState<any>(null)
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-            if (session?.user) {
-                fetchProfile(session.user.id)
-            }
-        })
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-            if (session?.user) {
-                fetchProfile(session.user.id)
-            } else {
-                setProfile(null)
-            }
-        })
-
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const fetchProfile = async (userId: string) => {
-        const data = await getProfile(userId)
-        setProfile(data)
-    }
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -59,7 +35,7 @@ export default function TopNav() {
 
     return (
         <header
-            className="hidden md:block fixed top-0 left-0 right-0 z-[var(--z-nav)]"
+            className="hidden md:block sticky top-0 left-0 right-0 z-[var(--z-nav)]"
             role="banner"
         >
             {/* Glass background */}
@@ -71,7 +47,7 @@ export default function TopNav() {
                     to="/"
                     className="flex items-center gap-2 no-underline group"
                 >
-                    <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--color-accent)] flex items-center justify-center shadow-[var(--glow-accent-sm)]">
+                    <div className="w-8 h-8 rounded-sm bg-[var(--color-accent)] flex items-center justify-center shadow-[var(--glow-accent-sm)]">
                         <Zap className="w-4.5 h-4.5 text-white" />
                     </div>
                     <span className="font-display text-lg font-bold text-[var(--color-text-primary)] tracking-tight group-hover:text-[var(--color-accent)] transition-colors">
@@ -90,7 +66,7 @@ export default function TopNav() {
                                 <Link
                                     key={item.to}
                                     to={item.to}
-                                    className="ml-2 inline-flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-white text-sm font-semibold shadow-[var(--glow-accent-sm)] hover:shadow-[var(--glow-accent)] hover:bg-[var(--color-accent-hover)] transition-all duration-150 no-underline"
+                                    className="ml-2 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm font-semibold shadow-[var(--glow-accent-sm)] hover:shadow-[var(--glow-accent)] hover:bg-[var(--color-accent-hover)] transition-all duration-150 no-underline"
                                 >
                                     <Camera className="w-4 h-4" />
                                     Spot
@@ -102,7 +78,7 @@ export default function TopNav() {
                             <Link
                                 key={item.to}
                                 to={item.to}
-                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-all duration-150 no-underline ${isActive
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 no-underline ${isActive
                                     ? 'text-[var(--color-accent)] bg-[var(--color-accent-soft)]'
                                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)]'
                                     }`}
@@ -137,7 +113,7 @@ export default function TopNav() {
 
                                 <button
                                     onClick={handleSignOut}
-                                    className="p-2 rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
+                                    className="p-2 rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
                                     title="Sign Out"
                                 >
                                     <LogOut className="w-4.5 h-4.5" />
@@ -147,13 +123,13 @@ export default function TopNav() {
                             <div className="flex items-center gap-2">
                                 <Link
                                     to="/signin"
-                                    className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all no-underline"
+                                    className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all no-underline"
                                 >
                                     Sign In
                                 </Link>
                                 <Link
                                     to="/signup"
-                                    className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] bg-[var(--glass-bg-strong)] border border-[var(--glass-border-hover)] text-white text-sm font-bold hover:bg-[var(--color-accent)] hover:border-transparent transition-all shadow-[var(--shadow-sm)] no-underline"
+                                    className="inline-flex items-center px-4 py-2 rounded-md bg-[var(--glass-bg-strong)] border border-[var(--glass-border-hover)] text-white text-sm font-bold hover:bg-[var(--color-accent)] hover:border-transparent transition-all shadow-[var(--shadow-sm)] no-underline"
                                 >
                                     Join
                                 </Link>

@@ -181,6 +181,7 @@ export default function CrewLiveSetupScreen() {
   const [lastLiveAt, setLastLiveAt] = useState<string | null>(null);
   const [direction, setDirection] = useState<CrewDirectionValue | null>(null);
   const [seatsLeft, setSeatsLeft] = useState(10);
+  const [hasConfirmedSeats, setHasConfirmedSeats] = useState(false);
   const [permissionStatus, setPermissionStatus] =
     useState<PermissionStateLocal>("prompt");
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -240,10 +241,17 @@ export default function CrewLiveSetupScreen() {
     [],
   );
 
-  // Guided attention: compute next required step
+  const assignmentReady = Boolean(assignment?.nganya_id);
   const locationGranted = permissionStatus === "granted";
   const directionSelected = Boolean(direction);
-  const seatsSet = Number.isFinite(seatsLeft);
+  const seatsSet = hasConfirmedSeats;
+  const readinessTotal = 4;
+  const readinessCount = [
+    assignmentReady,
+    locationGranted,
+    directionSelected,
+    seatsSet,
+  ].filter(Boolean).length;
 
   const nextRequired = !locationGranted
     ? "location"
@@ -254,16 +262,10 @@ export default function CrewLiveSetupScreen() {
         : "start";
 
 
-  const isReadyToStart = nextRequired === "start";
+  const isReadyToStart = assignmentReady && nextRequired === "start";
 
   const captureLocation = useCallback(async () => {
-    console.log(
-      "📍 captureLocation called, current permissionStatus:",
-      permissionStatus,
-    );
-
     if (!navigator.geolocation) {
-      console.log("❌ Geolocation not supported");
       setPermissionStatus("unsupported");
       throw new Error("This browser does not support geolocation.");
     }
@@ -301,18 +303,10 @@ export default function CrewLiveSetupScreen() {
         },
         (error) => {
           clearTimeout(timeoutId);
-          console.log("❌ Geolocation error:", {
-            code: error.code,
-            message: error.message,
-            PERMISSION_DENIED: error.PERMISSION_DENIED,
-            permissionStatusBefore: permissionStatus,
-          });
-
           let errorMessage = "Location permission is required to go Live.";
 
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              console.log("🚫 Permission denied by user in getCurrentPosition");
               setPermissionStatus("denied");
               if (typeof window !== "undefined" && window.isSecureContext === false) {
                 errorMessage =
@@ -353,6 +347,7 @@ export default function CrewLiveSetupScreen() {
     const draft = readCrewSetupDraft();
     setDirection(draft?.direction || null);
     setSeatsLeft(clampSeats(draft?.seatsLeft ?? 10));
+    setHasConfirmedSeats(Boolean(draft?.seatsConfirmed));
   }, []);
 
   useEffect(() => {
@@ -494,8 +489,9 @@ export default function CrewLiveSetupScreen() {
     writeCrewSetupDraft({
       direction,
       seatsLeft,
+      seatsConfirmed: hasConfirmedSeats,
     });
-  }, [assignment, direction, seatsLeft]);
+  }, [assignment, direction, seatsLeft, hasConfirmedSeats]);
 
   const autoDetectedStage = useMemo(
     () => detectNearestStage(stages, coords),
@@ -523,20 +519,24 @@ export default function CrewLiveSetupScreen() {
     registrationRequest?.corridors?.name ||
     "Unknown terminal";
   const directionLabels = getDirectionLabels(corridorName);
-  const controlsReady = Boolean(direction && Number.isFinite(seatsLeft));
-  const canStart = Boolean(
-    assignment?.nganya_id && permissionStatus === "granted" && controlsReady,
-  );
+  const controlsReady = Boolean(directionSelected && seatsSet);
+  const canStart = Boolean(assignmentReady && isReadyToStart);
   const gpsQuality = getGpsQuality(coords?.accuracy ?? null);
   const mobileReadinessCollapsed =
-    Boolean(assignment) && !isMobileReadinessExpanded;
+    readinessCount > 1 && !isMobileReadinessExpanded;
+  const directionIsActive = nextRequired === "direction";
+  const seatsIsActive = nextRequired === "seats";
+  const startIsActive = isReadyToStart;
+  const settingsNeedAttention = directionIsActive || seatsIsActive;
   const stickyHelperText = !assignment
     ? "Complete crew setup before going Live."
     : permissionStatus !== "granted"
       ? "Enable location to start Live."
       : !direction
         ? "Choose direction to continue."
-        : `${assignment.nganya_name} | ${direction === "TO_TOWN" ? directionLabels.toTown : directionLabels.fromTown} | ${seatsLeft === 0 ? "Full" : `${seatsLeft} seats left`}`;
+        : !seatsSet
+          ? "Confirm seats to continue."
+          : `${assignment.nganya_name} | ${direction === "TO_TOWN" ? directionLabels.toTown : directionLabels.fromTown} | ${seatsLeft === 0 ? "Full" : `${seatsLeft} seats left`}`;
 
   const readinessItems = [
     {
@@ -587,7 +587,7 @@ export default function CrewLiveSetupScreen() {
       status: controlsReady ? "done" : "pending",
       detail: controlsReady
         ? `${direction === "TO_TOWN" ? directionLabels.toTown : directionLabels.fromTown} | ${seatsLeft === 0 ? "Full (0 seats)" : `${seatsLeft} seats left`}`
-        : "Direction is still required.",
+        : "Direction and seats are required before you go live.",
     },
   ] as const;
 
@@ -597,6 +597,38 @@ export default function CrewLiveSetupScreen() {
     null;
   const assignmentPlateLast4 = registrationRequest?.plate_last4 || null;
   const assignmentSacco = registrationRequest?.sacco || null;
+
+  const handleDirectionChange = (value: CrewDirectionValue) => {
+    setDirection(value);
+  };
+
+  const handleSeatsChange = (value: number) => {
+    setHasConfirmedSeats(true);
+    setSeatsLeft(value);
+  };
+
+  const handleSeatStep = (delta: number) => {
+    setHasConfirmedSeats(true);
+    setSeatsLeft((current) => clampSeats(current + delta));
+  };
+
+  const handleLocationAction = useCallback(() => {
+    void captureLocation().catch((permissionError: any) => {
+      setError(
+        permissionError?.message ||
+          "Location permission is required to go Live.",
+      );
+    });
+  }, [captureLocation]);
+
+  const ghostCtaLabel =
+    nextRequired === "location"
+      ? "Enable location to start"
+      : nextRequired === "direction"
+        ? "Set direction to start"
+        : nextRequired === "seats"
+          ? "Set seats to start"
+          : "Start Live";
 
   const handleStart = async () => {
     if (!assignment?.nganya_id || !assignment?.corridor_id) {
@@ -611,6 +643,11 @@ export default function CrewLiveSetupScreen() {
 
     if (!direction) {
       setError("Choose your direction before going Live.");
+      return;
+    }
+
+    if (!seatsSet) {
+      setError("Confirm seats before going Live.");
       return;
     }
 
@@ -870,7 +907,13 @@ export default function CrewLiveSetupScreen() {
               </section>
 
               {assignment && permissionStatus === "granted" ? (
-                <section className="rounded-[28px] border border-white/[0.08] bg-[rgba(23,23,31,0.94)] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)] md:p-6">
+                <section
+                  className={`rounded-[28px] border p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)] transition-all duration-300 md:p-6 ${
+                    settingsNeedAttention
+                      ? "border-white/[0.05] bg-[rgba(23,23,31,0.74)]"
+                      : "border-white/[0.08] bg-[rgba(23,23,31,0.94)]"
+                  }`}
+                >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="text-caption text-[var(--color-text-tertiary)]">
@@ -911,29 +954,21 @@ export default function CrewLiveSetupScreen() {
                   gpsQuality={gpsQuality}
                   networkStatus={networkStatus}
                   networkMessage={networkMessage}
+                  readinessCount={readinessCount}
+                  readinessTotal={readinessTotal}
                   compact
                   collapsed={mobileReadinessCollapsed}
                   nextRequired={nextRequired}
                   onSetDirection={() => scrollToSection("direction")}
                   onSetSeats={() => scrollToSection("seats")}
-                  onToggle={
-                    assignment
-                      ? () =>
-                          setIsMobileReadinessExpanded((current) => !current)
-                      : undefined
+                  onToggle={() =>
+                    setIsMobileReadinessExpanded((current) => !current)
                   }
-                  onEnableLocation={() => {
-                    void captureLocation().catch((permissionError: any) => {
-                      setError(
-                        permissionError?.message ||
-                          "Location permission is required to go Live.",
-                      );
-                    });
-                  }}
+                  onEnableLocation={handleLocationAction}
                 />
               </div>
 
-              <div className="hidden xl:block">
+              <div className="hidden xl:block" ref={startLiveButtonRef}>
                 <CrewReadinessCard
                   items={readinessItems as any}
                   permissionStatus={permissionStatus}
@@ -941,17 +976,12 @@ export default function CrewLiveSetupScreen() {
                   gpsQuality={gpsQuality}
                   networkStatus={networkStatus}
                   networkMessage={networkMessage}
+                  readinessCount={readinessCount}
+                  readinessTotal={readinessTotal}
                   nextRequired={nextRequired}
                   onSetDirection={() => scrollToSection("direction")}
                   onSetSeats={() => scrollToSection("seats")}
-                  onEnableLocation={() => {
-                    void captureLocation().catch((permissionError: any) => {
-                      setError(
-                        permissionError?.message ||
-                          "Location permission is required to go Live.",
-                      );
-                    });
-                  }}
+                  onEnableLocation={handleLocationAction}
                 />
               </div>
 
@@ -959,41 +989,39 @@ export default function CrewLiveSetupScreen() {
               <div className="xl:hidden">
                 <Button
                   variant="ghost"
-                  className="min-h-[44px] w-full rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-4 text-sm font-semibold text-[var(--color-text-secondary)] disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
+                  className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${
+                    startIsActive
+                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.10)] text-[var(--color-accent)] shadow-[0_12px_32px_rgba(255,45,120,0.10)]"
+                      : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-secondary)]"
+                  } disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none`}
                   disabled={!isReadyToStart}
                   onClick={handleStart}
                 >
                   <Radio className="h-4 w-4" />
-                  {nextRequired === "location" && "Enable location to start"}
-                  {nextRequired === "direction" && "Set direction to start"}
-                  {nextRequired === "seats" && "Set seats to start"}
-                  {nextRequired === "start" && "Start Live"}
+                  {ghostCtaLabel}
                 </Button>
               </div>
 
               <div className="hidden xl:block">
                 <Button
                   variant="ghost"
-                  className="min-h-[44px] w-full rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-4 text-sm font-semibold text-[var(--color-text-secondary)] disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
+                  className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${
+                    startIsActive
+                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.10)] text-[var(--color-accent)] shadow-[0_12px_32px_rgba(255,45,120,0.10)]"
+                      : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-secondary)]"
+                  } disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none`}
                   disabled={!isReadyToStart}
                   onClick={handleStart}
                 >
                   <Radio className="h-4 w-4" />
-                  {nextRequired === "location" && "Enable location to start"}
-                  {nextRequired === "direction" && "Set direction to start"}
-                  {nextRequired === "seats" && "Set seats to start"}
-                  {nextRequired === "start" && "Start Live"}
+                  {ghostCtaLabel}
                 </Button>
               </div>
 
               {/* Combined Live settings with spotlight */}
               <SpotlightCard
-                isActive={
-                  nextRequired === "direction" || nextRequired === "seats"
-                }
-                showRequiredChip={
-                  nextRequired === "direction" || nextRequired === "seats"
-                }
+                isActive={settingsNeedAttention}
+                showRequiredChip={settingsNeedAttention}
               >
                 <div className="text-caption text-[var(--color-text-tertiary)]">
                   Live settings (required)
@@ -1002,14 +1030,27 @@ export default function CrewLiveSetupScreen() {
                   These are shown to riders in the live feed.
                 </div>
 
-                {/* Direction section */}
-                <div className="mt-4" ref={directionSectionRef}>
-                  <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-                    Direction
+                <div
+                  ref={directionSectionRef}
+                  className={`mt-4 rounded-[22px] border px-4 py-4 transition-all ${
+                    directionIsActive
+                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)] shadow-[0_10px_28px_rgba(255,45,120,0.08)]"
+                      : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)]"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      Direction
+                    </div>
+                    {directionIsActive ? (
+                      <div className="rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--color-accent)]">
+                        REQUIRED
+                      </div>
+                    ) : null}
                   </div>
                   <DirectionToggle
                     value={direction}
-                    onChange={setDirection}
+                    onChange={handleDirectionChange}
                     disabled={!assignment}
                     toTownLabel={directionLabels.toTown}
                     fromTownLabel={directionLabels.fromTown}
@@ -1019,39 +1060,51 @@ export default function CrewLiveSetupScreen() {
                   </div>
                 </div>
 
-                {/* Seats section */}
-                <div className="mt-6" ref={seatsSectionRef}>
-                  <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-                    Seats
+                <div
+                  ref={seatsSectionRef}
+                  className={`mt-4 rounded-[22px] border px-4 py-4 transition-all ${
+                    seatsIsActive
+                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)] shadow-[0_10px_28px_rgba(255,45,120,0.08)]"
+                      : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)]"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      Seats
+                    </div>
+                    {seatsIsActive ? (
+                      <div className="rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--color-accent)]">
+                        REQUIRED
+                      </div>
+                    ) : null}
                   </div>
                   <SeatsQuickButtons
                     value={seatsLeft}
-                    onChange={(value) => setSeatsLeft(value)}
+                    onChange={handleSeatsChange}
                     disabled={!assignment}
+                    isConfirmed={hasConfirmedSeats}
                   />
 
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       type="button"
                       className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-primary)]"
-                      onClick={() =>
-                        setSeatsLeft((current) => clampSeats(current - 1))
-                      }
+                      onClick={() => handleSeatStep(-1)}
                       disabled={!assignment || seatsLeft === 0}
                     >
                       <Minus className="h-4 w-4" />
                     </button>
                     <div className="flex-1 rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-2 text-center text-body-sm text-[var(--color-text-secondary)]">
-                      {seatsLeft === 0
+                      {!hasConfirmedSeats
+                        ? "Confirm seats left"
+                        : seatsLeft === 0
                         ? "Full (0 seats)"
                         : `${seatsLeft} seats left`}
                     </div>
                     <button
                       type="button"
                       className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-primary)]"
-                      onClick={() =>
-                        setSeatsLeft((current) => clampSeats(current + 1))
-                      }
+                      onClick={() => handleSeatStep(1)}
                       disabled={!assignment}
                     >
                       <Plus className="h-4 w-4" />
@@ -1061,7 +1114,7 @@ export default function CrewLiveSetupScreen() {
                   <div className="mt-3 text-body-sm text-[var(--color-text-secondary)]">
                     {seatsLeft === 0
                       ? "Full selected. Consider stopping Live when boarding is fully closed."
-                      : "Keep it honest — it affects recommendations."}
+                      : "Keep it honest - it affects recommendations."}
                   </div>
                 </div>
               </SpotlightCard>
@@ -1069,7 +1122,11 @@ export default function CrewLiveSetupScreen() {
               <div className="hidden xl:block">
                 <Button
                   variant="primary"
-                  className="min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
+                  className={`min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold transition-all disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none ${
+                    startIsActive
+                      ? "ring-1 ring-[var(--color-accent)]/35 shadow-[0_16px_42px_rgba(255,45,120,0.16)]"
+                      : ""
+                  }`}
                   isLoading={isStarting}
                   disabled={!canStart}
                   onClick={handleStart}
@@ -1084,7 +1141,7 @@ export default function CrewLiveSetupScreen() {
           <div className="h-24 xl:hidden" />
 
           {/* Mobile sticky guidance bar */}
-          <div className="fixed inset-x-0 bottom-0 z-[var(--z-fab)] border-t border-[var(--glass-border)] bg-[var(--color-bg-base)]/92 px-4 py-3 backdrop-blur-xl xl:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-[var(--z-fab)] border-t border-[var(--glass-border)] bg-[var(--color-bg-base)]/92 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl xl:hidden">
             <div className="mx-auto max-w-7xl space-y-3">
               <div className="min-w-0">
                 <div className="text-caption text-[var(--color-text-tertiary)]">
@@ -1114,30 +1171,7 @@ export default function CrewLiveSetupScreen() {
                       className="rounded-[12px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-2 text-xs font-semibold text-[var(--color-accent)]"
                       onClick={() => {
                         if (nextRequired === "location") {
-                          if (permissionStatus === "denied") {
-                            // Try to open browser settings on mobile
-                            if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-                              // iOS: Can't programmatically open settings, show instructions
-                              setError(
-                                "To enable location: Settings > Safari > Location > Ask",
-                              );
-                            } else if (/Android/.test(navigator.userAgent)) {
-                              // Android: Try to open settings
-                              window.open(
-                                "chrome://settings/content/location",
-                                "_blank",
-                              );
-                            }
-                          } else {
-                            void captureLocation().catch(
-                              (permissionError: any) => {
-                                setError(
-                                  permissionError?.message ||
-                                    "Location permission is required to go Live.",
-                                );
-                              },
-                            );
-                          }
+                          handleLocationAction();
                         } else if (nextRequired === "direction") {
                           scrollToSection("direction");
                         } else if (nextRequired === "seats") {
@@ -1146,23 +1180,31 @@ export default function CrewLiveSetupScreen() {
                       }}
                     >
                       {nextRequired === "location" &&
-                        (permissionStatus === "denied" ? "Settings" : "Enable")}
+                        (permissionStatus === "denied"
+                          ? "Retry location"
+                          : "Enable")}
                       {nextRequired === "direction" && "Set direction"}
                       {nextRequired === "seats" && "Set seats"}
                     </button>
                   )}
                 </div>
               </div>
-              <Button
-                variant="primary"
-                className="min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none"
-                isLoading={isStarting}
-                disabled={!canStart}
-                onClick={handleStart}
-              >
-                <Radio className="h-4 w-4" />
-                Start Live
-              </Button>
+              <div ref={startLiveButtonRef}>
+                <Button
+                  variant="primary"
+                  className={`min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold transition-all disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none ${
+                    startIsActive
+                      ? "ring-1 ring-[var(--color-accent)]/35 shadow-[0_16px_42px_rgba(255,45,120,0.16)]"
+                      : ""
+                  }`}
+                  isLoading={isStarting}
+                  disabled={!canStart}
+                  onClick={handleStart}
+                >
+                  <Radio className="h-4 w-4" />
+                  Start Live
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1186,3 +1228,4 @@ export default function CrewLiveSetupScreen() {
     </div>
   );
 }
+

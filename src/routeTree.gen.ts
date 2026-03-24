@@ -26,7 +26,9 @@ import { Route as crewCrewPendingRouteImport } from './routes/(crew)/crew/pendin
 import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
 import { Route as crewCrewLayoutRouteImport } from './routes/(crew)/crew/_layout'
+import { Route as adminAdminUsersRouteImport } from './routes/(admin)/admin/users'
 import { Route as adminAdminRegistrationsRouteImport } from './routes/(admin)/admin/registrations'
+import { Route as adminAdminCrewRouteImport } from './routes/(admin)/admin/crew'
 import { Route as adminAdminLayoutRouteImport } from './routes/(admin)/admin/_layout'
 import { Route as crewCrewSessionIdRouteImport } from './routes/(crew)/crew/session.$id'
 
@@ -114,9 +116,19 @@ const crewCrewLayoutRoute = crewCrewLayoutRouteImport.update({
   path: '/crew',
   getParentRoute: () => rootRouteImport,
 } as any)
+const adminAdminUsersRoute = adminAdminUsersRouteImport.update({
+  id: '/(admin)/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const adminAdminRegistrationsRoute = adminAdminRegistrationsRouteImport.update({
   id: '/(admin)/admin/registrations',
   path: '/admin/registrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const adminAdminCrewRoute = adminAdminCrewRouteImport.update({
+  id: '/(admin)/admin/crew',
+  path: '/admin/crew',
   getParentRoute: () => rootRouteImport,
 } as any)
 const adminAdminLayoutRoute = adminAdminLayoutRouteImport.update({
@@ -140,7 +152,9 @@ export interface FileRoutesByFullPath {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin': typeof adminAdminLayoutRoute
+  '/admin/crew': typeof adminAdminCrewRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
+  '/admin/users': typeof adminAdminUsersRoute
   '/crew': typeof crewCrewLayoutRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
@@ -161,7 +175,9 @@ export interface FileRoutesByTo {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin': typeof adminAdminIndexRoute
+  '/admin/crew': typeof adminAdminCrewRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
+  '/admin/users': typeof adminAdminUsersRoute
   '/crew': typeof crewCrewIndexRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
@@ -182,7 +198,9 @@ export interface FileRoutesById {
   '/(fan)/spot': typeof fanSpotRoute
   '/(fan)/': typeof fanIndexRoute
   '/(admin)/admin/_layout': typeof adminAdminLayoutRoute
+  '/(admin)/admin/crew': typeof adminAdminCrewRoute
   '/(admin)/admin/registrations': typeof adminAdminRegistrationsRoute
+  '/(admin)/admin/users': typeof adminAdminUsersRoute
   '/(crew)/crew/_layout': typeof crewCrewLayoutRoute
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
   '/(crew)/crew/live': typeof crewCrewLiveRoute
@@ -205,7 +223,9 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin'
+    | '/admin/crew'
     | '/admin/registrations'
+    | '/admin/users'
     | '/crew'
     | '/crew/history'
     | '/crew/live'
@@ -226,7 +246,9 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin'
+    | '/admin/crew'
     | '/admin/registrations'
+    | '/admin/users'
     | '/crew'
     | '/crew/history'
     | '/crew/live'
@@ -246,7 +268,9 @@ export interface FileRouteTypes {
     | '/(fan)/spot'
     | '/(fan)/'
     | '/(admin)/admin/_layout'
+    | '/(admin)/admin/crew'
     | '/(admin)/admin/registrations'
+    | '/(admin)/admin/users'
     | '/(crew)/crew/_layout'
     | '/(crew)/crew/history'
     | '/(crew)/crew/live'
@@ -269,7 +293,9 @@ export interface RootRouteChildren {
   fanSpotRoute: typeof fanSpotRoute
   fanIndexRoute: typeof fanIndexRoute
   adminAdminLayoutRoute: typeof adminAdminLayoutRoute
+  adminAdminCrewRoute: typeof adminAdminCrewRoute
   adminAdminRegistrationsRoute: typeof adminAdminRegistrationsRoute
+  adminAdminUsersRoute: typeof adminAdminUsersRoute
   crewCrewLayoutRoute: typeof crewCrewLayoutRoute
   crewCrewHistoryRoute: typeof crewCrewHistoryRoute
   crewCrewLiveRoute: typeof crewCrewLiveRoute
@@ -402,11 +428,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof crewCrewLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(admin)/admin/users': {
+      id: '/(admin)/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof adminAdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(admin)/admin/registrations': {
       id: '/(admin)/admin/registrations'
       path: '/admin/registrations'
       fullPath: '/admin/registrations'
       preLoaderRoute: typeof adminAdminRegistrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(admin)/admin/crew': {
+      id: '/(admin)/admin/crew'
+      path: '/admin/crew'
+      fullPath: '/admin/crew'
+      preLoaderRoute: typeof adminAdminCrewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(admin)/admin/_layout': {
@@ -437,7 +477,9 @@ const rootRouteChildren: RootRouteChildren = {
   fanSpotRoute: fanSpotRoute,
   fanIndexRoute: fanIndexRoute,
   adminAdminLayoutRoute: adminAdminLayoutRoute,
+  adminAdminCrewRoute: adminAdminCrewRoute,
   adminAdminRegistrationsRoute: adminAdminRegistrationsRoute,
+  adminAdminUsersRoute: adminAdminUsersRoute,
   crewCrewLayoutRoute: crewCrewLayoutRoute,
   crewCrewHistoryRoute: crewCrewHistoryRoute,
   crewCrewLiveRoute: crewCrewLiveRoute,

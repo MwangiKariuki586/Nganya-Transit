@@ -8,7 +8,7 @@ export async function getCorridorSightings(corridorId: string) {
         .select(`
       *, 
       nganya:nganyas(name, tags), 
-      user:v_public_profiles(handle, avatar_url), 
+      user:v_public_profiles!sightings_user_id_fkey(handle, avatar_url), 
       confidence:v_sighting_confidence(*)
     `)
         .eq('corridor_id', corridorId)

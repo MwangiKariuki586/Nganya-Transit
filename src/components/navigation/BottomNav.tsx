@@ -1,10 +1,12 @@
 import { Compass, Search, Heart, User, LogIn } from 'lucide-react'
 import { Link, useMatches } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import FAB from '../ui/FAB'
-import { getProfile } from '../../lib/queries/profile'
+
+interface NavProps {
+    session: Session | null;
+    profile: any;
+}
 
 /* Tab configuration */
 const tabs = [
@@ -15,34 +17,9 @@ const tabs = [
     { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
-export default function BottomNav() {
+export default function BottomNav({ session, profile }: NavProps) {
     const matches = useMatches()
     const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
-    const [session, setSession] = useState<Session | null>(null)
-    const [profile, setProfile] = useState<any>(null)
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-            if (session?.user) fetchProfile(session.user.id)
-        })
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-            if (session?.user) {
-                fetchProfile(session.user.id)
-            } else {
-                setProfile(null)
-            }
-        })
-
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const fetchProfile = async (userId: string) => {
-        const data = await getProfile(userId)
-        setProfile(data)
-    }
 
     return (
         <nav

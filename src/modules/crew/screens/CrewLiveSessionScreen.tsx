@@ -144,7 +144,7 @@ export default function CrewLiveSessionScreen({ sessionId }: CrewLiveSessionScre
         <Button variant="secondary" className="min-h-[56px]" onClick={() => navigate({ to: '/crew/history' })}>
           Session history
         </Button>
-        <Button variant="primary" className="min-h-[56px] bg-red-500 hover:bg-red-500/90 shadow-none" isLoading={isStopping} onClick={handleStop}>
+        <Button variant="primary" className="min-h-[56px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)/90] shadow-none" isLoading={isStopping} onClick={handleStop}>
           Stop session
         </Button>
       </div>
