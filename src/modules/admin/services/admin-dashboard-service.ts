@@ -23,6 +23,16 @@ export const adminDashboardService = {
     return listAdminNganyaOptionsServerFn({ data: { accessToken } })
   },
 
+  async getCrewManagementData() {
+    const accessToken = await requireClientAccessToken()
+    const [crewRows, nganyaOptions] = await Promise.all([
+      listAdminCrewServerFn({ data: { accessToken } }),
+      listAdminNganyaOptionsServerFn({ data: { accessToken } }),
+    ])
+
+    return { crewRows, nganyaOptions }
+  },
+
   async updateUserRole(userId: string, role: AppRole) {
     const accessToken = await requireClientAccessToken()
     return updateAdminUserRoleServerFn({ data: { accessToken, userId, role } })

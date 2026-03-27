@@ -1,25 +1,21 @@
-import { ClipboardList, LayoutGrid, LogOut, ShieldCheck, UserCog, Users } from "lucide-react";
-import { Link, useMatches, useNavigate } from "@tanstack/react-router";
+import { LogOut, ShieldCheck } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import type { Session } from "@supabase/supabase-js";
+import { getAdminNavLabel } from "@/modules/admin/components/admin-nav-items";
 
 interface NavProps {
   session: Session | null;
   profile: any;
 }
 
-const navItems = [
-  { to: "/admin", label: "Overview", icon: LayoutGrid },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/crew", label: "Crew", icon: UserCog },
-  { to: "/admin/registrations", label: "Registrations", icon: ClipboardList },
-] as const;
-
 export function AdminNav({ session, profile }: NavProps) {
-  const matches = useMatches();
   const navigate = useNavigate();
-  const currentPath = matches[matches.length - 1]?.fullPath ?? "/admin";
+  const currentPath = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const activeLabel = getAdminNavLabel(currentPath);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -28,105 +24,57 @@ export function AdminNav({ session, profile }: NavProps) {
   };
 
   return (
-    <header
-      className="hidden md:block sticky top-0 z-[var(--z-nav)]"
-      role="banner"
-    >
-      {/* Glass background */}
+    <header className="sticky top-0 z-[var(--z-nav)]" role="banner">
       <div className="absolute inset-0 bg-[var(--color-bg-base)]/80 backdrop-blur-xl border-b border-[var(--glass-border)]" />
 
-      <div className="relative page-container flex items-center justify-between h-[var(--top-nav-height)]">
-        {/* Logo */}
+      <div className="relative page-container flex h-[var(--top-nav-height)] items-center justify-between gap-4">
         <Link
           to="/admin"
-          className="flex items-center gap-2 no-underline group"
+          className="flex items-center gap-3 no-underline group lg:gap-4"
         >
           <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--color-accent)] flex items-center justify-center shadow-[var(--glow-accent-sm)]">
             <ShieldCheck className="w-4.5 h-4.5 text-white" />
           </div>
           <div className="min-w-0">
-            <span className="font-display text-lg font-bold text-[var(--color-text-primary)] tracking-tight group-hover:text-[var(--color-accent)] transition-colors">
+            <span className="font-display text-base font-bold text-[var(--color-text-primary)] tracking-tight group-hover:text-[var(--color-accent)] transition-colors lg:hidden">
               MATWANA Admin
             </span>
-            <div className="text-caption text-[var(--color-text-tertiary)]">
-              Review and moderation
+            <div className="hidden lg:block">
+              <div className="text-caption text-[var(--color-text-tertiary)]">
+                Admin surface
+              </div>
+              <div className="mt-1 text-sm font-semibold text-white">
+                {activeLabel}
+              </div>
             </div>
           </div>
         </Link>
 
-        {/* Nav links */}
-        <nav className="flex items-center gap-1" aria-label="Admin navigation">
-          {navItems.map((item) => {
-            const isActive = currentPath === item.to;
-
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-all duration-150 no-underline ${
-                  isActive
-                    ? "text-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)]"
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-
-          {/* Auth Status */}
-          <div className="ml-4 pl-4 border-l border-[var(--glass-border)] flex items-center gap-3">
-            {session ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/profile"
-                  className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"
-                >
-                  <div className="w-7 h-7 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.handle}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
-                        {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">
-                    @{profile?.handle || "user"}
-                  </span>
-                </Link>
-
-                <button
-                  onClick={handleSignOut}
-                  className="p-2 rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4.5 h-4.5" />
-                </button>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2 rounded-[var(--radius-full)] border border-[var(--glass-border)] bg-[var(--glass-bg)] px-2 py-1">
+            <div className="w-8 h-8 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile?.handle || "Admin avatar"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)]">
+                  {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
+                </div>
+              )}
+            </div>
+            <div className="hidden lg:block pr-2">
+              <div className="text-[11px] font-semibold text-white">
+                {profile?.full_name || "Admin account"}
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/signin"
-                  className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all no-underline"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/signup"
-                  className="inline-flex items-center px-4 py-2 rounded-[var(--radius-md)] bg-[var(--glass-bg-strong)] border border-[var(--glass-border-hover)] text-white text-sm font-bold hover:bg-[var(--color-accent)] hover:border-transparent transition-all shadow-[var(--shadow-sm)] no-underline"
-                >
-                  Join
-                </Link>
+              <div className="text-[10px] text-[var(--color-text-tertiary)]">
+                @{profile?.handle || session?.user?.email || "admin"}
               </div>
-            )}
+            </div>
           </div>
-        </nav>
+        </div>
       </div>
     </header>
   );

@@ -11,13 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as fanRouteRouteImport } from './routes/(fan)/route'
 import { Route as fanIndexRouteImport } from './routes/(fan)/index'
 import { Route as fanSpotRouteImport } from './routes/(fan)/spot'
 import { Route as fanProfileRouteImport } from './routes/(fan)/profile'
 import { Route as fanFollowingRouteImport } from './routes/(fan)/following'
 import { Route as fanDiscoverRouteImport } from './routes/(fan)/discover'
 import { Route as fanCreateNganyaRouteImport } from './routes/(fan)/create-nganya'
-import { Route as fanLayoutRouteImport } from './routes/(fan)/_layout'
+import { Route as crewCrewRouteRouteImport } from './routes/(crew)/crew/route'
+import { Route as adminAdminRouteRouteImport } from './routes/(admin)/admin/route'
 import { Route as crewCrewIndexRouteImport } from './routes/(crew)/crew/index'
 import { Route as adminAdminIndexRouteImport } from './routes/(admin)/admin/index'
 import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
@@ -25,11 +27,9 @@ import { Route as crewCrewRegisterRouteImport } from './routes/(crew)/crew/regis
 import { Route as crewCrewPendingRouteImport } from './routes/(crew)/crew/pending'
 import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
-import { Route as crewCrewLayoutRouteImport } from './routes/(crew)/crew/_layout'
 import { Route as adminAdminUsersRouteImport } from './routes/(admin)/admin/users'
 import { Route as adminAdminRegistrationsRouteImport } from './routes/(admin)/admin/registrations'
 import { Route as adminAdminCrewRouteImport } from './routes/(admin)/admin/crew'
-import { Route as adminAdminLayoutRouteImport } from './routes/(admin)/admin/_layout'
 import { Route as crewCrewSessionIdRouteImport } from './routes/(crew)/crew/session.$id'
 
 const SignupRoute = SignupRouteImport.update({
@@ -42,120 +42,120 @@ const SigninRoute = SigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const fanIndexRoute = fanIndexRouteImport.update({
-  id: '/(fan)/',
-  path: '/',
+const fanRouteRoute = fanRouteRouteImport.update({
+  id: '/(fan)',
   getParentRoute: () => rootRouteImport,
+} as any)
+const fanIndexRoute = fanIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => fanRouteRoute,
 } as any)
 const fanSpotRoute = fanSpotRouteImport.update({
-  id: '/(fan)/spot',
+  id: '/spot',
   path: '/spot',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => fanRouteRoute,
 } as any)
 const fanProfileRoute = fanProfileRouteImport.update({
-  id: '/(fan)/profile',
+  id: '/profile',
   path: '/profile',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => fanRouteRoute,
 } as any)
 const fanFollowingRoute = fanFollowingRouteImport.update({
-  id: '/(fan)/following',
+  id: '/following',
   path: '/following',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => fanRouteRoute,
 } as any)
 const fanDiscoverRoute = fanDiscoverRouteImport.update({
-  id: '/(fan)/discover',
+  id: '/discover',
   path: '/discover',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => fanRouteRoute,
 } as any)
 const fanCreateNganyaRoute = fanCreateNganyaRouteImport.update({
-  id: '/(fan)/create-nganya',
+  id: '/create-nganya',
   path: '/create-nganya',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => fanRouteRoute,
 } as any)
-const fanLayoutRoute = fanLayoutRouteImport.update({
-  id: '/(fan)/_layout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewIndexRoute = crewCrewIndexRouteImport.update({
-  id: '/(crew)/crew/',
-  path: '/crew/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const adminAdminIndexRoute = adminAdminIndexRouteImport.update({
-  id: '/(admin)/admin/',
-  path: '/admin/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fanNganyaSlugRoute = fanNganyaSlugRouteImport.update({
-  id: '/(fan)/nganya/$slug',
-  path: '/nganya/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewRegisterRoute = crewCrewRegisterRouteImport.update({
-  id: '/(crew)/crew/register',
-  path: '/crew/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewPendingRoute = crewCrewPendingRouteImport.update({
-  id: '/(crew)/crew/pending',
-  path: '/crew/pending',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewLiveRoute = crewCrewLiveRouteImport.update({
-  id: '/(crew)/crew/live',
-  path: '/crew/live',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewHistoryRoute = crewCrewHistoryRouteImport.update({
-  id: '/(crew)/crew/history',
-  path: '/crew/history',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const crewCrewLayoutRoute = crewCrewLayoutRouteImport.update({
-  id: '/(crew)/crew/_layout',
+const crewCrewRouteRoute = crewCrewRouteRouteImport.update({
+  id: '/(crew)/crew',
   path: '/crew',
   getParentRoute: () => rootRouteImport,
 } as any)
-const adminAdminUsersRoute = adminAdminUsersRouteImport.update({
-  id: '/(admin)/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const adminAdminRegistrationsRoute = adminAdminRegistrationsRouteImport.update({
-  id: '/(admin)/admin/registrations',
-  path: '/admin/registrations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const adminAdminCrewRoute = adminAdminCrewRouteImport.update({
-  id: '/(admin)/admin/crew',
-  path: '/admin/crew',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const adminAdminLayoutRoute = adminAdminLayoutRouteImport.update({
-  id: '/(admin)/admin/_layout',
+const adminAdminRouteRoute = adminAdminRouteRouteImport.update({
+  id: '/(admin)/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const crewCrewIndexRoute = crewCrewIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
+const adminAdminIndexRoute = adminAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => adminAdminRouteRoute,
+} as any)
+const fanNganyaSlugRoute = fanNganyaSlugRouteImport.update({
+  id: '/nganya/$slug',
+  path: '/nganya/$slug',
+  getParentRoute: () => fanRouteRoute,
+} as any)
+const crewCrewRegisterRoute = crewCrewRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
+const crewCrewPendingRoute = crewCrewPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
+const crewCrewLiveRoute = crewCrewLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
+const crewCrewHistoryRoute = crewCrewHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
+const adminAdminUsersRoute = adminAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => adminAdminRouteRoute,
+} as any)
+const adminAdminRegistrationsRoute = adminAdminRegistrationsRouteImport.update({
+  id: '/registrations',
+  path: '/registrations',
+  getParentRoute: () => adminAdminRouteRoute,
+} as any)
+const adminAdminCrewRoute = adminAdminCrewRouteImport.update({
+  id: '/crew',
+  path: '/crew',
+  getParentRoute: () => adminAdminRouteRoute,
+} as any)
 const crewCrewSessionIdRoute = crewCrewSessionIdRouteImport.update({
-  id: '/(crew)/crew/session/$id',
-  path: '/crew/session/$id',
-  getParentRoute: () => rootRouteImport,
+  id: '/session/$id',
+  path: '/session/$id',
+  getParentRoute: () => crewCrewRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof adminAdminRouteRouteWithChildren
+  '/crew': typeof crewCrewRouteRouteWithChildren
   '/create-nganya': typeof fanCreateNganyaRoute
   '/discover': typeof fanDiscoverRoute
   '/following': typeof fanFollowingRoute
   '/profile': typeof fanProfileRoute
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
-  '/admin': typeof adminAdminLayoutRoute
   '/admin/crew': typeof adminAdminCrewRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/admin/users': typeof adminAdminUsersRoute
-  '/crew': typeof crewCrewLayoutRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
   '/crew/pending': typeof crewCrewPendingRoute
@@ -174,34 +174,34 @@ export interface FileRoutesByTo {
   '/profile': typeof fanProfileRoute
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
-  '/admin': typeof adminAdminIndexRoute
   '/admin/crew': typeof adminAdminCrewRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/admin/users': typeof adminAdminUsersRoute
-  '/crew': typeof crewCrewIndexRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
   '/crew/pending': typeof crewCrewPendingRoute
   '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
+  '/admin': typeof adminAdminIndexRoute
+  '/crew': typeof crewCrewIndexRoute
   '/crew/session/$id': typeof crewCrewSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/(fan)': typeof fanRouteRouteWithChildren
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/(fan)/_layout': typeof fanLayoutRoute
+  '/(admin)/admin': typeof adminAdminRouteRouteWithChildren
+  '/(crew)/crew': typeof crewCrewRouteRouteWithChildren
   '/(fan)/create-nganya': typeof fanCreateNganyaRoute
   '/(fan)/discover': typeof fanDiscoverRoute
   '/(fan)/following': typeof fanFollowingRoute
   '/(fan)/profile': typeof fanProfileRoute
   '/(fan)/spot': typeof fanSpotRoute
   '/(fan)/': typeof fanIndexRoute
-  '/(admin)/admin/_layout': typeof adminAdminLayoutRoute
   '/(admin)/admin/crew': typeof adminAdminCrewRoute
   '/(admin)/admin/registrations': typeof adminAdminRegistrationsRoute
   '/(admin)/admin/users': typeof adminAdminUsersRoute
-  '/(crew)/crew/_layout': typeof crewCrewLayoutRoute
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
   '/(crew)/crew/live': typeof crewCrewLiveRoute
   '/(crew)/crew/pending': typeof crewCrewPendingRoute
@@ -216,17 +216,17 @@ export interface FileRouteTypes {
   fullPaths:
     | '/signin'
     | '/signup'
+    | '/admin'
+    | '/crew'
     | '/create-nganya'
     | '/discover'
     | '/following'
     | '/profile'
     | '/spot'
     | '/'
-    | '/admin'
     | '/admin/crew'
     | '/admin/registrations'
     | '/admin/users'
-    | '/crew'
     | '/crew/history'
     | '/crew/live'
     | '/crew/pending'
@@ -245,33 +245,33 @@ export interface FileRouteTypes {
     | '/profile'
     | '/spot'
     | '/'
-    | '/admin'
     | '/admin/crew'
     | '/admin/registrations'
     | '/admin/users'
-    | '/crew'
     | '/crew/history'
     | '/crew/live'
     | '/crew/pending'
     | '/crew/register'
     | '/nganya/$slug'
+    | '/admin'
+    | '/crew'
     | '/crew/session/$id'
   id:
     | '__root__'
+    | '/(fan)'
     | '/signin'
     | '/signup'
-    | '/(fan)/_layout'
+    | '/(admin)/admin'
+    | '/(crew)/crew'
     | '/(fan)/create-nganya'
     | '/(fan)/discover'
     | '/(fan)/following'
     | '/(fan)/profile'
     | '/(fan)/spot'
     | '/(fan)/'
-    | '/(admin)/admin/_layout'
     | '/(admin)/admin/crew'
     | '/(admin)/admin/registrations'
     | '/(admin)/admin/users'
-    | '/(crew)/crew/_layout'
     | '/(crew)/crew/history'
     | '/(crew)/crew/live'
     | '/(crew)/crew/pending'
@@ -283,28 +283,11 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  fanRouteRoute: typeof fanRouteRouteWithChildren
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
-  fanLayoutRoute: typeof fanLayoutRoute
-  fanCreateNganyaRoute: typeof fanCreateNganyaRoute
-  fanDiscoverRoute: typeof fanDiscoverRoute
-  fanFollowingRoute: typeof fanFollowingRoute
-  fanProfileRoute: typeof fanProfileRoute
-  fanSpotRoute: typeof fanSpotRoute
-  fanIndexRoute: typeof fanIndexRoute
-  adminAdminLayoutRoute: typeof adminAdminLayoutRoute
-  adminAdminCrewRoute: typeof adminAdminCrewRoute
-  adminAdminRegistrationsRoute: typeof adminAdminRegistrationsRoute
-  adminAdminUsersRoute: typeof adminAdminUsersRoute
-  crewCrewLayoutRoute: typeof crewCrewLayoutRoute
-  crewCrewHistoryRoute: typeof crewCrewHistoryRoute
-  crewCrewLiveRoute: typeof crewCrewLiveRoute
-  crewCrewPendingRoute: typeof crewCrewPendingRoute
-  crewCrewRegisterRoute: typeof crewCrewRegisterRoute
-  fanNganyaSlugRoute: typeof fanNganyaSlugRoute
-  adminAdminIndexRoute: typeof adminAdminIndexRoute
-  crewCrewIndexRoute: typeof crewCrewIndexRoute
-  crewCrewSessionIdRoute: typeof crewCrewSessionIdRoute
+  adminAdminRouteRoute: typeof adminAdminRouteRouteWithChildren
+  crewCrewRouteRoute: typeof crewCrewRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -323,172 +306,219 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(fan)': {
+      id: '/(fan)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof fanRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(fan)/': {
       id: '/(fan)/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof fanIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(fan)/spot': {
       id: '/(fan)/spot'
       path: '/spot'
       fullPath: '/spot'
       preLoaderRoute: typeof fanSpotRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(fan)/profile': {
       id: '/(fan)/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof fanProfileRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(fan)/following': {
       id: '/(fan)/following'
       path: '/following'
       fullPath: '/following'
       preLoaderRoute: typeof fanFollowingRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(fan)/discover': {
       id: '/(fan)/discover'
       path: '/discover'
       fullPath: '/discover'
       preLoaderRoute: typeof fanDiscoverRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(fan)/create-nganya': {
       id: '/(fan)/create-nganya'
       path: '/create-nganya'
       fullPath: '/create-nganya'
       preLoaderRoute: typeof fanCreateNganyaRouteImport
+      parentRoute: typeof fanRouteRoute
+    }
+    '/(crew)/crew': {
+      id: '/(crew)/crew'
+      path: '/crew'
+      fullPath: '/crew'
+      preLoaderRoute: typeof crewCrewRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(fan)/_layout': {
-      id: '/(fan)/_layout'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof fanLayoutRouteImport
+    '/(admin)/admin': {
+      id: '/(admin)/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof adminAdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(crew)/crew/': {
       id: '/(crew)/crew/'
-      path: '/crew'
+      path: '/'
       fullPath: '/crew/'
       preLoaderRoute: typeof crewCrewIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
     '/(admin)/admin/': {
       id: '/(admin)/admin/'
-      path: '/admin'
+      path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof adminAdminIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof adminAdminRouteRoute
     }
     '/(fan)/nganya/$slug': {
       id: '/(fan)/nganya/$slug'
       path: '/nganya/$slug'
       fullPath: '/nganya/$slug'
       preLoaderRoute: typeof fanNganyaSlugRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof fanRouteRoute
     }
     '/(crew)/crew/register': {
       id: '/(crew)/crew/register'
-      path: '/crew/register'
+      path: '/register'
       fullPath: '/crew/register'
       preLoaderRoute: typeof crewCrewRegisterRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
     '/(crew)/crew/pending': {
       id: '/(crew)/crew/pending'
-      path: '/crew/pending'
+      path: '/pending'
       fullPath: '/crew/pending'
       preLoaderRoute: typeof crewCrewPendingRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
     '/(crew)/crew/live': {
       id: '/(crew)/crew/live'
-      path: '/crew/live'
+      path: '/live'
       fullPath: '/crew/live'
       preLoaderRoute: typeof crewCrewLiveRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
     '/(crew)/crew/history': {
       id: '/(crew)/crew/history'
-      path: '/crew/history'
+      path: '/history'
       fullPath: '/crew/history'
       preLoaderRoute: typeof crewCrewHistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(crew)/crew/_layout': {
-      id: '/(crew)/crew/_layout'
-      path: '/crew'
-      fullPath: '/crew'
-      preLoaderRoute: typeof crewCrewLayoutRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
     '/(admin)/admin/users': {
       id: '/(admin)/admin/users'
-      path: '/admin/users'
+      path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof adminAdminUsersRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof adminAdminRouteRoute
     }
     '/(admin)/admin/registrations': {
       id: '/(admin)/admin/registrations'
-      path: '/admin/registrations'
+      path: '/registrations'
       fullPath: '/admin/registrations'
       preLoaderRoute: typeof adminAdminRegistrationsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof adminAdminRouteRoute
     }
     '/(admin)/admin/crew': {
       id: '/(admin)/admin/crew'
-      path: '/admin/crew'
+      path: '/crew'
       fullPath: '/admin/crew'
       preLoaderRoute: typeof adminAdminCrewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(admin)/admin/_layout': {
-      id: '/(admin)/admin/_layout'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof adminAdminLayoutRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof adminAdminRouteRoute
     }
     '/(crew)/crew/session/$id': {
       id: '/(crew)/crew/session/$id'
-      path: '/crew/session/$id'
+      path: '/session/$id'
       fullPath: '/crew/session/$id'
       preLoaderRoute: typeof crewCrewSessionIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof crewCrewRouteRoute
     }
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  SigninRoute: SigninRoute,
-  SignupRoute: SignupRoute,
-  fanLayoutRoute: fanLayoutRoute,
+interface fanRouteRouteChildren {
+  fanCreateNganyaRoute: typeof fanCreateNganyaRoute
+  fanDiscoverRoute: typeof fanDiscoverRoute
+  fanFollowingRoute: typeof fanFollowingRoute
+  fanProfileRoute: typeof fanProfileRoute
+  fanSpotRoute: typeof fanSpotRoute
+  fanIndexRoute: typeof fanIndexRoute
+  fanNganyaSlugRoute: typeof fanNganyaSlugRoute
+}
+
+const fanRouteRouteChildren: fanRouteRouteChildren = {
   fanCreateNganyaRoute: fanCreateNganyaRoute,
   fanDiscoverRoute: fanDiscoverRoute,
   fanFollowingRoute: fanFollowingRoute,
   fanProfileRoute: fanProfileRoute,
   fanSpotRoute: fanSpotRoute,
   fanIndexRoute: fanIndexRoute,
-  adminAdminLayoutRoute: adminAdminLayoutRoute,
+  fanNganyaSlugRoute: fanNganyaSlugRoute,
+}
+
+const fanRouteRouteWithChildren = fanRouteRoute._addFileChildren(
+  fanRouteRouteChildren,
+)
+
+interface adminAdminRouteRouteChildren {
+  adminAdminCrewRoute: typeof adminAdminCrewRoute
+  adminAdminRegistrationsRoute: typeof adminAdminRegistrationsRoute
+  adminAdminUsersRoute: typeof adminAdminUsersRoute
+  adminAdminIndexRoute: typeof adminAdminIndexRoute
+}
+
+const adminAdminRouteRouteChildren: adminAdminRouteRouteChildren = {
   adminAdminCrewRoute: adminAdminCrewRoute,
   adminAdminRegistrationsRoute: adminAdminRegistrationsRoute,
   adminAdminUsersRoute: adminAdminUsersRoute,
-  crewCrewLayoutRoute: crewCrewLayoutRoute,
+  adminAdminIndexRoute: adminAdminIndexRoute,
+}
+
+const adminAdminRouteRouteWithChildren = adminAdminRouteRoute._addFileChildren(
+  adminAdminRouteRouteChildren,
+)
+
+interface crewCrewRouteRouteChildren {
+  crewCrewHistoryRoute: typeof crewCrewHistoryRoute
+  crewCrewLiveRoute: typeof crewCrewLiveRoute
+  crewCrewPendingRoute: typeof crewCrewPendingRoute
+  crewCrewRegisterRoute: typeof crewCrewRegisterRoute
+  crewCrewIndexRoute: typeof crewCrewIndexRoute
+  crewCrewSessionIdRoute: typeof crewCrewSessionIdRoute
+}
+
+const crewCrewRouteRouteChildren: crewCrewRouteRouteChildren = {
   crewCrewHistoryRoute: crewCrewHistoryRoute,
   crewCrewLiveRoute: crewCrewLiveRoute,
   crewCrewPendingRoute: crewCrewPendingRoute,
   crewCrewRegisterRoute: crewCrewRegisterRoute,
-  fanNganyaSlugRoute: fanNganyaSlugRoute,
-  adminAdminIndexRoute: adminAdminIndexRoute,
   crewCrewIndexRoute: crewCrewIndexRoute,
   crewCrewSessionIdRoute: crewCrewSessionIdRoute,
+}
+
+const crewCrewRouteRouteWithChildren = crewCrewRouteRoute._addFileChildren(
+  crewCrewRouteRouteChildren,
+)
+
+const rootRouteChildren: RootRouteChildren = {
+  fanRouteRoute: fanRouteRouteWithChildren,
+  SigninRoute: SigninRoute,
+  SignupRoute: SignupRoute,
+  adminAdminRouteRoute: adminAdminRouteRouteWithChildren,
+  crewCrewRouteRoute: crewCrewRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

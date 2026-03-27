@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Button from '../components/ui/Button'
-import { LogIn, Mail, Lock, ChevronLeft, AlertCircle } from 'lucide-react'
+import { LogIn, Mail, Lock, ChevronLeft } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 import { enforceGuestOnlyRoute, getHomePathForRole, resolveClientRole } from '@/shared/auth/guards'
 import { syncAuthSessionCookie } from '@/shared/auth/session-cookie'
 
@@ -18,16 +19,15 @@ export const Route = createFileRoute('/signin')({
 
 function SignInScreen() {
     const navigate = useNavigate()
+    const { addToast } = useToast()
     const search = Route.useSearch()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
 
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
-        setError(null)
 
         try {
             const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -54,7 +54,7 @@ function SignInScreen() {
 
             navigate({ to: role ? getHomePathForRole(role) : '/' })
         } catch (err: any) {
-            setError(err.message || 'Failed to sign in. Please check your credentials.')
+            addToast(err.message || 'Failed to sign in. Please check your credentials.', 'error')
         } finally {
             setIsLoading(false)
         }
@@ -75,13 +75,6 @@ function SignInScreen() {
 
                 <div className="p-8 rounded-xl bg-(--glass-bg) border border-(--glass-border) backdrop-blur-xl">
                     <form onSubmit={handleSignIn} className="space-y-6">
-                        {error && (
-                            <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-500 text-sm">
-                                <AlertCircle className="w-5 h-5 shrink-0" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-semibold text-(--color-text-primary) mb-2">Email Address</label>

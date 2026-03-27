@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ClipboardList, RadioTower, ShieldAlert, Users, UserCog } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 import { AdminStatCard } from '@/modules/admin/components/AdminStatCard'
-import { adminDashboardService } from '@/modules/admin/services/admin-dashboard-service'
-import type { AdminOverviewStats } from '@/shared/types/admin-dashboard'
+import { useAdminOverviewQuery } from '@/modules/admin/hooks/useAdminQueries'
 
 const quickActions = [
   {
@@ -24,27 +24,13 @@ const quickActions = [
 ] as const
 
 export default function AdminHomeScreen() {
-  const [stats, setStats] = useState<AdminOverviewStats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { addToast } = useToast()
+  const { data: stats, isLoading, error } = useAdminOverviewQuery()
 
   useEffect(() => {
-    async function loadOverview() {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const overview = await adminDashboardService.getOverview()
-        setStats(overview)
-      } catch (loadError: any) {
-        setError(loadError?.message || 'Failed to load admin overview.')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void loadOverview()
-  }, [])
+    if (!error) return
+    addToast(error.message || 'Failed to load admin overview.', 'error')
+  }, [addToast, error])
 
   return (
     <div className="page-container py-8 md:py-10">
@@ -57,12 +43,6 @@ export default function AdminHomeScreen() {
           </p>
         </div>
       </div>
-
-      {error ? (
-        <div className="mb-5 rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard

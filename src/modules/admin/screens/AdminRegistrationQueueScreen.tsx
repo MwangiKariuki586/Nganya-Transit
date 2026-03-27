@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { nganyaRegistrationService } from '@/features/nganya-registration/services/nganya-registration-service'
+import { adminQueryKeys, useAdminRegistrationDetailQuery, useAdminRegistrationsQuery } from '@/modules/admin/hooks/useAdminQueries'
 import type { NganyaRegistrationRequestStatus } from '@/shared/types/nganya-registration'
 
 function statusClasses(status: NganyaRegistrationRequestStatus) {
@@ -18,42 +21,42 @@ function statusClasses(status: NganyaRegistrationRequestStatus) {
 }
 
 export default function AdminRegistrationQueueScreen() {
-  const [requests, setRequests] = useState<any[]>([])
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
-  const [selectedRequestData, setSelectedRequestData] = useState<any>(null)
   const [reviewNotes, setReviewNotes] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadRequests = async (preferredRequestId?: string | null) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const nextRequests = await nganyaRegistrationService.listAdminRequests({ limit: 50 })
-      setRequests(nextRequests)
-      const nextSelectedId = preferredRequestId || selectedRequestId || nextRequests[0]?.id || null
-      setSelectedRequestId(nextSelectedId)
-
-      if (nextSelectedId) {
-        const details = await nganyaRegistrationService.getAdminReviewData(nextSelectedId)
-        setSelectedRequestData(details)
-        setReviewNotes(details.request.review_notes || '')
-      } else {
-        setSelectedRequestData(null)
-        setReviewNotes('')
-      }
-    } catch (loadError: any) {
-      setError(loadError?.message || 'Failed to load registration queue.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { data: requests = [], isLoading, error } = useAdminRegistrationsQuery(50)
+  const {
+    data: selectedRequestData,
+    error: selectedRequestError,
+  } = useAdminRegistrationDetailQuery(selectedRequestId)
 
   useEffect(() => {
-    void loadRequests()
-  }, [])
+    if (!error) return
+    addToast(error.message || 'Failed to load registration queue.', 'error')
+  }, [addToast, error])
+
+  useEffect(() => {
+    if (!selectedRequestError) return
+    addToast(selectedRequestError.message || 'Failed to load request details.', 'error')
+  }, [addToast, selectedRequestError])
+
+  useEffect(() => {
+    if (!requests.length) {
+      setSelectedRequestId(null)
+      return
+    }
+
+    setSelectedRequestId((current) =>
+      current && requests.some((request) => request.id === current) ? current : requests[0].id,
+    )
+  }, [requests])
+
+  useEffect(() => {
+    if (!selectedRequestData?.request) return
+    setReviewNotes(selectedRequestData.request.review_notes || '')
+  }, [selectedRequestData])
 
   const selectedRequest = selectedRequestData?.request || null
   const duplicateWarnings = selectedRequestData?.duplicateWarnings || { similarNganyas: [], matchingPlateHints: [] }
@@ -63,32 +66,42 @@ export default function AdminRegistrationQueueScreen() {
     [requests],
   )
 
+  const approveMutation = useMutation({
+    mutationFn: (payload: { requestId: string; reviewNotes?: string | null }) =>
+      nganyaRegistrationService.approveRequest(payload),
+  })
+
+  const reviewMutation = useMutation({
+    mutationFn: (payload: { requestId: string; status: 'REJECTED' | 'NEEDS_INFO'; reviewNotes?: string | null }) =>
+      nganyaRegistrationService.reviewRequest(payload),
+  })
+
+  const refreshRegistrationData = async (requestId: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.registrations(50) }),
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.registrationDetail(requestId) }),
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.crewManagement() }),
+      queryClient.invalidateQueries({ queryKey: adminQueryKeys.overview() }),
+    ])
+  }
+
   const handleSelect = async (requestId: string) => {
     setSelectedRequestId(requestId)
-    setError(null)
-
-    try {
-      const details = await nganyaRegistrationService.getAdminReviewData(requestId)
-      setSelectedRequestData(details)
-      setReviewNotes(details.request.review_notes || '')
-    } catch (loadError: any) {
-      setError(loadError?.message || 'Failed to load request details.')
-    }
   }
 
   const handleApprove = async () => {
     if (!selectedRequestId) return
     setIsMutating(true)
-    setError(null)
 
     try {
-      await nganyaRegistrationService.approveRequest({
+      await approveMutation.mutateAsync({
         requestId: selectedRequestId,
         reviewNotes,
       })
-      await loadRequests(selectedRequestId)
+      await refreshRegistrationData(selectedRequestId)
+      addToast('Registration approved and mapped.', 'success')
     } catch (mutationError: any) {
-      setError(mutationError?.message || 'Failed to approve registration request.')
+      addToast(mutationError?.message || 'Failed to approve registration request.', 'error')
     } finally {
       setIsMutating(false)
     }
@@ -97,17 +110,17 @@ export default function AdminRegistrationQueueScreen() {
   const handleReview = async (status: 'REJECTED' | 'NEEDS_INFO') => {
     if (!selectedRequestId) return
     setIsMutating(true)
-    setError(null)
 
     try {
-      await nganyaRegistrationService.reviewRequest({
+      await reviewMutation.mutateAsync({
         requestId: selectedRequestId,
         status,
         reviewNotes,
       })
-      await loadRequests(selectedRequestId)
+      await refreshRegistrationData(selectedRequestId)
+      addToast(status === 'NEEDS_INFO' ? 'Change request sent to crew.' : 'Registration rejected.', 'success')
     } catch (mutationError: any) {
-      setError(mutationError?.message || 'Failed to update registration request.')
+      addToast(mutationError?.message || 'Failed to update registration request.', 'error')
     } finally {
       setIsMutating(false)
     }
@@ -127,12 +140,6 @@ export default function AdminRegistrationQueueScreen() {
           Pending: <span className="font-semibold text-white">{pendingCount}</span>
         </div>
       </div>
-
-      {error ? (
-        <div className="mb-4 rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <section className="rounded-[28px] border border-[var(--glass-border)] bg-[rgba(23,23,31,0.94)] p-4 shadow-[var(--shadow-md)] md:p-5">

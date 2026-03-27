@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Button from '../components/ui/Button'
 import { UserPlus, Mail, Lock, User, AtSign, ChevronLeft, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 import { enforceGuestOnlyRoute } from '@/shared/auth/guards'
 
 export const Route = createFileRoute('/signup')({
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/signup')({
 
 function SignUpScreen() {
     const navigate = useNavigate()
+    const { addToast } = useToast()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [fullName, setFullName] = useState('')
@@ -21,12 +23,10 @@ function SignUpScreen() {
     const [accountType, setAccountType] = useState<'fan' | 'crew'>('fan')
     const [isLoading, setIsLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
-    const [error, setError] = useState<string | null>(null)
 
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
-        setError(null)
 
         try {
             const { error: signUpError } = await supabase.auth.signUp({
@@ -45,10 +45,11 @@ function SignUpScreen() {
             if (signUpError) throw signUpError
 
             setIsSuccess(true)
+            addToast('Account created. Check your email to continue.', 'success')
             // Note: If email confirmation is enabled, we stay here. 
             // If disabled, user might be logged in immediately.
         } catch (err: any) {
-            setError(err.message || 'Failed to sign up. Please try again.')
+            addToast(err.message || 'Failed to sign up. Please try again.', 'error')
         } finally {
             setIsLoading(false)
         }
@@ -94,13 +95,6 @@ function SignUpScreen() {
                 {/* Form */}
                 <div className="p-8 rounded-xl bg-(--glass-bg) border border-(--glass-border) backdrop-blur-xl">
                     <form onSubmit={handleSignUp} className="space-y-5">
-                        {error && (
-                            <div className="p-4 rounded-[var(--radius-md)] bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-500 text-sm">
-                                <AlertCircle className="w-5 h-5 shrink-0" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
                         {/* Account Type Selector */}
                         <div className="p-1 rounded-md bg-(--bg-card) border border-(--glass-border) flex">
                             <button

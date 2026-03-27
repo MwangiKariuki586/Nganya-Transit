@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { AdminStatusBadge } from '@/modules/admin/components/AdminStatusBadge'
+import { adminQueryKeys, useAdminUsersQuery } from '@/modules/admin/hooks/useAdminQueries'
 import { adminDashboardService } from '@/modules/admin/services/admin-dashboard-service'
-import type { AdminUserRecord } from '@/shared/types/admin-dashboard'
 import type { AppRole } from '@/shared/types/rbac'
 
 const roleFilters: Array<AppRole | 'all'> = ['all', 'fan', 'crew', 'admin']
@@ -20,30 +22,17 @@ function formatDate(value: string | null) {
 }
 
 export default function AdminUsersScreen() {
-  const [users, setUsers] = useState<AdminUserRecord[]>([])
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<AppRole | 'all'>('all')
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isMutatingUserId, setIsMutatingUserId] = useState<string | null>(null)
-
-  const loadUsers = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const nextUsers = await adminDashboardService.listUsers()
-      setUsers(nextUsers)
-    } catch (loadError: any) {
-      setError(loadError?.message || 'Failed to load users.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { data: users = [], isLoading, error } = useAdminUsersQuery()
 
   useEffect(() => {
-    void loadUsers()
-  }, [])
+    if (!error) return
+    addToast(error.message || 'Failed to load users.', 'error')
+  }, [addToast, error])
 
   const filteredUsers = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -64,15 +53,23 @@ export default function AdminUsersScreen() {
     })
   }, [roleFilter, search, users])
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: AppRole }) =>
+      adminDashboardService.updateUserRole(userId, role),
+  })
+
   const handleRoleUpdate = async (userId: string, role: AppRole) => {
     setIsMutatingUserId(userId)
-    setError(null)
 
     try {
-      await adminDashboardService.updateUserRole(userId, role)
-      await loadUsers()
+      await updateRoleMutation.mutateAsync({ userId, role })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.users() }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overview() }),
+      ])
+      addToast(`Role updated to ${role.toUpperCase()}.`, 'success')
     } catch (mutationError: any) {
-      setError(mutationError?.message || 'Failed to update user role.')
+      addToast(mutationError?.message || 'Failed to update user role.', 'error')
     } finally {
       setIsMutatingUserId(null)
     }
@@ -92,12 +89,6 @@ export default function AdminUsersScreen() {
           Results <span className="ml-1 font-semibold text-white">{filteredUsers.length}</span>
         </div>
       </div>
-
-      {error ? (
-        <div className="mb-4 rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
 
       <section className="rounded-[28px] border border-[var(--glass-border)] bg-[rgba(23,23,31,0.94)] p-5 shadow-[var(--shadow-md)] md:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

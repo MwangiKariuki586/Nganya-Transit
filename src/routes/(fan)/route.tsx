@@ -1,7 +1,8 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { FanRouteFrame } from '@/modules/fan/components/FanRouteFrame'
 import { requireFanRouteAccess } from '@/modules/fan/services/route-access'
 
-export const Route = createFileRoute('/(fan)/_layout')({
+export const Route = createFileRoute('/(fan)')({
   beforeLoad: async () => {
     await requireFanRouteAccess()
   },
@@ -9,5 +10,9 @@ export const Route = createFileRoute('/(fan)/_layout')({
 })
 
 function FanLayout() {
-  return <Outlet />
+  return (
+    <FanRouteFrame>
+      <Outlet />
+    </FanRouteFrame>
+  )
 }

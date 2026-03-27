@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { AdminStatusBadge } from '@/modules/admin/components/AdminStatusBadge'
+import { adminQueryKeys, useAdminCrewManagementQuery } from '@/modules/admin/hooks/useAdminQueries'
 import { adminDashboardService } from '@/modules/admin/services/admin-dashboard-service'
-import type { AdminCrewRecord, AdminNganyaOption } from '@/shared/types/admin-dashboard'
 
 function formatDate(value: string | null) {
   if (!value) return 'Not available'
@@ -12,39 +14,31 @@ function formatDate(value: string | null) {
 }
 
 export default function AdminCrewScreen() {
-  const [crewRows, setCrewRows] = useState<AdminCrewRecord[]>([])
-  const [nganyaOptions, setNganyaOptions] = useState<AdminNganyaOption[]>([])
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({})
   const [isMutatingCrewId, setIsMutatingCrewId] = useState<string | null>(null)
-
-  const loadCrewData = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const [nextCrew, nextNganyas] = await Promise.all([
-        adminDashboardService.listCrew(),
-        adminDashboardService.listNganyaOptions(),
-      ])
-
-      setCrewRows(nextCrew)
-      setNganyaOptions(nextNganyas)
-      setAssignmentDrafts(
-        Object.fromEntries(nextCrew.map((crew) => [crew.id, crew.assignedNganyaId || ''])),
-      )
-    } catch (loadError: any) {
-      setError(loadError?.message || 'Failed to load crew operations data.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const {
+    data,
+    isLoading,
+    error,
+  } = useAdminCrewManagementQuery()
+  const crewRows = data?.crewRows ?? []
+  const nganyaOptions = data?.nganyaOptions ?? []
 
   useEffect(() => {
-    void loadCrewData()
-  }, [])
+    if (!error) return
+    addToast(error.message || 'Failed to load crew operations data.', 'error')
+  }, [addToast, error])
+
+  useEffect(() => {
+    if (!crewRows.length) return
+
+    setAssignmentDrafts(
+      Object.fromEntries(crewRows.map((crew) => [crew.id, crew.assignedNganyaId || ''])),
+    )
+  }, [crewRows])
 
   const filteredCrew = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -64,21 +58,33 @@ export default function AdminCrewScreen() {
     })
   }, [crewRows, search])
 
+  const assignMutation = useMutation({
+    mutationFn: ({ crewUserId, nganyaId }: { crewUserId: string; nganyaId: string }) =>
+      adminDashboardService.assignCrewNganya(crewUserId, nganyaId),
+  })
+
+  const unassignMutation = useMutation({
+    mutationFn: (crewUserId: string) => adminDashboardService.unassignCrewNganya(crewUserId),
+  })
+
   const handleAssign = async (crewUserId: string) => {
     const nganyaId = assignmentDrafts[crewUserId]
     if (!nganyaId) {
-      setError('Select a nganya before assigning.')
+      addToast('Select a nganya before assigning.', 'error')
       return
     }
 
     setIsMutatingCrewId(crewUserId)
-    setError(null)
 
     try {
-      await adminDashboardService.assignCrewNganya(crewUserId, nganyaId)
-      await loadCrewData()
+      await assignMutation.mutateAsync({ crewUserId, nganyaId })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.crewManagement() }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overview() }),
+      ])
+      addToast('Crew assignment saved.', 'success')
     } catch (mutationError: any) {
-      setError(mutationError?.message || 'Failed to assign crew nganya.')
+      addToast(mutationError?.message || 'Failed to assign crew nganya.', 'error')
     } finally {
       setIsMutatingCrewId(null)
     }
@@ -86,13 +92,16 @@ export default function AdminCrewScreen() {
 
   const handleUnassign = async (crewUserId: string) => {
     setIsMutatingCrewId(crewUserId)
-    setError(null)
 
     try {
-      await adminDashboardService.unassignCrewNganya(crewUserId)
-      await loadCrewData()
+      await unassignMutation.mutateAsync(crewUserId)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.crewManagement() }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overview() }),
+      ])
+      addToast('Crew assignment removed.', 'success')
     } catch (mutationError: any) {
-      setError(mutationError?.message || 'Failed to remove crew assignment.')
+      addToast(mutationError?.message || 'Failed to remove crew assignment.', 'error')
     } finally {
       setIsMutatingCrewId(null)
     }
@@ -115,12 +124,6 @@ export default function AdminCrewScreen() {
           className="w-full rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-4 py-3 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none md:max-w-sm"
         />
       </div>
-
-      {error ? (
-        <div className="mb-4 rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
 
       <section className="rounded-[28px] border border-[var(--glass-border)] bg-[rgba(23,23,31,0.94)] p-5 shadow-[var(--shadow-md)] md:p-6">
         <div className="overflow-x-auto">

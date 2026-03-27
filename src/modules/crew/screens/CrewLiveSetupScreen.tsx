@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import StagePicker from "@/components/features/StagePicker";
 import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { stageRepository } from "@/entities/stage/repository";
 import { crewLiveService } from "@/features/crew-live/services/crew-live-service";
 import { nganyaRegistrationService } from "@/features/nganya-registration/services/nganya-registration-service";
@@ -172,6 +173,7 @@ function getGpsQuality(accuracy: number | null): "good" | "weak" | null {
 
 export default function CrewLiveSetupScreen() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const { snapshot, refresh } = useCrewBootstrap();
   const permissionWatcherRef = useRef<PermissionStatus | null>(null);
   const assignment = snapshot.bootstrap.assignment;
@@ -202,7 +204,6 @@ export default function CrewLiveSetupScreen() {
   const [isAssignmentExpanded, setIsAssignmentExpanded] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isEndingActive, setIsEndingActive] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Guided attention: refs for scroll-to-focus
   const directionSectionRef = useRef<HTMLDivElement>(null);
@@ -298,7 +299,6 @@ export default function CrewLiveSetupScreen() {
           setCoords(nextCoords);
           setPermissionStatus("granted");
           setLastFixAt(new Date().toISOString());
-          setError(null);
           resolve(nextCoords);
         },
         (error) => {
@@ -369,7 +369,7 @@ export default function CrewLiveSetupScreen() {
       })
       .catch((loadError: any) => {
         if (!active) return;
-        setError(loadError?.message || "Failed to load your assigned nganya.");
+        addToast(loadError?.message || "Failed to load your assigned nganya.", "error");
       });
 
     return () => {
@@ -614,12 +614,13 @@ export default function CrewLiveSetupScreen() {
 
   const handleLocationAction = useCallback(() => {
     void captureLocation().catch((permissionError: any) => {
-      setError(
+      addToast(
         permissionError?.message ||
           "Location permission is required to go Live.",
+        "error",
       );
     });
-  }, [captureLocation]);
+  }, [addToast, captureLocation]);
 
   const ghostCtaLabel =
     nextRequired === "location"
@@ -632,27 +633,26 @@ export default function CrewLiveSetupScreen() {
 
   const handleStart = async () => {
     if (!assignment?.nganya_id || !assignment?.corridor_id) {
-      setError("This crew account has no valid nganya assignment yet.");
+      addToast("This crew account has no valid nganya assignment yet.", "error");
       return;
     }
 
     if (permissionStatus !== "granted") {
-      setError("Enable location before going Live.");
+      addToast("Enable location before going Live.", "error");
       return;
     }
 
     if (!direction) {
-      setError("Choose your direction before going Live.");
+      addToast("Choose your direction before going Live.", "error");
       return;
     }
 
     if (!seatsSet) {
-      setError("Confirm seats before going Live.");
+      addToast("Confirm seats before going Live.", "error");
       return;
     }
 
     setIsStarting(true);
-    setError(null);
 
     try {
       const liveCoords = coords || (await captureLocation());
@@ -667,6 +667,7 @@ export default function CrewLiveSetupScreen() {
       setNetworkStatus("healthy");
       setNetworkMessage(null);
       writeCrewActiveSessionId(session.id);
+      addToast("Live session started.", "success");
       navigate({ to: "/crew/session/$id", params: { id: session.id } });
     } catch (startError: any) {
       const message = startError?.message || "Failed to start live session.";
@@ -685,11 +686,12 @@ export default function CrewLiveSetupScreen() {
         message.includes("NOT_MAPPED") ||
         message.includes("row-level security")
       ) {
-        setError(
+        addToast(
           "This nganya is not linked to your crew account yet. Contact admin if the assignment is wrong.",
+          "error",
         );
       } else {
-        setError(message);
+        addToast(message, "error");
       }
     } finally {
       setIsStarting(false);
@@ -700,14 +702,14 @@ export default function CrewLiveSetupScreen() {
     if (!activeSession?.id) return;
 
     setIsEndingActive(true);
-    setError(null);
 
     try {
       await crewLiveService.stopSession(activeSession.id);
       clearCrewActiveSessionId();
+      addToast("Live session ended.", "success");
       await refresh();
     } catch (stopError: any) {
-      setError(stopError?.message || "Failed to end the active session.");
+      addToast(stopError?.message || "Failed to end the active session.", "error");
     } finally {
       setIsEndingActive(false);
     }
@@ -736,20 +738,9 @@ export default function CrewLiveSetupScreen() {
               void handleEndActiveSession();
             }}
           />
-          {error ? (
-            <div className="rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              {error}
-            </div>
-          ) : null}
         </div>
       ) : (
         <>
-          {error ? (
-            <div className="mb-4 rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              {error}
-            </div>
-          ) : null}
-
           <div className="xl:grid xl:grid-cols-[minmax(0,1.1fr)_390px] xl:items-start xl:gap-6">
             <div className="space-y-4">
               <section className="rounded-[28px] border border-white/[0.08] bg-[rgba(23,23,31,0.94)] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)] md:p-6">

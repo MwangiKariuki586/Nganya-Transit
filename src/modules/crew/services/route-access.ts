@@ -4,8 +4,6 @@ import { getCrewBootstrapServerFn } from '@/shared/server-fns/crew-bootstrap'
 import { readCrewBootstrapCache, writeCrewBootstrapCache } from '@/modules/crew/services/bootstrap-cache'
 import type { CrewBootstrapSnapshot, CrewStatusState } from '@/shared/types/crew-bootstrap'
 
-type CrewRegisterMode = 'needs_info' | 'rejected'
-
 function isCrewRouteRole(role: CrewBootstrapSnapshot['bootstrap']['role']) {
   return role === 'crew' || role === 'admin'
 }
@@ -20,70 +18,6 @@ function getUnauthenticatedSnapshot(): CrewBootstrapSnapshot {
       request: null,
       active_session: null,
     },
-  }
-}
-
-function buildCrewEntryRedirect(snapshot: CrewBootstrapSnapshot) {
-  const state = getCrewStatusState(snapshot)
-
-  switch (state) {
-    case 'LIVE_ACTIVE':
-      return {
-        to: '/crew/session/$id' as const,
-        params: { id: snapshot.bootstrap.active_session!.id },
-        search: undefined,
-        replace: true,
-      }
-    case 'ASSIGNED':
-      return {
-        to: '/crew/live' as const,
-        params: undefined,
-        search: undefined,
-        replace: true,
-      }
-    case 'PENDING_APPROVAL':
-      return {
-        to: '/crew/pending' as const,
-        params: undefined,
-        search: undefined,
-        replace: true,
-      }
-    case 'NEEDS_INFO':
-      return {
-        to: '/crew/register' as const,
-        params: undefined,
-        search: { mode: 'needs_info' as CrewRegisterMode },
-        replace: true,
-      }
-    case 'REJECTED':
-      return {
-        to: '/crew/register' as const,
-        params: undefined,
-        search: { mode: 'rejected' as CrewRegisterMode },
-        replace: true,
-      }
-    case 'UNREGISTERED':
-      return {
-        to: '/crew/register' as const,
-        params: undefined,
-        search: undefined,
-        replace: true,
-      }
-    case 'NOT_CREW':
-      return {
-        to: '/discover' as const,
-        params: undefined,
-        search: undefined,
-        replace: true,
-      }
-    case 'NOT_AUTHENTICATED':
-    default:
-      return {
-        to: '/signin' as const,
-        params: undefined,
-        search: { returnTo: '/crew' },
-        replace: true,
-      }
   }
 }
 
@@ -160,12 +94,4 @@ export async function requireCrewRouteAccess(requestedPath: string) {
   }
 
   return snapshot
-}
-
-export async function resolveCrewEntryRoute() {
-  const snapshot = await loadCrewBootstrapSnapshot()
-  return {
-    snapshot,
-    redirectTarget: buildCrewEntryRedirect(snapshot),
-  }
 }

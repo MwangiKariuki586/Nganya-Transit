@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from '
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Camera, ChevronLeft, ImagePlus, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { corridorRepository } from '@/entities/corridor/repository'
 import { nganyaRegistrationService } from '@/features/nganya-registration/services/nganya-registration-service'
 import { useCrewBootstrap } from '@/modules/crew/context/CrewBootstrapContext'
@@ -109,6 +110,7 @@ export default function CrewRegistrationScreen({
   entryReason = null,
   mode = null,
 }: CrewRegistrationScreenProps) {
+  const { addToast } = useToast()
   const { snapshot } = useCrewBootstrap()
   const [corridors, setCorridors] = useState<any[]>([])
   const [existingRequests, setExistingRequests] = useState<any[]>([])
@@ -125,7 +127,6 @@ export default function CrewRegistrationScreen({
   const [submittedRequest, setSubmittedRequest] = useState<any>(null)
   const [isLoadingCorridors, setIsLoadingCorridors] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const latestExistingRequest = existingRequests[0] ?? null
   const activeRequest = submittedRequest ?? latestExistingRequest
   const assignment = snapshot.bootstrap.assignment
@@ -153,7 +154,7 @@ export default function CrewRegistrationScreen({
       })
       .catch((loadError: any) => {
         if (!mounted) return
-        setError(loadError?.message || 'Failed to load corridors.')
+        addToast(loadError?.message || 'Failed to load corridors.', 'error')
       })
       .finally(() => {
         if (mounted) {
@@ -196,7 +197,7 @@ export default function CrewRegistrationScreen({
     const normalizedTag = normalizeTagInput(customTagInput)
 
     if (!normalizedTag) {
-      setError('Enter a valid tag first.')
+      addToast('Enter a valid tag first.', 'error')
       return
     }
 
@@ -208,7 +209,6 @@ export default function CrewRegistrationScreen({
       return [...current, normalizedTag]
     })
     setCustomTagInput('')
-    setError(null)
   }
 
   const removeFileAtIndex = (index: number) => {
@@ -219,12 +219,12 @@ export default function CrewRegistrationScreen({
     const nextUrl = normalizeImageUrl(imageUrlInput)
 
     if (!nextUrl) {
-      setError('Enter an image URL first.')
+      addToast('Enter an image URL first.', 'error')
       return
     }
 
     if (!isValidImageUrl(nextUrl)) {
-      setError('Enter a valid http or https image URL.')
+      addToast('Enter a valid http or https image URL.', 'error')
       return
     }
 
@@ -237,7 +237,6 @@ export default function CrewRegistrationScreen({
     })
     setBrokenImageUrls((current) => current.filter((url) => url !== nextUrl))
     setImageUrlInput('')
-    setError(null)
   }
 
   const removeImageUrlAtIndex = (index: number) => {
@@ -254,17 +253,16 @@ export default function CrewRegistrationScreen({
     event.preventDefault()
 
     if (!corridorId || !proposedName.trim()) {
-      setError('Route and nganya name are required.')
+      addToast('Route and nganya name are required.', 'error')
       return
     }
 
     if (files.length === 0 && imageUrls.length === 0) {
-      setError('Add at least one photo or image URL for review.')
+      addToast('Add at least one photo or image URL for review.', 'error')
       return
     }
 
     setIsSubmitting(true)
-    setError(null)
 
     try {
       const requestId = crypto.randomUUID()
@@ -291,13 +289,14 @@ export default function CrewRegistrationScreen({
       })
 
       setSubmittedRequest(request)
+      addToast('Registration submitted for review.', 'success')
     } catch (submitError: any) {
       const message = submitError?.message || 'Failed to submit registration request.'
       if (message.startsWith('REGISTRATION_ALREADY_EXISTS:')) {
         const existingStatus = message.split(':')[1] || 'PENDING'
-        setError(`This account already has a nganya registration (${existingStatus}). One nganya registration is allowed per account.`)
+        addToast(`This account already has a nganya registration (${existingStatus}). One nganya registration is allowed per account.`, 'error')
       } else {
-        setError(message)
+        addToast(message, 'error')
       }
     } finally {
       setIsSubmitting(false)
@@ -565,12 +564,6 @@ export default function CrewRegistrationScreen({
             </div>
           </div>
         </section>
-
-        {error ? (
-          <div className="rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-            {error}
-          </div>
-        ) : null}
 
         <div className="sticky bottom-4 z-10 rounded-[24px] border border-[var(--glass-border)] bg-[var(--color-bg-base)]/92 p-3 backdrop-blur-xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

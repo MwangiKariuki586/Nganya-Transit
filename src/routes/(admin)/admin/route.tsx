@@ -1,7 +1,8 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { AdminRouteFrame } from '@/modules/admin/components/AdminRouteFrame'
 import { requireAdminRouteAccess } from '@/modules/admin/services/route-access'
 
-export const Route = createFileRoute('/(admin)/admin/_layout')({
+export const Route = createFileRoute('/(admin)/admin')({
   beforeLoad: async () => {
     await requireAdminRouteAccess()
   },
@@ -9,5 +10,9 @@ export const Route = createFileRoute('/(admin)/admin/_layout')({
 })
 
 function AdminLayout() {
-  return <Outlet />
+  return (
+    <AdminRouteFrame>
+      <Outlet />
+    </AdminRouteFrame>
+  )
 }

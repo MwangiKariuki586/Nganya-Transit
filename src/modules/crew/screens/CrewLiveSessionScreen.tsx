@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { crewLiveService } from '@/features/crew-live/services/crew-live-service'
 import { ConnectionBanner } from '@/modules/crew/components/ConnectionBanner'
 import { CrewHeaderStatus } from '@/modules/crew/components/CrewHeaderStatus'
@@ -16,6 +17,7 @@ interface CrewLiveSessionScreenProps {
 
 export default function CrewLiveSessionScreen({ sessionId }: CrewLiveSessionScreenProps) {
   const navigate = useNavigate()
+  const { addToast } = useToast()
   const [initialSession, setInitialSession] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -58,9 +60,10 @@ export default function CrewLiveSessionScreen({ sessionId }: CrewLiveSessionScre
     try {
       await stopSession()
       clearCrewActiveSessionId()
+      addToast('Live session stopped.', 'success')
       navigate({ to: '/crew/live' })
     } catch (error: any) {
-      setLoadError(error?.message || 'Failed to stop live session.')
+      addToast(error?.message || 'Failed to stop live session.', 'error')
     } finally {
       setIsStopping(false)
     }
@@ -97,12 +100,6 @@ export default function CrewLiveSessionScreen({ sessionId }: CrewLiveSessionScre
 
       <PermissionBanner status={permissionStatus} onRequest={() => { void requestPermission().catch(() => null) }} />
       <ConnectionBanner status={connectionStatus} message={connectionMessage} onRetry={() => { void retryNow() }} />
-
-      {loadError ? (
-        <div className="rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {loadError}
-        </div>
-      ) : null}
 
       <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
         <div className="flex items-center justify-between gap-3">

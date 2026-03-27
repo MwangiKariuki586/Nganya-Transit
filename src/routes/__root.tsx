@@ -30,9 +30,7 @@ function RootComponent() {
       <AuthSessionBridge />
       <RoleAccessBoundary>
         <AppShell>
-          <div className="animate-slide-up">
-            <Outlet />
-          </div>
+          <Outlet />
         </AppShell>
       </RoleAccessBoundary>
     </>
