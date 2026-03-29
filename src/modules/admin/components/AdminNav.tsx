@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import type { Session } from "@supabase/supabase-js";
 import { getAdminNavLabel } from "@/modules/admin/components/admin-nav-items";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface NavProps {
   session: Session | null;
@@ -20,6 +21,7 @@ export function AdminNav({ session, profile }: NavProps) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     clearAuthSessionCookie();
+    useAuthStore.getState().invalidateRole();
     navigate({ to: "/signin", search: {} });
   };
 

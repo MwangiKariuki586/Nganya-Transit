@@ -1,89 +1,79 @@
-import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from '@tanstack/react-router'
-import { getRedirectPathForAudience, getRouteAudience } from '@/shared/auth/access-policy'
-import { resolveClientRole } from '@/shared/auth/guards'
-import type { AppRole } from '@/shared/types/rbac'
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import {
+  getRedirectPathForAudience,
+  getRouteAudience,
+} from "@/shared/auth/access-policy";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface RoleAccessBoundaryProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function RoleAccessBoundary({ children }: RoleAccessBoundaryProps) {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [isChecking, setIsChecking] = useState(() => getRouteAudience(location.pathname) !== 'public')
-  const [resolvedRole, setResolvedRole] = useState<AppRole | null | undefined>(undefined)
+  const location = useLocation();
+  const navigate = useNavigate();
+  const resolveRole = useAuthStore((state) => state.resolveRole);
+  const role = useAuthStore((state) => state.role);
+  const [isChecking, setIsChecking] = useState(
+    () => getRouteAudience(location.pathname) !== "public",
+  );
 
   useEffect(() => {
-    let cancelled = false
-    const audience = getRouteAudience(location.pathname)
+    let cancelled = false;
 
-    void resolveClientRole().then((role) => {
-      if (cancelled) return
+    const checkAccess = async () => {
+      const audience = getRouteAudience(location.pathname);
 
-      setResolvedRole(role)
-
-      if (audience === 'public') {
-        setIsChecking(false)
-        return
+      // Public routes don't need role resolution
+      if (audience === "public") {
+        setIsChecking(false);
+        return;
       }
 
-      if (!role && audience !== 'guest') {
+      // Resolve role from store (with caching and deduplication)
+      const resolvedRole = await resolveRole();
+
+      if (cancelled) return;
+
+      // Redirect unauthenticated users to signin (except guest routes)
+      if (!resolvedRole && audience !== "guest") {
         void navigate({
-          to: '/signin',
-          search: { returnTo: location.pathname.startsWith('/crew') ? '/crew' : location.pathname },
+          to: "/signin",
+          search: {
+            returnTo: location.pathname.startsWith("/crew")
+              ? "/crew"
+              : location.pathname,
+          },
           replace: true,
-        })
-        return
+        });
+        return;
       }
 
-      const redirectPath = getRedirectPathForAudience(location.pathname, role)
+      // Check if user needs to be redirected based on role
+      const redirectPath = getRedirectPathForAudience(
+        location.pathname,
+        resolvedRole,
+      );
       if (redirectPath && redirectPath !== location.pathname) {
-        void navigate({ to: redirectPath, replace: true })
-        return
+        void navigate({ to: redirectPath, replace: true });
+        return;
       }
 
-      setIsChecking(false)
-    })
+      setIsChecking(false);
+    };
+
+    void checkAccess();
 
     return () => {
-      cancelled = true
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    if (resolvedRole === undefined) {
-      return
-    }
-
-    const audience = getRouteAudience(location.pathname)
-    if (audience === 'public') {
-      setIsChecking(false)
-      return
-    }
-
-    if (!resolvedRole && audience !== 'guest') {
-      void navigate({
-        to: '/signin',
-        search: { returnTo: location.pathname.startsWith('/crew') ? '/crew' : location.pathname },
-        replace: true,
-      })
-      return
-    }
-
-    const redirectPath = getRedirectPathForAudience(location.pathname, resolvedRole ?? null)
-    if (redirectPath && redirectPath !== location.pathname) {
-      void navigate({ to: redirectPath, replace: true })
-      return
-    }
-
-    setIsChecking(false)
-  }, [location.pathname, navigate, resolvedRole])
+      cancelled = true;
+    };
+  }, [location.pathname, role, navigate, resolveRole]);
 
   if (isChecking) {
-    return <div className="min-h-screen bg-[var(--color-bg-base)]" />
+    return <div className="min-h-screen bg-[var(--color-bg-base)]" />;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

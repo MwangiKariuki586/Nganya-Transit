@@ -359,6 +359,7 @@ export function getSuggestedRole(record: Pick<AdminUserRecord, 'profileRole' | '
 }
 
 export async function updateAdminUserRole(
+  actorUserId: string,
   role: string | null | undefined,
   input: { userId: string; role: AppRole },
 ) {
@@ -367,6 +368,13 @@ export async function updateAdminUserRole(
   const supabase = getServiceRoleSupabaseClient()
   const { data: existingUserData, error: existingUserError } = await supabase.auth.admin.getUserById(input.userId)
   if (existingUserError) throw existingUserError
+
+  // Capture old role for audit
+  const { data: oldProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', input.userId)
+    .single()
 
   const { error: profileError } = await supabase
     .from('profiles')
@@ -401,5 +409,351 @@ export async function updateAdminUserRole(
 
   if (authError) throw authError
 
+  // Log action
+  await logAdminAction({
+    actorUserId,
+    actionType: 'SET_ROLE',
+    targetUserId: input.userId,
+    payload: {
+      oldRole: oldProfile?.role,
+      newRole: input.role,
+    },
+  })
+
   return { ok: true }
+}
+
+async function logAdminAction(input: {
+  actorUserId: string
+  actionType: string
+  targetUserId?: string
+  targetResourceId?: string
+  payload?: any
+  note?: string
+}) {
+  const supabase = getServiceRoleSupabaseClient()
+  
+  const { error } = await (supabase.from('admin_actions') as any).insert({
+    actor_user_id: input.actorUserId,
+    action_type: input.actionType,
+    target_user_id: input.targetUserId || null,
+    target_resource_id: input.targetResourceId || null,
+    payload: input.payload || null,
+    note: input.note || null,
+  })
+
+  if (error) {
+    console.error('Failed to log admin action:', error)
+    // Don't throw - audit logging failure shouldn't block the operation
+  }
+}
+
+export async function getUserDetailWithAudit(
+  role: string | null | undefined,
+  input: { userId: string },
+) {
+  assertAdminRole(role)
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Get user details
+  const [
+    { data: authUser, error: authError },
+    { data: profile, error: profileError },
+    { data: userRole, error: userRoleError },
+    { data: crewMapping, error: crewError },
+    { data: auditLogs, error: auditError },
+  ] = await Promise.all([
+    supabase.auth.admin.getUserById(input.userId),
+    supabase.from('profiles').select('*').eq('id', input.userId).maybeSingle(),
+    (supabase.from('user_roles') as any).select('role').eq('user_id', input.userId).maybeSingle(),
+    (supabase.from('crew_nganyas') as any)
+      .select('nganya_id, nganyas(id, name, corridors(name))')
+      .eq('crew_user_id', input.userId)
+      .maybeSingle(),
+    (supabase.from('admin_actions') as any)
+      .select('id, created_at, action_type, payload, note, actor:actor_user_id(id, email)')
+      .eq('target_user_id', input.userId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ])
+
+  if (authError) throw authError
+  if (profileError) throw profileError
+  if (userRoleError) throw userRoleError
+
+  const profileRole = normalizeRole(profile?.role) ?? null
+  const userRoleValue = normalizeRole(userRole?.role) ?? null
+  const authRole =
+    normalizeRole(authUser.user?.app_metadata?.role) ??
+    normalizeRole(authUser.user?.user_metadata?.role) ??
+    null
+
+  return {
+    id: input.userId,
+    email: authUser.user?.email ?? null,
+    handle: profile?.handle ?? null,
+    fullName: profile?.full_name ?? null,
+    avatarUrl: profile?.avatar_url ?? null,
+    profileRole,
+    userRole: userRoleValue,
+    authRole,
+    createdAt: profile?.created_at ?? authUser.user?.created_at ?? null,
+    lastSignInAt: authUser.user?.last_sign_in_at ?? null,
+    roleMismatch: Boolean(
+      (profileRole && userRoleValue && profileRole !== userRoleValue) ||
+        (profileRole && authRole && profileRole !== authRole) ||
+        (userRoleValue && authRole && userRoleValue !== authRole),
+    ),
+    crewAssignment: crewMapping
+      ? {
+          nganyaId: crewMapping.nganya_id,
+          nganyaName: (crewMapping.nganyas as any)?.name ?? null,
+          corridorName: (crewMapping.nganyas as any)?.corridors?.name ?? null,
+        }
+      : null,
+    auditLogs: (auditLogs || []).map((log: any) => ({
+      id: log.id,
+      createdAt: log.created_at,
+      actionType: log.action_type,
+      payload: log.payload,
+      note: log.note,
+      actorEmail: log.actor?.email ?? 'Unknown',
+    })),
+  }
+}
+
+export async function fixRoleMismatch(
+  actorUserId: string,
+  role: string | null | undefined,
+  input: { userId: string; targetRole: AppRole },
+) {
+  assertAdminRole(role)
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Get current state
+  const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(input.userId)
+  if (authError) throw authError
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', input.userId)
+    .single()
+
+  const { data: userRole } = await (supabase.from('user_roles') as any)
+    .select('role')
+    .eq('user_id', input.userId)
+    .maybeSingle()
+
+  const oldState = {
+    profileRole: normalizeRole(profile?.role),
+    userRole: normalizeRole(userRole?.role),
+    authRole:
+      normalizeRole(authUser.user?.app_metadata?.role) ??
+      normalizeRole(authUser.user?.user_metadata?.role),
+  }
+
+  // Update all sources to target role
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ role: input.targetRole })
+    .eq('id', input.userId)
+
+  if (profileError) throw profileError
+
+  const { error: userRoleError } = await (supabase.from('user_roles') as any).upsert(
+    {
+      user_id: input.userId,
+      role: input.targetRole,
+    },
+    {
+      onConflict: 'user_id',
+    },
+  )
+
+  if (userRoleError) throw userRoleError
+
+  const { error: authUpdateError } = await supabase.auth.admin.updateUserById(input.userId, {
+    app_metadata: {
+      ...(authUser.user?.app_metadata ?? {}),
+      role: input.targetRole,
+    },
+    user_metadata: {
+      ...(authUser.user?.user_metadata ?? {}),
+      role: input.targetRole,
+      intent: input.targetRole,
+    },
+  })
+
+  if (authUpdateError) throw authUpdateError
+
+  // Log action
+  await logAdminAction({
+    actorUserId,
+    actionType: 'FIX_MISMATCH',
+    targetUserId: input.userId,
+    payload: {
+      oldState,
+      newRole: input.targetRole,
+    },
+  })
+
+  return {
+    ok: true,
+    warnings: ['User must re-login for auth claim changes to take effect'],
+    changes: {
+      profile: oldState.profileRole !== input.targetRole,
+      userRoles: oldState.userRole !== input.targetRole,
+      authClaim: oldState.authRole !== input.targetRole,
+    },
+  }
+}
+
+export async function forceUserSignout(
+  actorUserId: string,
+  role: string | null | undefined,
+  input: { userId: string; reason?: string },
+) {
+  assertAdminRole(role)
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Sign out user by revoking all sessions
+  const { error } = await supabase.auth.admin.signOut(input.userId)
+
+  if (error) throw error
+
+  // Log action
+  await logAdminAction({
+    actorUserId,
+    actionType: 'FORCE_SIGNOUT',
+    targetUserId: input.userId,
+    payload: { reason: input.reason },
+    note: input.reason,
+  })
+
+  return { ok: true }
+}
+
+export async function suspendUser(
+  actorUserId: string,
+  role: string | null | undefined,
+  input: { userId: string; reason: string },
+) {
+  assertAdminRole(role)
+
+  if (!input.reason || input.reason.trim().length < 10) {
+    throw new Error('Suspension reason must be at least 10 characters')
+  }
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Ban the user (Supabase Admin API)
+  const { error } = await supabase.auth.admin.updateUserById(input.userId, {
+    ban_duration: 'none', // Indefinite ban
+  })
+
+  if (error) throw error
+
+  // Log action
+  await logAdminAction({
+    actorUserId,
+    actionType: 'SUSPEND_USER',
+    targetUserId: input.userId,
+    payload: { reason: input.reason },
+    note: input.reason,
+  })
+
+  return { ok: true }
+}
+
+export async function deleteUser(
+  actorUserId: string,
+  role: string | null | undefined,
+  input: { userId: string; reason: string },
+) {
+  assertAdminRole(role)
+
+  if (!input.reason || input.reason.trim().length < 20) {
+    throw new Error('Deletion reason must be at least 20 characters')
+  }
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Prevent self-deletion
+  if (actorUserId === input.userId) {
+    throw new Error('Cannot delete your own account')
+  }
+
+  // Get user info before deletion for audit
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email, handle, role')
+    .eq('id', input.userId)
+    .single()
+
+  // Log action BEFORE deletion (so we can still reference the user)
+  await logAdminAction({
+    actorUserId,
+    actionType: 'DELETE_USER',
+    targetUserId: input.userId,
+    payload: {
+      reason: input.reason,
+      deletedUser: profile,
+    },
+    note: input.reason,
+  })
+
+  // Delete user via Supabase Admin API
+  const { error } = await supabase.auth.admin.deleteUser(input.userId)
+
+  if (error) throw error
+
+  return { ok: true }
+}
+
+export async function terminateCrewSession(
+  actorUserId: string,
+  role: string | null | undefined,
+  input: { sessionId: string; reason?: string },
+) {
+  assertAdminRole(role)
+
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Verify session exists and is active
+  const { data: session, error: fetchError } = await (supabase.from('live_sessions') as any)
+    .select('id, status, crew_user_id')
+    .eq('id', input.sessionId)
+    .single()
+
+  if (fetchError) throw fetchError
+  if (!session) throw new Error('Session not found')
+
+  // Terminate the session
+  const { error: updateError } = await (supabase.from('live_sessions') as any)
+    .update({
+      status: 'OFF',
+      ended_at: new Date().toISOString(),
+      last_ping_at: new Date().toISOString(),
+      admin_terminated: true,
+      admin_termination_reason: input.reason || 'Admin terminated',
+    })
+    .eq('id', input.sessionId)
+
+  if (updateError) throw updateError
+
+  // Log action
+  await logAdminAction({
+    actorUserId,
+    actionType: 'TERMINATE_SESSION',
+    targetUserId: session.crew_user_id,
+    targetResourceId: input.sessionId,
+    payload: { reason: input.reason },
+    note: input.reason,
+  })
+
+  return { ok: true, sessionId: input.sessionId }
 }

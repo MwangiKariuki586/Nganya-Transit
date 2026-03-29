@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
-import { clearCrewBootstrapCache } from "@/modules/crew/services/bootstrap-cache";
+import { useCrewStore } from "@/stores/useCrewStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import type { Session } from "@supabase/supabase-js";
 
 interface NavProps {
@@ -40,7 +41,8 @@ export function CrewNav({ session, profile }: NavProps) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     clearAuthSessionCookie();
-    clearCrewBootstrapCache(snapshot.userId);
+    useCrewStore.getState().invalidateBootstrap();
+    useAuthStore.getState().invalidateRole();
     navigate({ to: "/signin" });
   };
 

@@ -1,32 +1,34 @@
-import { LogOut } from 'lucide-react'
-import { Link, useRouterState } from '@tanstack/react-router'
-import { supabase } from '@/lib/supabase'
-import type { Session } from '@supabase/supabase-js'
-import { clearAuthSessionCookie } from '@/shared/auth/session-cookie'
-import { adminNavItems } from '@/modules/admin/components/admin-nav-items'
+import { LogOut } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
+import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
+import { adminNavItems } from "@/modules/admin/components/admin-nav-items";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface NavProps {
-  session: Session | null
-  profile: any
+  session: Session | null;
+  profile: any;
 }
 
 const tabs = [
-  adminNavItems[0],
-  adminNavItems[2],
-  adminNavItems[3],
-  { to: '/profile', icon: LogOut, label: 'Sign Out' },
-] as const
+  adminNavItems[0], // Overview
+  adminNavItems[4], // Live Sessions
+  adminNavItems[3], // Registrations
+  { to: "/profile", icon: LogOut, label: "Sign Out" },
+] as const;
 
 export default function AdminBottomNav({ session, profile }: NavProps) {
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
-  })
+  });
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    clearAuthSessionCookie()
-    window.location.href = '/signin'
-  }
+    await supabase.auth.signOut();
+    clearAuthSessionCookie();
+    useAuthStore.getState().invalidateRole();
+    window.location.href = "/signin";
+  };
 
   return (
     <nav
@@ -37,9 +39,9 @@ export default function AdminBottomNav({ session, profile }: NavProps) {
 
       <div className="relative grid grid-cols-4 items-center px-2 h-[var(--bottom-nav-height)] pb-[env(safe-area-inset-bottom)]">
         {tabs.map((tab) => {
-          const isActive = currentPath === tab.to
-          const isSignOut = tab.to === '/profile' && session
-          const targetTo = isSignOut ? '#' : tab.to
+          const isActive = currentPath === tab.to;
+          const isSignOut = tab.to === "/profile" && session;
+          const targetTo = isSignOut ? "#" : tab.to;
 
           return (
             <Link
@@ -48,8 +50,8 @@ export default function AdminBottomNav({ session, profile }: NavProps) {
               onClick={isSignOut ? handleSignOut : undefined}
               className={`flex flex-col items-center justify-center gap-1 w-full h-12 rounded-[var(--radius-md)] transition-colors duration-150 no-underline ${
                 isActive
-                  ? 'text-[var(--color-accent)]'
-                  : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
+                  ? "text-[var(--color-accent)]"
+                  : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
               }`}
               aria-label={tab.label}
             >
@@ -60,9 +62,9 @@ export default function AdminBottomNav({ session, profile }: NavProps) {
               )}
               <span className="text-[10px] font-medium">{tab.label}</span>
             </Link>
-          )
+          );
         })}
       </div>
     </nav>
-  )
+  );
 }

@@ -59,8 +59,73 @@ export const updateAdminUserRoleServerFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const dashboard = await import('@/server/admin/dashboard.server')
     const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
-    return dashboard.updateAdminUserRole(context.role, {
+    return dashboard.updateAdminUserRole(context.userId, context.role, {
       userId: data.userId,
       role: data.role,
+    })
+  })
+
+export const terminateCrewSessionServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; sessionId: string; reason?: string }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.terminateCrewSession(context.userId, context.role, {
+      sessionId: data.sessionId,
+      reason: data.reason,
+    })
+  })
+
+export const getUserDetailWithAuditServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; userId: string }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.getUserDetailWithAudit(context.role, {
+      userId: data.userId,
+    })
+  })
+
+export const fixRoleMismatchServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; userId: string; targetRole: AppRole }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.fixRoleMismatch(context.userId, context.role, {
+      userId: data.userId,
+      targetRole: data.targetRole,
+    })
+  })
+
+export const forceUserSignoutServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; userId: string; reason?: string }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.forceUserSignout(context.userId, context.role, {
+      userId: data.userId,
+      reason: data.reason,
+    })
+  })
+
+export const suspendUserServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; userId: string; reason: string }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.suspendUser(context.userId, context.role, {
+      userId: data.userId,
+      reason: data.reason,
+    })
+  })
+
+export const deleteUserServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: { accessToken: string; userId: string; reason: string }) => data)
+  .handler(async ({ data }) => {
+    const dashboard = await import('@/server/admin/dashboard.server')
+    const context = await dashboard.requireAdminDashboardAccess(data.accessToken)
+    return dashboard.deleteUser(context.userId, context.role, {
+      userId: data.userId,
+      reason: data.reason,
     })
   })

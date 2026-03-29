@@ -1,78 +1,93 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { getCrewBootstrapServerFn } from '@/shared/server-fns/crew-bootstrap'
-import { writeCrewBootstrapCache } from '@/modules/crew/services/bootstrap-cache'
-import type { CrewBootstrapSnapshot } from '@/shared/types/crew-bootstrap'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
+import { useCrewStore } from "@/stores/useCrewStore";
+import type { CrewBootstrapSnapshot } from "@/shared/types/crew-bootstrap";
 
 interface CrewBootstrapContextValue {
-  snapshot: CrewBootstrapSnapshot
-  isRefreshing: boolean
-  refresh: () => Promise<CrewBootstrapSnapshot>
-  setSnapshot: (value: CrewBootstrapSnapshot) => void
+  snapshot: CrewBootstrapSnapshot;
+  isRefreshing: boolean;
+  refresh: () => Promise<CrewBootstrapSnapshot>;
+  setSnapshot: (value: CrewBootstrapSnapshot) => void;
 }
 
-const CrewBootstrapContext = createContext<CrewBootstrapContextValue | null>(null)
+const CrewBootstrapContext = createContext<CrewBootstrapContextValue | null>(
+  null,
+);
 
 interface CrewBootstrapProviderProps {
-  initialSnapshot: CrewBootstrapSnapshot
-  children: ReactNode
+  initialSnapshot: CrewBootstrapSnapshot;
+  children: ReactNode;
 }
 
 export function CrewBootstrapProvider({
   initialSnapshot,
   children,
 }: CrewBootstrapProviderProps) {
-  const [snapshot, setSnapshotState] = useState(initialSnapshot)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  // Use Zustand store instead of manual useState/useEffect
+  const bootstrap = useCrewStore((state) => state.bootstrap);
+  const isRefreshing = useCrewStore((state) => state.isRefreshing);
+  const fetchBootstrap = useCrewStore((state) => state.fetchBootstrap);
+  const setBootstrap = useCrewStore((state) => state.setBootstrap);
 
-  const setSnapshot = useCallback((value: CrewBootstrapSnapshot) => {
-    setSnapshotState(value)
-    writeCrewBootstrapCache(value)
-  }, [])
+  // Initialize store with initialSnapshot if store is empty
+  useEffect(() => {
+    if (!bootstrap && initialSnapshot.userId) {
+      setBootstrap(initialSnapshot);
+    }
+  }, [bootstrap, initialSnapshot, setBootstrap]);
 
+  // Refresh bootstrap data when userId changes
+  useEffect(() => {
+    if (initialSnapshot.userId) {
+      void fetchBootstrap();
+    }
+  }, [initialSnapshot.userId, fetchBootstrap]);
+
+  // Map store methods to context interface
   const refresh = useCallback(async () => {
-    setIsRefreshing(true)
+    return fetchBootstrap();
+  }, [fetchBootstrap]);
 
-    try {
-      const nextSnapshot = await getCrewBootstrapServerFn()
-      setSnapshot(nextSnapshot)
-      return nextSnapshot
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [setSnapshot])
+  const setSnapshot = useCallback(
+    (value: CrewBootstrapSnapshot) => {
+      setBootstrap(value);
+    },
+    [setBootstrap],
+  );
 
-  useEffect(() => {
-    setSnapshotState(initialSnapshot)
-    writeCrewBootstrapCache(initialSnapshot)
-  }, [initialSnapshot])
+  // Use bootstrap from store, fallback to initialSnapshot if store is empty
+  const snapshot = bootstrap ?? initialSnapshot;
 
-  useEffect(() => {
-    if (!initialSnapshot.userId) {
-      return
-    }
-
-    void refresh()
-  }, [initialSnapshot.userId, refresh])
-
-  const value = useMemo<CrewBootstrapContextValue>(() => ({
-    snapshot,
-    isRefreshing,
-    refresh,
-    setSnapshot,
-  }), [isRefreshing, refresh, setSnapshot, snapshot])
+  const value = useMemo<CrewBootstrapContextValue>(
+    () => ({
+      snapshot,
+      isRefreshing,
+      refresh,
+      setSnapshot,
+    }),
+    [snapshot, isRefreshing, refresh, setSnapshot],
+  );
 
   return (
     <CrewBootstrapContext.Provider value={value}>
       {children}
     </CrewBootstrapContext.Provider>
-  )
+  );
 }
 
 export function useCrewBootstrap() {
-  const context = useContext(CrewBootstrapContext)
+  const context = useContext(CrewBootstrapContext);
   if (!context) {
-    throw new Error('useCrewBootstrap must be used within CrewBootstrapProvider')
+    throw new Error(
+      "useCrewBootstrap must be used within CrewBootstrapProvider",
+    );
   }
 
-  return context
+  return context;
 }

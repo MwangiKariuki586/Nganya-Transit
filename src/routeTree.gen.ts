@@ -29,6 +29,7 @@ import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
 import { Route as adminAdminUsersRouteImport } from './routes/(admin)/admin/users'
 import { Route as adminAdminRegistrationsRouteImport } from './routes/(admin)/admin/registrations'
+import { Route as adminAdminLiveRouteImport } from './routes/(admin)/admin/live'
 import { Route as adminAdminCrewRouteImport } from './routes/(admin)/admin/crew'
 import { Route as crewCrewSessionIdRouteImport } from './routes/(crew)/crew/session.$id'
 
@@ -131,6 +132,11 @@ const adminAdminRegistrationsRoute = adminAdminRegistrationsRouteImport.update({
   path: '/registrations',
   getParentRoute: () => adminAdminRouteRoute,
 } as any)
+const adminAdminLiveRoute = adminAdminLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => adminAdminRouteRoute,
+} as any)
 const adminAdminCrewRoute = adminAdminCrewRouteImport.update({
   id: '/crew',
   path: '/crew',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin/crew': typeof adminAdminCrewRoute
+  '/admin/live': typeof adminAdminLiveRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/admin/users': typeof adminAdminUsersRoute
   '/crew/history': typeof crewCrewHistoryRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/spot': typeof fanSpotRoute
   '/': typeof fanIndexRoute
   '/admin/crew': typeof adminAdminCrewRoute
+  '/admin/live': typeof adminAdminLiveRoute
   '/admin/registrations': typeof adminAdminRegistrationsRoute
   '/admin/users': typeof adminAdminUsersRoute
   '/crew/history': typeof crewCrewHistoryRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/(fan)/spot': typeof fanSpotRoute
   '/(fan)/': typeof fanIndexRoute
   '/(admin)/admin/crew': typeof adminAdminCrewRoute
+  '/(admin)/admin/live': typeof adminAdminLiveRoute
   '/(admin)/admin/registrations': typeof adminAdminRegistrationsRoute
   '/(admin)/admin/users': typeof adminAdminUsersRoute
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin/crew'
+    | '/admin/live'
     | '/admin/registrations'
     | '/admin/users'
     | '/crew/history'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/spot'
     | '/'
     | '/admin/crew'
+    | '/admin/live'
     | '/admin/registrations'
     | '/admin/users'
     | '/crew/history'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/(fan)/spot'
     | '/(fan)/'
     | '/(admin)/admin/crew'
+    | '/(admin)/admin/live'
     | '/(admin)/admin/registrations'
     | '/(admin)/admin/users'
     | '/(crew)/crew/history'
@@ -432,6 +444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof adminAdminRegistrationsRouteImport
       parentRoute: typeof adminAdminRouteRoute
     }
+    '/(admin)/admin/live': {
+      id: '/(admin)/admin/live'
+      path: '/live'
+      fullPath: '/admin/live'
+      preLoaderRoute: typeof adminAdminLiveRouteImport
+      parentRoute: typeof adminAdminRouteRoute
+    }
     '/(admin)/admin/crew': {
       id: '/(admin)/admin/crew'
       path: '/crew'
@@ -475,6 +494,7 @@ const fanRouteRouteWithChildren = fanRouteRoute._addFileChildren(
 
 interface adminAdminRouteRouteChildren {
   adminAdminCrewRoute: typeof adminAdminCrewRoute
+  adminAdminLiveRoute: typeof adminAdminLiveRoute
   adminAdminRegistrationsRoute: typeof adminAdminRegistrationsRoute
   adminAdminUsersRoute: typeof adminAdminUsersRoute
   adminAdminIndexRoute: typeof adminAdminIndexRoute
@@ -482,6 +502,7 @@ interface adminAdminRouteRouteChildren {
 
 const adminAdminRouteRouteChildren: adminAdminRouteRouteChildren = {
   adminAdminCrewRoute: adminAdminCrewRoute,
+  adminAdminLiveRoute: adminAdminLiveRoute,
   adminAdminRegistrationsRoute: adminAdminRegistrationsRoute,
   adminAdminUsersRoute: adminAdminUsersRoute,
   adminAdminIndexRoute: adminAdminIndexRoute,

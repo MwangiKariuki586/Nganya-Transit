@@ -1,4 +1,4 @@
-import { ClipboardList, LayoutGrid, UserCog, Users } from 'lucide-react'
+import { ClipboardList, LayoutGrid, RadioTower, UserCog, Users } from 'lucide-react'
 
 export const adminNavItems = [
   { to: '/admin', label: 'Overview', icon: LayoutGrid },
@@ -8,6 +8,11 @@ export const adminNavItems = [
     to: '/admin/registrations',
     label: 'Registrations',
     icon: ClipboardList,
+  },
+  {
+    to: '/admin/live',
+    label: 'Live Sessions',
+    icon: RadioTower,
   },
 ] as const
 
