@@ -11,7 +11,7 @@ import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import WhereToCard, {
   type RideSearchPayload,
 } from "@/components/features/WhereToCard";
-import SearchResultsOverlay from "@/components/features/SearchResultsOverlay";
+import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
 import { useNganyaStore } from "@/stores/useNganyaStore";
 import { useSightingStore } from "@/stores/useSightingStore";
 
@@ -207,7 +207,7 @@ export default function HomeScreen() {
         <div className="lg:col-span-8">
           <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
-              <div>
+              <div className="flex gap-2 flex-col">
                 <h2 className="text-h3">Top Answers</h2>
                 <p className="text-xs text-[var(--color-text-tertiary)]">
                   Route-scoped options with ETA and confidence
@@ -216,7 +216,7 @@ export default function HomeScreen() {
             </div>
 
             {plannerSearch ? (
-              <SearchResultsOverlay
+              <SearchResultsOverlayV2
                 inline
                 isOpen
                 onClose={() => setPlannerSearch(null)}
@@ -226,7 +226,7 @@ export default function HomeScreen() {
                 preferredNganya={plannerSearch.preferredNganya}
               />
             ) : (
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 <p className="text-sm text-[var(--color-text-secondary)]">
                   Set route and pickup stage to get ranked matches instantly.
                 </p>
@@ -247,7 +247,7 @@ export default function HomeScreen() {
                     })}
                   </div>
                 ) : (
-                  <div className="text-sm text-[var(--color-text-secondary)] border border-dashed border-[var(--color-line)] rounded-[var(--radius-md)] p-4">
+                  <div className="mt-3 text-sm text-[var(--color-text-secondary)] border border-dashed border-[var(--color-line)] rounded-[var(--radius-md)] p-4">
                     No live sessions right now. Use recent sightings below while
                     planning.
                   </div>
