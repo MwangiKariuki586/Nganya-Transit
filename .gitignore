@@ -17,11 +17,13 @@ mcp.json
 __unconfig*
 todos.json
 migrations
+.cursor/skills
 
 # Ignore Cursor MCP configs (contains sensitive token)
 .cursor/mcp.json
 
 # Ignore all markdown files except README files
 *.md
+!src/ARCHITECTURE.md
 !README.md
 !**/README.md

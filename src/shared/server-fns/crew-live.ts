@@ -81,19 +81,15 @@ export const startCrewSessionServerFn = createServerFn({ method: 'POST' })
       return activeSession
     }
 
-    const { data: session, error } = await (context.supabase.from('live_sessions') as any)
-      .insert({
-        nganya_id: data.nganyaId,
-        corridor_id: data.corridorId,
-        crew_user_id: context.userId,
-        status: 'LIVE',
-        direction: data.direction,
-        seats_left: data.seatsLeft,
-        last_location: data.lastLocation,
-        last_ping_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+    // Use RPC to properly cast geography type
+    const { data: session, error } = await context.supabase.rpc('create_live_session', {
+      p_nganya_id: data.nganyaId,
+      p_corridor_id: data.corridorId,
+      p_crew_user_id: context.userId,
+      p_direction: data.direction,
+      p_seats_left: data.seatsLeft,
+      p_last_location: data.lastLocation,
+    })
 
     if (error) {
       throw error
@@ -115,19 +111,13 @@ export const pingCrewSessionServerFn = createServerFn({ method: 'POST' })
     const context = await access.requireCrewAccess(data.accessToken)
     await access.getCrewSessionById(context, data.sessionId)
 
-    const updatePayload: Record<string, unknown> = {
-      seats_left: data.seatsLeft,
-      last_ping_at: new Date().toISOString(),
-      last_location: data.lastLocation,
-    }
-
-    if (data.direction) {
-      updatePayload.direction = data.direction
-    }
-
-    const { error } = await (context.supabase.from('live_sessions') as any)
-      .update(updatePayload)
-      .eq('id', data.sessionId)
+    // Use RPC to properly cast geography type
+    const { error } = await context.supabase.rpc('update_live_session_ping', {
+      p_session_id: data.sessionId,
+      p_seats_left: data.seatsLeft,
+      p_last_location: data.lastLocation,
+      p_direction: data.direction || null,
+    })
 
     if (error) {
       throw error

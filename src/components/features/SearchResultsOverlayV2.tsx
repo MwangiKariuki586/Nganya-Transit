@@ -508,48 +508,58 @@ function AlternativesDrawer({
   }, []);
 
   const content = (
-    <div className="space-y-3">
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        Better options available for catching:
-      </p>
-      {alternatives.map((alt) => {
-        const catchability = getCatchability(
-          alt.eta_minutes,
-          alt.confidence_level,
-        );
-        return (
-          <button
-            key={alt.nganya_id}
-            onClick={() => onSelect(alt)}
-            className="w-full text-left p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--color-accent-soft)] transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
-                  {alt.nganya_name}
-                </h4>
-                <p className="text-xs text-[var(--color-text-tertiary)]">
-                  {alt.source === "LIVE" ? "🔴 LIVE" : "SIGHTING"}
-                </p>
-              </div>
-              <div className="text-right ml-2">
-                <div className="text-lg font-bold text-[var(--color-accent)]">
-                  {alt.eta_minutes}m
+    <div className="flex flex-col gap-3">
+      {alternatives.length > 0 ? (
+        <>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Better options available for catching:
+          </p>
+          {alternatives.map((alt) => {
+            const catchability = getCatchability(
+              alt.eta_minutes,
+              alt.confidence_level,
+            );
+            return (
+              <button
+                key={alt.nganya_id}
+                onClick={() => onSelect(alt)}
+                className="w-full text-left p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--color-accent-soft)] transition-colors"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+                      {alt.nganya_name}
+                    </h4>
+                    <p className="text-xs text-[var(--color-text-tertiary)]">
+                      {alt.source === "LIVE" ? "🔴 LIVE" : "SIGHTING"}
+                    </p>
+                  </div>
+                  <div className="text-right ml-2">
+                    <div className="text-lg font-bold text-[var(--color-accent)]">
+                      {alt.eta_minutes}m
+                    </div>
+                    <div
+                      className={`text-[10px] font-bold uppercase ${catchability.color}`}
+                    >
+                      {catchability.label}
+                    </div>
+                  </div>
                 </div>
-                <div
-                  className={`text-[10px] font-bold uppercase ${catchability.color}`}
-                >
-                  {catchability.label}
+                <div className="flex items-center justify-between">
+                  <ConfidenceBadge level={alt.confidence_level} />
+                  <ChevronRight className="w-4 h-4 text-[var(--color-text-tertiary)]" />
                 </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <ConfidenceBadge level={alt.confidence_level} />
-              <ChevronRight className="w-4 h-4 text-[var(--color-text-tertiary)]" />
-            </div>
-          </button>
-        );
-      })}
+              </button>
+            );
+          })}
+        </>
+      ) : (
+        <div className="text-center p-6 border border-dashed border-[var(--color-line)] rounded-[var(--radius-lg)]">
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            No alternative rides available right now.
+          </p>
+        </div>
+      )}
     </div>
   );
 

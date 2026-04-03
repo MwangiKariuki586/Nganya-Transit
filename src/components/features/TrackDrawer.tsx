@@ -383,7 +383,7 @@ export default function TrackDrawer({
       )}
 
       {/* Outcome capture (secondary) */}
-      <div className="pt-4 border-t border-[var(--glass-border)] space-y-3">
+      <div className="pt-4 border-t border-[var(--glass-border)] flex flex-col gap-3">
         <p className="text-xs text-[var(--color-text-tertiary)] text-center">
           Did you catch it?
         </p>
