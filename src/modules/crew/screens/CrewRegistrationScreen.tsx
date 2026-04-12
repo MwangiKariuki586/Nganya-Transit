@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from '
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Camera, ChevronLeft, ImagePlus, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { InlineErrorState } from '@/components/error/InlineErrorState'
 import { useToast } from '@/components/ui/Toast'
 import { corridorRepository } from '@/entities/corridor/repository'
 import { nganyaRegistrationService } from '@/features/nganya-registration/services/nganya-registration-service'
@@ -127,6 +128,7 @@ export default function CrewRegistrationScreen({
   const [submittedRequest, setSubmittedRequest] = useState<any>(null)
   const [isLoadingCorridors, setIsLoadingCorridors] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const latestExistingRequest = existingRequests[0] ?? null
   const activeRequest = submittedRequest ?? latestExistingRequest
   const assignment = snapshot.bootstrap.assignment
@@ -146,6 +148,7 @@ export default function CrewRegistrationScreen({
     ])
       .then(([data, requestData]) => {
         if (!mounted) return
+        setLoadError(null)
         setCorridors(data || [])
         setExistingRequests(requestData || [])
         if (!initialCorridorId && data?.[0]?.id) {
@@ -154,7 +157,7 @@ export default function CrewRegistrationScreen({
       })
       .catch((loadError: any) => {
         if (!mounted) return
-        addToast(loadError?.message || 'Failed to load corridors.', 'error')
+        setLoadError(loadError?.message || 'Failed to load corridors.')
       })
       .finally(() => {
         if (mounted) {
@@ -180,6 +183,18 @@ export default function CrewRegistrationScreen({
       filePreviews.forEach((item) => URL.revokeObjectURL(item.previewUrl))
     }
   }, [filePreviews])
+
+  if (loadError && !corridors.length && !latestExistingRequest && !isLoadingCorridors) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <InlineErrorState
+          title="Registration form failed to load"
+          message={loadError}
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    )
+  }
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFiles = Array.from(event.target.files || []).slice(0, 3)

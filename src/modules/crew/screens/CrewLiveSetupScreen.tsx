@@ -174,16 +174,31 @@ function getGpsQuality(accuracy: number | null): "good" | "weak" | null {
 export default function CrewLiveSetupScreen() {
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { snapshot, refresh } = useCrewBootstrap();
+  const { snapshot, refresh, invalidate } = useCrewBootstrap();
   const permissionWatcherRef = useRef<PermissionStatus | null>(null);
   const assignment = snapshot.bootstrap.assignment;
-  const activeSession = snapshot.bootstrap.active_session;
+  const rawActiveSession = snapshot.bootstrap.active_session;
+
+  // Only consider session active if it's LIVE and not ended
+  const activeSession =
+    rawActiveSession?.status === "LIVE" && !rawActiveSession?.ended_at
+      ? rawActiveSession
+      : null;
 
   const [registrationRequest, setRegistrationRequest] = useState<any>(null);
   const [lastLiveAt, setLastLiveAt] = useState<string | null>(null);
-  const [direction, setDirection] = useState<CrewDirectionValue | null>(null);
-  const [seatsLeft, setSeatsLeft] = useState(10);
-  const [hasConfirmedSeats, setHasConfirmedSeats] = useState(false);
+  const [direction, setDirection] = useState<CrewDirectionValue | null>(() => {
+    const draft = readCrewSetupDraft();
+    return draft?.direction || null;
+  });
+  const [seatsLeft, setSeatsLeft] = useState(() => {
+    const draft = readCrewSetupDraft();
+    return clampSeats(draft?.seatsLeft ?? 10);
+  });
+  const [hasConfirmedSeats, setHasConfirmedSeats] = useState(() => {
+    const draft = readCrewSetupDraft();
+    return Boolean(draft?.seatsConfirmed);
+  });
   const [permissionStatus, setPermissionStatus] =
     useState<PermissionStateLocal>("prompt");
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -262,7 +277,6 @@ export default function CrewLiveSetupScreen() {
         ? "seats"
         : "start";
 
-
   const isReadyToStart = assignmentReady && nextRequired === "start";
 
   const captureLocation = useCallback(async () => {
@@ -308,7 +322,10 @@ export default function CrewLiveSetupScreen() {
           switch (error.code) {
             case error.PERMISSION_DENIED:
               setPermissionStatus("denied");
-              if (typeof window !== "undefined" && window.isSecureContext === false) {
+              if (
+                typeof window !== "undefined" &&
+                window.isSecureContext === false
+              ) {
                 errorMessage =
                   "Location requires a secure connection. Please use HTTPS or localhost.";
               } else {
@@ -344,13 +361,6 @@ export default function CrewLiveSetupScreen() {
   }, []);
 
   useEffect(() => {
-    const draft = readCrewSetupDraft();
-    setDirection(draft?.direction || null);
-    setSeatsLeft(clampSeats(draft?.seatsLeft ?? 10));
-    setHasConfirmedSeats(Boolean(draft?.seatsConfirmed));
-  }, []);
-
-  useEffect(() => {
     let active = true;
 
     Promise.all([
@@ -369,7 +379,10 @@ export default function CrewLiveSetupScreen() {
       })
       .catch((loadError: any) => {
         if (!active) return;
-        addToast(loadError?.message || "Failed to load your assigned nganya.", "error");
+        addToast(
+          loadError?.message || "Failed to load your assigned nganya.",
+          "error",
+        );
       });
 
     return () => {
@@ -486,11 +499,13 @@ export default function CrewLiveSetupScreen() {
 
   useEffect(() => {
     if (!assignment) return;
-    writeCrewSetupDraft({
+    const draft = {
       direction,
       seatsLeft,
       seatsConfirmed: hasConfirmedSeats,
-    });
+    };
+    console.log("Saving crew setup draft:", draft);
+    writeCrewSetupDraft(draft);
   }, [assignment, direction, seatsLeft, hasConfirmedSeats]);
 
   const autoDetectedStage = useMemo(
@@ -633,7 +648,10 @@ export default function CrewLiveSetupScreen() {
 
   const handleStart = async () => {
     if (!assignment?.nganya_id || !assignment?.corridor_id) {
-      addToast("This crew account has no valid nganya assignment yet.", "error");
+      addToast(
+        "This crew account has no valid nganya assignment yet.",
+        "error",
+      );
       return;
     }
 
@@ -707,9 +725,13 @@ export default function CrewLiveSetupScreen() {
       await crewLiveService.stopSession(activeSession.id);
       clearCrewActiveSessionId();
       addToast("Live session ended.", "success");
+      invalidate(); // Clear cache to force fresh fetch
       await refresh();
     } catch (stopError: any) {
-      addToast(stopError?.message || "Failed to end the active session.", "error");
+      addToast(
+        stopError?.message || "Failed to end the active session.",
+        "error",
+      );
     } finally {
       setIsEndingActive(false);
     }
@@ -741,11 +763,11 @@ export default function CrewLiveSetupScreen() {
         </div>
       ) : (
         <>
-          <div className="xl:grid xl:grid-cols-[minmax(0,1.1fr)_390px] xl:items-start xl:gap-6">
-            <div className="space-y-4">
-              <section className="rounded-[28px] border border-white/[0.08] bg-[rgba(23,23,31,0.94)] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)] md:p-6">
-                <div className="flex flex-col gap-5 md:flex-row md:items-start">
-                  <div className="h-28 w-full overflow-hidden rounded-[22px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] md:h-32 md:w-44">
+          <div className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] xl:items-start xl:gap-6">
+            <div className="space-y-4 xl:order-2">
+              <section className="rounded-[28px] border border-white/[0.08] bg-[rgba(23,23,31,0.94)] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)]">
+                <div className="flex flex-col gap-4">
+                  <div className="h-48 w-full overflow-hidden rounded-[22px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] xl:h-56">
                     {assignmentThumb ? (
                       <img
                         src={assignmentThumb}
@@ -759,7 +781,7 @@ export default function CrewLiveSetupScreen() {
                     )}
                   </div>
 
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="rounded-[999px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-1 text-caption text-[var(--color-text-secondary)]">
                         Assigned nganya
@@ -804,25 +826,37 @@ export default function CrewLiveSetupScreen() {
                       <>
                         {/* Compact view (default) */}
                         {!isAssignmentExpanded && (
-                          <div className="mt-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-secondary)]">
-                            <span>
-                              Plate:{" "}
-                              {assignmentPlateLast4
-                                ? `****${assignmentPlateLast4}`
-                                : "Not available"}
-                            </span>
-                            <span>
-                              SACCO: {assignmentSacco || "Not provided"}
-                            </span>
-                            <span>
-                              Last live: {formatDateTime(lastLiveAt) || "Never"}
-                            </span>
+                          <div className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[var(--color-text-tertiary)]">
+                                Plate hint
+                              </span>
+                              <span>
+                                {assignmentPlateLast4
+                                  ? `****${assignmentPlateLast4}`
+                                  : "Not available"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[var(--color-text-tertiary)]">
+                                SACCO
+                              </span>
+                              <span>{assignmentSacco || "Not provided"}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[var(--color-text-tertiary)]">
+                                Last live
+                              </span>
+                              <span>
+                                {formatDateTime(lastLiveAt) || "Never"}
+                              </span>
+                            </div>
                           </div>
                         )}
 
                         {/* Expanded view */}
                         {isAssignmentExpanded && (
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div className="mt-3 space-y-3">
                             <div className="rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.45)] px-4 py-3">
                               <div className="text-caption text-[var(--color-text-tertiary)]">
                                 Plate hint
@@ -841,7 +875,7 @@ export default function CrewLiveSetupScreen() {
                                 {assignmentSacco || "Not provided"}
                               </div>
                             </div>
-                            <div className="rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.45)] px-4 py-3 sm:col-span-2">
+                            <div className="rounded-[18px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.45)] px-4 py-3">
                               <div className="text-caption text-[var(--color-text-tertiary)]">
                                 Last live
                               </div>
@@ -855,7 +889,7 @@ export default function CrewLiveSetupScreen() {
 
                         <button
                           type="button"
-                          className="mt-4 text-sm text-[var(--color-accent)]"
+                          className="mt-4 w-full text-center text-sm text-[var(--color-accent)]"
                           onClick={() =>
                             setShowAssignmentHelp((current) => !current)
                           }
@@ -897,7 +931,7 @@ export default function CrewLiveSetupScreen() {
                 </div>
               </section>
 
-              {assignment && permissionStatus === "granted" ? (
+              {/* {assignment && permissionStatus === "granted" ? (
                 <section
                   className={`rounded-[28px] border p-5 shadow-[0_28px_70px_rgba(0,0,0,0.28)] transition-all duration-300 md:p-6 ${
                     settingsNeedAttention
@@ -933,10 +967,10 @@ export default function CrewLiveSetupScreen() {
                     </Button>
                   </div>
                 </section>
-              ) : null}
+              ) : null} */}
             </div>
 
-            <aside className="mt-4 space-y-4 xl:sticky xl:top-[calc(var(--top-nav-height)+24px)] xl:mt-0">
+            <aside className="mt-4 space-y-4 xl:order-1 xl:sticky xl:top-[calc(var(--top-nav-height)+24px)] xl:mt-0">
               <div className="xl:hidden">
                 <CrewReadinessCard
                   items={readinessItems as any}
@@ -993,7 +1027,7 @@ export default function CrewLiveSetupScreen() {
                 </Button>
               </div>
 
-              <div className="hidden xl:block">
+              {/* <div className="hidden xl:block">
                 <Button
                   variant="ghost"
                   className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${
@@ -1007,7 +1041,7 @@ export default function CrewLiveSetupScreen() {
                   <Radio className="h-4 w-4" />
                   {ghostCtaLabel}
                 </Button>
-              </div>
+              </div> */}
 
               {/* Combined Live settings with spotlight */}
               <SpotlightCard
@@ -1089,8 +1123,8 @@ export default function CrewLiveSetupScreen() {
                       {!hasConfirmedSeats
                         ? "Confirm seats left"
                         : seatsLeft === 0
-                        ? "Full (0 seats)"
-                        : `${seatsLeft} seats left`}
+                          ? "Full (0 seats)"
+                          : `${seatsLeft} seats left`}
                     </div>
                     <button
                       type="button"
@@ -1219,4 +1253,3 @@ export default function CrewLiveSetupScreen() {
     </div>
   );
 }
-

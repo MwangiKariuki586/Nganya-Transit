@@ -37,23 +37,93 @@ export default function WhereToCard({
   const [isSpecificPickerOpen, setSpecificPickerOpen] = useState(false);
   const [isResultsOpen, setResultsOpen] = useState(false);
 
-  // Form state
+  // Form state - initialize from localStorage
   const [toPlace, setToPlace] = useState<{
     id: string;
     name: string;
     corridor_id?: string;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem("whereto_toPlace");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [fromStage, setFromStage] = useState<{
     id: string;
     name: string;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem("whereto_fromStage");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [preference, setPreference] = useState<"ANY" | "NEWEST" | "SPECIFIC">(
-    "ANY",
+    () => {
+      try {
+        const saved = localStorage.getItem("whereto_preference");
+        return (saved as "ANY" | "NEWEST" | "SPECIFIC") || "ANY";
+      } catch {
+        return "ANY";
+      }
+    },
   );
+
   const [preferredNganya, setPreferredNganya] = useState<{
     id: string;
     name: string;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem("whereto_preferredNganya");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Persist to localStorage whenever state changes
+  useEffect(() => {
+    if (toPlace) {
+      localStorage.setItem("whereto_toPlace", JSON.stringify(toPlace));
+    } else {
+      localStorage.removeItem("whereto_toPlace");
+    }
+  }, [toPlace]);
+
+  useEffect(() => {
+    if (fromStage) {
+      localStorage.setItem("whereto_fromStage", JSON.stringify(fromStage));
+    } else {
+      localStorage.removeItem("whereto_fromStage");
+    }
+  }, [fromStage]);
+
+  useEffect(() => {
+    localStorage.setItem("whereto_preference", preference);
+  }, [preference]);
+
+  useEffect(() => {
+    if (preferredNganya) {
+      localStorage.setItem(
+        "whereto_preferredNganya",
+        JSON.stringify(preferredNganya),
+      );
+    } else {
+      localStorage.removeItem("whereto_preferredNganya");
+    }
+  }, [preferredNganya]);
+
+  // Notify parent of initial corridor on mount
+  useEffect(() => {
+    if (toPlace?.corridor_id) {
+      onCorridorChange?.(toPlace.corridor_id, toPlace.name);
+    }
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -85,6 +155,13 @@ export default function WhereToCard({
     setPreference("ANY");
     setIsCompact(false);
     setResultsOpen(false);
+
+    // Clear localStorage
+    localStorage.removeItem("whereto_toPlace");
+    localStorage.removeItem("whereto_fromStage");
+    localStorage.removeItem("whereto_preference");
+    localStorage.removeItem("whereto_preferredNganya");
+
     onCorridorChange?.(null, null);
     onClear?.();
   };

@@ -5,7 +5,7 @@
  */
 
 import { Compass, Heart, Camera, Zap, LogOut } from "lucide-react";
-import { Link, useMatches, useNavigate } from "@tanstack/react-router";
+import { Link, useMatches, useNavigate, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
@@ -26,13 +26,15 @@ const navItems = [
 export default function TopNav({ session, profile }: NavProps) {
   const matches = useMatches();
   const navigate = useNavigate();
+  const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/";
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     clearAuthSessionCookie();
     useAuthStore.getState().invalidateRole();
-    navigate({ to: "/" });
+    await router.invalidate();
+    navigate({ to: "/", replace: true });
   };
 
   return (

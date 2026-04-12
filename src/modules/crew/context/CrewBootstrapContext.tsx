@@ -2,17 +2,18 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
-import { useCrewStore } from "@/stores/useCrewStore";
+import { getCrewBootstrapServerFn } from "@/shared/server-fns/crew-bootstrap";
 import type { CrewBootstrapSnapshot } from "@/shared/types/crew-bootstrap";
 
 interface CrewBootstrapContextValue {
   snapshot: CrewBootstrapSnapshot;
   isRefreshing: boolean;
   refresh: () => Promise<CrewBootstrapSnapshot>;
+  invalidate: () => void;
   setSnapshot: (value: CrewBootstrapSnapshot) => void;
 }
 
@@ -29,49 +30,40 @@ export function CrewBootstrapProvider({
   initialSnapshot,
   children,
 }: CrewBootstrapProviderProps) {
-  // Use Zustand store instead of manual useState/useEffect
-  const bootstrap = useCrewStore((state) => state.bootstrap);
-  const isRefreshing = useCrewStore((state) => state.isRefreshing);
-  const fetchBootstrap = useCrewStore((state) => state.fetchBootstrap);
-  const setBootstrap = useCrewStore((state) => state.setBootstrap);
+  const [snapshot, setSnapshotState] = useState(initialSnapshot);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Initialize store with initialSnapshot if store is empty
-  useEffect(() => {
-    if (!bootstrap && initialSnapshot.userId) {
-      setBootstrap(initialSnapshot);
-    }
-  }, [bootstrap, initialSnapshot, setBootstrap]);
-
-  // Refresh bootstrap data when userId changes
-  useEffect(() => {
-    if (initialSnapshot.userId) {
-      void fetchBootstrap();
-    }
-  }, [initialSnapshot.userId, fetchBootstrap]);
-
-  // Map store methods to context interface
   const refresh = useCallback(async () => {
-    return fetchBootstrap();
-  }, [fetchBootstrap]);
+    setIsRefreshing(true);
+    try {
+      const nextSnapshot = await getCrewBootstrapServerFn();
+      setSnapshotState(nextSnapshot);
+      return nextSnapshot;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const invalidate = useCallback(() => {
+    setSnapshotState(initialSnapshot);
+  }, [initialSnapshot]);
 
   const setSnapshot = useCallback(
     (value: CrewBootstrapSnapshot) => {
-      setBootstrap(value);
+      setSnapshotState(value);
     },
-    [setBootstrap],
+    [],
   );
-
-  // Use bootstrap from store, fallback to initialSnapshot if store is empty
-  const snapshot = bootstrap ?? initialSnapshot;
 
   const value = useMemo<CrewBootstrapContextValue>(
     () => ({
       snapshot,
       isRefreshing,
       refresh,
+      invalidate,
       setSnapshot,
     }),
-    [snapshot, isRefreshing, refresh, setSnapshot],
+    [snapshot, isRefreshing, refresh, invalidate, setSnapshot],
   );
 
   return (

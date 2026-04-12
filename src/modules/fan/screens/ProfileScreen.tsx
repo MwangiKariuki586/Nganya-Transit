@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import Button from "@/components/ui/Button";
 import BottomSheet from "@/components/ui/BottomSheet";
 import Modal from "@/components/ui/Modal";
@@ -13,49 +14,20 @@ import {
   getInitials,
   toNganyaSlug,
 } from "@/lib/formatters";
-import { useNavigate } from "@tanstack/react-router";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useProfileStore } from "@/stores/useProfileStore";
-import { useFollowStore } from "@/stores/useFollowStore";
-import { useNganyaStore } from "@/stores/useNganyaStore";
-import { useSightingStore } from "@/stores/useSightingStore";
+import { updateCurrentUserProfile } from "@/lib/queries/profile";
+import type { ProfileRouteData } from "@/modules/fan/services/route-data";
 
-export default function ProfileScreen() {
+interface ProfileScreenProps {
+  data: ProfileRouteData;
+}
+
+export default function ProfileScreen({ data }: ProfileScreenProps) {
   const navigate = useNavigate();
+  const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const useSheet = typeof window !== "undefined" && window.innerWidth < 768;
-
-  // Store selectors
-  const authUser = useProfileStore((state) => state.authUser);
-  const profile = useProfileStore((state) => state.profile);
-  const isLoadingProfile = useProfileStore((state) => state.isLoading);
-  const fetchProfile = useProfileStore((state) => state.fetchProfile);
-  const updateProfile = useProfileStore((state) => state.updateProfile);
-
-  const followedNganyas = useFollowStore((state) => state.followedNganyas);
-  const fetchFollowedNganyas = useFollowStore(
-    (state) => state.fetchFollowedNganyas,
-  );
-
-  const liveNganyas = useNganyaStore((state) => state.liveNganyas);
-  const fetchLiveNganyas = useNganyaStore((state) => state.fetchLiveNganyas);
-
-  const userSightings = useSightingStore((state) => state.userSightings);
-  const isLoadingSightings = useSightingStore(
-    (state) => state.isLoadingUserSightings,
-  );
-  const fetchUserSightings = useSightingStore(
-    (state) => state.fetchUserSightings,
-  );
-
-  const isLoading = isLoadingProfile || isLoadingSightings;
-
-  useEffect(() => {
-    fetchProfile();
-    fetchFollowedNganyas();
-    fetchLiveNganyas();
-    fetchUserSightings();
-  }, []);
+  const { authUser, profile, followedNganyas, liveNganyas, userSightings } =
+    data;
 
   const displayName = useMemo(
     () =>
@@ -77,11 +49,9 @@ export default function ProfileScreen() {
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
 
-    // Handle both direct nganya objects and follow objects with nested nganyas
     const nganyaData = dbNganya.nganyas || dbNganya;
-
     const isLive = liveNganyas.some(
-      (liveNganya) => liveNganya.nganya_id === nganyaData.id,
+      (liveNganya) => liveNganyas && liveNganya.nganya_id === nganyaData.id,
     );
 
     return {
@@ -109,14 +79,6 @@ export default function ProfileScreen() {
       lastSeen: isLive ? "Live now" : "Recently",
     };
   };
-
-  if (isLoading) {
-    return (
-      <div className="page-container py-12 flex justify-center">
-        <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]" />
-      </div>
-    );
-  }
 
   if (!authUser) {
     return (
@@ -274,7 +236,8 @@ export default function ProfileScreen() {
             avatarUrl={avatarUrl}
             onClose={() => setEditOpen(false)}
             onSaved={async (payload) => {
-              await updateProfile(payload);
+              await updateCurrentUserProfile(payload);
+              await router.invalidate();
               setEditOpen(false);
             }}
           />
@@ -291,7 +254,8 @@ export default function ProfileScreen() {
             avatarUrl={avatarUrl}
             onClose={() => setEditOpen(false)}
             onSaved={async (payload) => {
-              await updateProfile(payload);
+              await updateCurrentUserProfile(payload);
+              await router.invalidate();
               setEditOpen(false);
             }}
           />

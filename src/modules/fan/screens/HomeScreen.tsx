@@ -1,98 +1,294 @@
-﻿/**
- * Home / Feed Screen Ã¢â‚¬â€ route-first planning + culture context.
- */
-
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
+import { useToast } from "@/components/ui/Toast";
+import { SectionBoundary } from "@/components/error/SectionBoundary";
 import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Chip from "@/components/ui/Chip";
 import LiveBadge from "@/components/ui/LiveBadge";
+import Skeleton from "@/components/ui/Skeleton";
 import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
-import { Clock, Eye, TrendingUp, ChevronRight } from "lucide-react";
-import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
+import { Clock, TrendingUp, ChevronRight } from "lucide-react";
 import WhereToCard, {
   type RideSearchPayload,
 } from "@/components/features/WhereToCard";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
-import { useNganyaStore } from "@/stores/useNganyaStore";
-import { useSightingStore } from "@/stores/useSightingStore";
+import { followNganya, unfollowNganya } from "@/lib/queries/follows";
+import {
+  canTrackWithPlannerContext,
+  readPlannerStorageContext,
+  seedPlannerStorage,
+} from "@/modules/fan/services/planner-storage";
+import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
 
-export default function HomeScreen() {
-  const [activeCorridor, setActiveCorridor] = useState<string | null>(null);
+interface HomeScreenProps {
+  data: FanHomeRouteData;
+  activeCorridor: string | null;
+  onCorridorChange: (corridorId: string | null) => void;
+  showAllRecent: boolean;
+}
+
+type RecentSightingFilter = "ALL" | "ON_ROUTE" | "HIGH_ACTIVITY";
+
+interface AggregatedRecentSightingRow {
+  key: string;
+  nganyaId: string;
+  slug: string;
+  nganyaName: string;
+  corridorId: string | null;
+  corridorName: string;
+  direction: string | null;
+  directionLabel: string | null;
+  stageName: string | null;
+  lastSeenAt: string;
+  lastSeenMinutes: number;
+  sightingsCountRecent: number;
+  distinctUsersCount: number;
+  confidenceLevel: "HIGH" | "MED" | "LOW";
+  signalLabel: string;
+  statusTone: "hot" | "warm" | "stale";
+  onRoute: boolean;
+}
+
+interface BrowseCardActionItem {
+  id: string;
+  slug: string;
+  name: string;
+  corridorId: string | null;
+  corridorName: string;
+  isLive: boolean;
+}
+
+function getDirectionLabel(
+  direction: string | null | undefined,
+  corridorName: string,
+) {
+  if (!direction) return null;
+
+  const normalized = direction.toUpperCase();
+  if (normalized.includes("TOWN")) return "→ Town";
+  if (normalized.includes("TERMINAL")) return `→ ${corridorName}`;
+  return direction;
+}
+
+function getMinutesSince(isoDate: string) {
+  return Math.max(
+    0,
+    Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000),
+  );
+}
+
+function getRecencyTone(minutes: number): "hot" | "warm" | "stale" {
+  if (minutes <= 2) return "hot";
+  if (minutes <= 15) return "warm";
+  return "stale";
+}
+
+function getRecencyLabel(minutes: number, isoDate: string) {
+  if (minutes <= 2) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  return formatRelativeTime(isoDate);
+}
+
+function aggregateRecentSightings(params: {
+  sightings: any[];
+  activeCorridor: string | null;
+  corridors: any[];
+}) {
+  const grouped = new Map<string, AggregatedRecentSightingRow>();
+  const recentUserKeysByGroup = new Map<string, Set<string>>();
+  const corridorNameById = new Map(
+    (params.corridors || []).map((corridor: any) => [
+      corridor.id,
+      corridor.name,
+    ]),
+  );
+
+  for (const sighting of params.sightings) {
+    const nganyaId = sighting.nganya_id || sighting.nganyaId;
+    if (!nganyaId) continue;
+
+    const corridorId = sighting.corridor_id || null;
+    const corridorName =
+      sighting.nganya?.corridors?.name ||
+      (corridorId ? corridorNameById.get(corridorId) : null) ||
+      sighting.corridor_name ||
+      sighting.corridor ||
+      "Route unavailable";
+    const direction = sighting.direction || null;
+    const key = `${nganyaId}:${corridorId || "unknown"}:${direction || "unknown"}`;
+    const lastSeenAt = sighting.created_at;
+    if (!lastSeenAt) continue;
+
+    const lastSeenMinutes = getMinutesSince(lastSeenAt);
+    if (lastSeenMinutes > 15) continue;
+    const authorKey = sighting.user?.handle || sighting.user_id || "anonymous";
+    const existing = grouped.get(key);
+
+    if (!existing) {
+      const sightingsCountRecent = lastSeenMinutes <= 15 ? 1 : 0;
+      const distinctUsersCount = lastSeenMinutes <= 15 ? 1 : 0;
+      const confidenceLevel =
+        lastSeenMinutes <= 2 ? "HIGH" : lastSeenMinutes <= 15 ? "MED" : "LOW";
+      const signalLabel =
+        distinctUsersCount > 1
+          ? `${distinctUsersCount} riders confirmed`
+          : sightingsCountRecent > 1
+            ? `${sightingsCountRecent} sightings`
+            : confidenceLevel === "HIGH"
+              ? "Live signal"
+              : confidenceLevel === "MED"
+                ? "Seen recently"
+                : "Low activity";
+
+      grouped.set(key, {
+        key,
+        nganyaId,
+        slug: toNganyaSlug(
+          sighting.nganya?.name || sighting.nganyaName || "nganya",
+        ),
+        nganyaName:
+          sighting.nganya?.name || sighting.nganyaName || "Unknown nganya",
+        corridorId,
+        corridorName,
+        direction,
+        directionLabel: getDirectionLabel(direction, corridorName),
+        stageName: sighting.stage?.name || null,
+        lastSeenAt,
+        lastSeenMinutes,
+        sightingsCountRecent,
+        distinctUsersCount,
+        confidenceLevel,
+        signalLabel,
+        statusTone: getRecencyTone(lastSeenMinutes),
+        onRoute: Boolean(
+          params.activeCorridor && corridorId === params.activeCorridor,
+        ),
+      });
+      if (lastSeenMinutes <= 15) {
+        recentUserKeysByGroup.set(key, new Set([authorKey]));
+      }
+      continue;
+    }
+
+    const isNewer =
+      new Date(lastSeenAt).getTime() > new Date(existing.lastSeenAt).getTime();
+    const updatedRecentCount =
+      existing.sightingsCountRecent + (lastSeenMinutes <= 15 ? 1 : 0);
+    const recentUserKeys = recentUserKeysByGroup.get(key) || new Set<string>();
+    if (lastSeenMinutes <= 15) {
+      recentUserKeys.add(authorKey);
+      recentUserKeysByGroup.set(key, recentUserKeys);
+    }
+    const distinctUsersCount = recentUserKeys.size;
+
+    const referenceMinutes = isNewer
+      ? lastSeenMinutes
+      : existing.lastSeenMinutes;
+    const confidenceLevel =
+      updatedRecentCount >= 2 || distinctUsersCount >= 2
+        ? "HIGH"
+        : referenceMinutes <= 15
+          ? "MED"
+          : "LOW";
+
+    const signalLabel =
+      distinctUsersCount >= 2
+        ? `${distinctUsersCount} riders confirmed`
+        : updatedRecentCount >= 2
+          ? `${updatedRecentCount} sightings`
+          : confidenceLevel === "HIGH"
+            ? "Just spotted"
+            : confidenceLevel === "MED"
+              ? "Seen recently"
+              : "Low activity";
+
+    grouped.set(key, {
+      ...existing,
+      stageName: isNewer
+        ? sighting.stage?.name || existing.stageName
+        : existing.stageName,
+      lastSeenAt: isNewer ? lastSeenAt : existing.lastSeenAt,
+      lastSeenMinutes: Math.min(existing.lastSeenMinutes, lastSeenMinutes),
+      statusTone: getRecencyTone(
+        Math.min(existing.lastSeenMinutes, lastSeenMinutes),
+      ),
+      sightingsCountRecent: updatedRecentCount,
+      distinctUsersCount,
+      confidenceLevel,
+      signalLabel,
+    });
+  }
+
+  return Array.from(grouped.values()).sort((left, right) => {
+    if (left.onRoute !== right.onRoute) return left.onRoute ? -1 : 1;
+    return (
+      new Date(right.lastSeenAt).getTime() - new Date(left.lastSeenAt).getTime()
+    );
+  });
+}
+
+export default function HomeScreen({
+  data,
+  activeCorridor,
+  onCorridorChange,
+  showAllRecent,
+}: HomeScreenProps) {
+  const router = useRouter();
+  const { showErrorToast, addToast } = useToast();
+  const [plannerContext, setPlannerContext] = useState(() =>
+    readPlannerStorageContext(),
+  );
   const [plannerSearch, setPlannerSearch] = useState<RideSearchPayload | null>(
     null,
   );
-  const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [trackingRow, setTrackingRow] =
+    useState<AggregatedRecentSightingRow | null>(null);
+  const [trackingNganya, setTrackingNganya] =
+    useState<BrowseCardActionItem | null>(null);
+  const [plannerSeed, setPlannerSeed] = useState(0);
+  const [recentFilter, setRecentFilter] = useState<RecentSightingFilter>("ALL");
+  const { corridors, nganyas, liveNganyas, recentSightings, followedIds } =
+    data;
 
-  // Use Zustand stores
-  const {
-    nganyas,
-    corridors,
-    liveNganyas,
-    isLoadingNganyas,
-    isLoadingCorridors,
-    isLoadingLiveNganyas,
-    nganyasError,
-    corridorsError,
-    liveNganyasError,
-    fetchNganyas,
-    fetchCorridors,
-    fetchLiveNganyas,
-  } = useNganyaStore();
-
-  const { recentSightings, fetchRecentSightings } = useSightingStore();
-
-  const isLoading =
-    isLoadingNganyas || isLoadingCorridors || isLoadingLiveNganyas;
-  const hasError = nganyasError || corridorsError || liveNganyasError;
-
-  useEffect(() => {
-    // Fetch all data in parallel on mount
-    fetchNganyas();
-    fetchCorridors();
-    fetchLiveNganyas();
-  }, [fetchNganyas, fetchCorridors, fetchLiveNganyas]);
-
-  useEffect(() => {
-    // Fetch sightings when corridors are available or activeCorridor changes
-    if (!corridors || corridors.length === 0) return;
-    const corridorId = activeCorridor || corridors[0]?.id;
-    if (!corridorId) return;
-    fetchRecentSightings(corridorId);
-  }, [activeCorridor, corridors, fetchRecentSightings]);
-
-  const toggleFollow = (id: string) => {
-    setFollowing((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggleFollow = async (id: string) => {
+    try {
+      if (followedIds.has(id)) {
+        await unfollowNganya(id);
+      } else {
+        await followNganya(id);
+      }
+      await router.invalidate();
+    } catch (error) {
+      showErrorToast(error, "Failed to update follow.");
+    }
   };
 
   const activeCorridorName = useMemo(
-    () => corridors?.find((c) => c.id === activeCorridor)?.name || null,
+    () => corridors.find((c) => c.id === activeCorridor)?.name || null,
     [corridors, activeCorridor],
   );
 
   const filteredNganyas = useMemo(
     () =>
       activeCorridor
-        ? (nganyas || []).filter((n) => n.corridor_id === activeCorridor)
-        : nganyas || [],
+        ? nganyas.filter((n) => n.corridor_id === activeCorridor)
+        : nganyas,
     [nganyas, activeCorridor],
   );
 
   const filteredLiveNganyas = useMemo(
     () =>
       activeCorridor
-        ? (liveNganyas || []).filter((n) => n.corridor_id === activeCorridor)
-        : liveNganyas || [],
+        ? liveNganyas.filter((n) => n.corridor_id === activeCorridor)
+        : liveNganyas,
     [liveNganyas, activeCorridor],
   );
 
   const filteredRecentSightings = useMemo(() => {
-    if (!activeCorridor) return recentSightings || [];
+    if (!activeCorridor) return recentSightings;
     const routeName = (activeCorridorName || "").toLowerCase();
-    return (recentSightings || []).filter((s: any) => {
+    return recentSightings.filter((s: any) => {
       if (s.corridor_id) return s.corridor_id === activeCorridor;
       const label = (s.corridor || s.corridor_name || "").toLowerCase();
       if (!routeName) return false;
@@ -100,16 +296,52 @@ export default function HomeScreen() {
     });
   }, [recentSightings, activeCorridor, activeCorridorName]);
 
+  const recentSightingsSource = useMemo(
+    () =>
+      filteredRecentSightings.length > 0
+        ? filteredRecentSightings
+        : recentSightings,
+    [filteredRecentSightings, recentSightings],
+  );
+
+  const aggregatedRecentSightings = useMemo(
+    () =>
+      aggregateRecentSightings({
+        sightings: recentSightingsSource,
+        activeCorridor,
+        corridors,
+      }),
+    [recentSightingsSource, activeCorridor, corridors],
+  );
+
+  const recentSummaryCount = useMemo(
+    () => aggregatedRecentSightings.length,
+    [aggregatedRecentSightings],
+  );
+
+  const filteredAggregatedRecentSightings = useMemo(() => {
+    if (recentFilter === "ON_ROUTE") {
+      return aggregatedRecentSightings.filter((row) => row.onRoute);
+    }
+    if (recentFilter === "HIGH_ACTIVITY") {
+      return aggregatedRecentSightings.filter(
+        (row) => row.sightingsCountRecent >= 2 || row.distinctUsersCount >= 2,
+      );
+    }
+    return aggregatedRecentSightings;
+  }, [aggregatedRecentSightings, recentFilter]);
+
   const featuredNganya =
-    filteredNganyas?.find((n) => n.tags?.includes("NEW_BUILD")) ??
-    filteredNganyas?.[0] ??
-    nganyas?.[0];
+    filteredNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
+    filteredNganyas[0] ??
+    nganyas[0];
 
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
     const isLive =
-      filteredLiveNganyas?.some((ln) => ln.nganya_id === dbNganya.id) ||
+      filteredLiveNganyas.some((ln) => ln.nganya_id === dbNganya.id) ||
       dbNganya.status === "LIVE";
+
     return {
       id: dbNganya.nganya_id || dbNganya.id,
       slug:
@@ -117,13 +349,16 @@ export default function HomeScreen() {
         dbNganya.nganya_slug ||
         toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
       name: dbNganya.nganya_name || dbNganya.name,
+      corridorId: dbNganya.corridor_id || dbNganya.nganyas?.corridor_id || null,
+      corridorName:
+        dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       corridor:
         dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
       imageUrl:
         dbNganya.nganya_media?.[0]?.media_url ||
         dbNganya.image_url ||
-        "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
+        "https://scontent-mba2-1.cdninstagram.com/v/t51.82787-15/631035481_17978430665986282_7566032497949382783_n.webp?_nc_cat=105&ig_cache_key=MzgyNzQxNjM4MTI1MjE5MDEzMw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4MTQ0MC5zZHIuQzMifQ%3D%3D&_nc_ohc=aHTAhdLjyNQQ7kNvwG3i9xI&_nc_oc=Adr5o1K9O4cDLOv7zDDmXPsvWeEy-NaD-MSsqhxfzPECEb6U1tm0isdrOrlHNNQ1c7Y&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-mba2-1.cdninstagram.com&_nc_gid=1b5YNR3If6lkABFGdff4Ug&_nc_ss=7a32e&oh=00_Af0dPpEbY79JVZeawMcoB9AYBsH4x_b-PICb6Ly63Jfk6A&oe=69D5D534",
       isLive,
       isNewBuild: dbNganya.tags?.includes("NEW_BUILD") || dbNganya.is_new_build,
       isVerified: dbNganya.is_verified,
@@ -133,45 +368,110 @@ export default function HomeScreen() {
     };
   };
 
+  const handlePlanRideForNganya = (item: BrowseCardActionItem) => {
+    const nextPlannerContext = readPlannerStorageContext();
+    seedPlannerStorage(
+      nextPlannerContext,
+      {
+        id: item.id,
+        name: item.name,
+        corridorId: item.corridorId,
+        corridorName: item.corridorName,
+      },
+      { clearStageOnRouteChange: true },
+    );
+
+    setPlannerContext(readPlannerStorageContext());
+    setPlannerSearch(null);
+    setPlannerSeed((current) => current + 1);
+    onCorridorChange(item.corridorId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    addToast(
+      `Route set to ${item.corridorName}. Pick your pickup stage to plan with ${item.name}.`,
+      "info",
+    );
+  };
+
+  const handleBrowseCardAction = (item: BrowseCardActionItem) => {
+    if (item.isLive && canTrackWithPlannerContext(plannerContext, item)) {
+      setTrackingNganya(item);
+      return;
+    }
+
+    handlePlanRideForNganya(item);
+  };
+
   const handlePlannerSearch = (payload: RideSearchPayload) => {
     setPlannerSearch(payload);
-    setActiveCorridor(payload.toPlace.corridor_id || payload.toPlace.id);
+    setPlannerContext({
+      toPlace: payload.toPlace,
+      fromStage: payload.fromStage,
+      preferredNganya: payload.preferredNganya,
+      preference: payload.preference,
+    });
+    onCorridorChange(payload.toPlace.corridor_id || payload.toPlace.id);
   };
 
-  const handlePlannerRouteChange = (corridorId: string | null) => {
-    setActiveCorridor(corridorId);
+  const handlePlannerRouteChange = (
+    corridorId: string | null,
+    corridorName?: string | null,
+  ) => {
+    onCorridorChange(corridorId);
     setPlannerSearch(null);
+    setPlannerContext((current) => ({
+      ...current,
+      toPlace: corridorId
+        ? {
+            id: corridorId,
+            name: corridorName || current.toPlace?.name || "Route",
+            corridor_id: corridorId,
+          }
+        : null,
+      fromStage:
+        corridorId &&
+        (current.toPlace?.corridor_id || current.toPlace?.id) === corridorId
+          ? current.fromStage
+          : null,
+      preferredNganya: null,
+      preference: "ANY",
+    }));
   };
 
-  if (isLoading) {
-    return (
-      <div className="page-container py-12 flex justify-center">
-        <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]"></div>
-      </div>
+  const handlePlanRideForRecentRow = (row: AggregatedRecentSightingRow) => {
+    const nextPlannerContext = readPlannerStorageContext();
+    seedPlannerStorage(
+      nextPlannerContext,
+      {
+        id: row.nganyaId,
+        name: row.nganyaName,
+        corridorId: row.corridorId,
+        corridorName: row.corridorName,
+      },
+      { clearStageOnRouteChange: true },
     );
-  }
 
-  if (hasError) {
-    return (
-      <div className="page-container py-12 flex justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-[var(--color-text-primary)]">
-            Unable to load data. Please try again.
-          </p>
-          <button
-            onClick={() => {
-              fetchNganyas();
-              fetchCorridors();
-              fetchLiveNganyas();
-            }}
-            className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 transition-opacity"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+    setPlannerContext(readPlannerStorageContext());
+    setPlannerSearch(null);
+    setPlannerSeed((current) => current + 1);
+    onCorridorChange(row.corridorId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    addToast(
+      `Route set to ${row.corridorName}. Pick your pickup stage to plan with ${row.nganyaName}.`,
+      "info",
     );
-  }
+  };
+
+  const handleRecentRowAction = (row: AggregatedRecentSightingRow) => {
+    if (
+      row.lastSeenMinutes <= 15 &&
+      canTrackWithPlannerContext(plannerContext, row)
+    ) {
+      setTrackingRow(row);
+      return;
+    }
+
+    handlePlanRideForRecentRow(row);
+  };
 
   return (
     <div className="page-container py-8 md:py-10 space-y-10 md:space-y-12">
@@ -187,11 +487,12 @@ export default function HomeScreen() {
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
         <div className="lg:col-span-4 lg:sticky lg:top-[84px] space-y-3">
           <WhereToCard
+            key={plannerSeed}
             onCorridorChange={handlePlannerRouteChange}
             onSearch={handlePlannerSearch}
             onClear={() => {
               setPlannerSearch(null);
-              setActiveCorridor(null);
+              onCorridorChange(null);
             }}
           />
           {activeCorridorName && (
@@ -216,15 +517,21 @@ export default function HomeScreen() {
             </div>
 
             {plannerSearch ? (
-              <SearchResultsOverlayV2
-                inline
-                isOpen
-                onClose={() => setPlannerSearch(null)}
-                fromStage={plannerSearch.fromStage}
-                toPlace={plannerSearch.toPlace}
-                preference={plannerSearch.preference}
-                preferredNganya={plannerSearch.preferredNganya}
-              />
+              <SectionBoundary
+                title="Trip planner failed to render"
+                areaLabel="fan-home-planner"
+                onRetry={() => setPlannerSearch(null)}
+              >
+                <SearchResultsOverlayV2
+                  inline
+                  isOpen
+                  onClose={() => setPlannerSearch(null)}
+                  fromStage={plannerSearch.fromStage}
+                  toPlace={plannerSearch.toPlace}
+                  preference={plannerSearch.preference}
+                  preferredNganya={plannerSearch.preferredNganya}
+                />
+              </SectionBoundary>
             ) : (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-[var(--color-text-secondary)]">
@@ -240,7 +547,7 @@ export default function HomeScreen() {
                           key={cardData.id}
                           nganya={cardData as any}
                           variant="compact"
-                          isFollowing={following.has(cardData.id)}
+                          isFollowing={followedIds.has(cardData.id)}
                           onFollow={toggleFollow}
                         />
                       );
@@ -284,8 +591,23 @@ export default function HomeScreen() {
                   <Card
                     nganya={cardData as any}
                     variant="standard"
-                    isFollowing={following.has(cardData.id)}
+                    isFollowing={followedIds.has(cardData.id)}
                     onFollow={toggleFollow}
+                    primaryAction={{
+                      label:
+                        cardData.isLive &&
+                        canTrackWithPlannerContext(plannerContext, cardData)
+                          ? "Track"
+                          : "Plan ride",
+                      onClick: () => handleBrowseCardAction(cardData),
+                    }}
+                    secondaryAction={{
+                      label: followedIds.has(cardData.id)
+                        ? "Following"
+                        : "Follow",
+                      onClick: () => void toggleFollow(cardData.id),
+                      variant: "secondary",
+                    }}
                   />
                 </div>
               );
@@ -301,71 +623,188 @@ export default function HomeScreen() {
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-h3">Recently Spotted</h2>
-          <button className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer">
-            See all <ChevronRight className="w-4 h-4" />
+          <div>
+            <h2 className="text-h3">Recently Spotted</h2>
+            <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+              {recentSummaryCount > 0
+                ? `${recentSummaryCount} nganyas spotted in the last 15 min`
+                : "Fresh route signals, grouped for quick decisions"}
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              router.navigate({
+                to: "/",
+                search: (current: any) => ({
+                  ...current,
+                  recent: showAllRecent ? undefined : "all",
+                }),
+              })
+            }
+            className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
+          >
+            {showAllRecent ? "Show less" : "See all"}{" "}
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="space-y-2">
-          {(filteredRecentSightings.length > 0
-            ? filteredRecentSightings
-            : recentSightings
-          )
-            .slice(0, 4)
-            .map((s: any) => {
-              const isSupabase = s.nganya !== undefined;
-              const title = isSupabase ? s.nganya.name : s.nganyaName;
-              const corridorLabel = isSupabase
-                ? s.nganya?.corridors?.name ||
-                  activeCorridorName ||
-                  "Current Route"
-                : s.corridor;
-              const author = isSupabase ? s.user?.handle : s.spottedBy;
-              const hasMedia = isSupabase
-                ? s.media_urls?.length > 0
-                : s.hasMedia;
-              const sightingTime = isSupabase
-                ? formatRelativeTime(s.created_at)
-                : s.time;
-
-              return (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-colors"
-                >
-                  <div className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-                        {title}
-                      </span>
-                      <ConfidenceBadge
-                        level={
-                          s.confidence?.confidence_level ||
-                          s.confidence ||
-                          "HIGH"
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-                      <span>{corridorLabel}</span>
-                      <span>-</span>
-                      <span>{author || "Anonymous"}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)] shrink-0">
-                    <Clock className="w-3 h-3" />
-                    {sightingTime}
-                  </div>
-                  {hasMedia && (
-                    <Eye className="w-3.5 h-3.5 text-[var(--color-cyan)] shrink-0" />
-                  )}
-                </div>
-              );
-            })}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Chip
+            label="All"
+            variant="route"
+            isActive={recentFilter === "ALL"}
+            onClick={() => setRecentFilter("ALL")}
+          />
+          {activeCorridor ? (
+            <Chip
+              label="On your route"
+              variant="route"
+              isActive={recentFilter === "ON_ROUTE"}
+              onClick={() => setRecentFilter("ON_ROUTE")}
+            />
+          ) : null}
+          <Chip
+            label="High activity"
+            variant="route"
+            isActive={recentFilter === "HIGH_ACTIVITY"}
+            onClick={() => setRecentFilter("HIGH_ACTIVITY")}
+          />
         </div>
+
+        {filteredAggregatedRecentSightings.length > 0 ? (
+          <div className="space-y-2">
+            {filteredAggregatedRecentSightings
+              .slice(
+                0,
+                showAllRecent ? filteredAggregatedRecentSightings.length : 5,
+              )
+              .map((row) => {
+                const recencyLabel = getRecencyLabel(
+                  row.lastSeenMinutes,
+                  row.lastSeenAt,
+                );
+                const isFresh = row.lastSeenMinutes <= 15;
+                const canTrackRow = canTrackWithPlannerContext(
+                  plannerContext,
+                  row,
+                );
+                const actionLabel =
+                  isFresh && canTrackRow ? "Track" : "Plan ride";
+                const primaryContext = row.directionLabel
+                  ? `${row.stageName || row.corridorName} ${row.directionLabel}`
+                  : row.stageName || row.corridorName;
+                const secondaryContext = row.onRoute
+                  ? `${row.corridorName}`
+                  : row.corridorName;
+                const toneClasses =
+                  row.statusTone === "hot"
+                    ? "bg-[var(--color-accent)]"
+                    : row.statusTone === "warm"
+                      ? "bg-[var(--color-warning)]"
+                      : "bg-[var(--color-text-tertiary)]";
+
+                return (
+                  <button
+                    key={row.key}
+                    onClick={() => handleRecentRowAction(row)}
+                    className="grid w-full grid-cols-[12px_minmax(0,1.2fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-3 text-left transition-colors hover:border-[var(--glass-border-hover)]"
+                  >
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${toneClasses}`}
+                    />
+
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                        {row.nganyaName}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-[var(--color-text-secondary)]">
+                        {primaryContext}
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="truncate text-xs text-[var(--color-text-secondary)]">
+                        {secondaryContext}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+                        <span>{row.signalLabel}</span>
+                        {row.sightingsCountRecent > 1 ? (
+                          <span>• {row.sightingsCountRecent} sightings</span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 justify-self-end">
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-1 text-xs text-[var(--color-text-tertiary)]">
+                          <Clock className="h-3 w-3" />
+                          {recencyLabel}
+                        </div>
+                      </div>
+                      <Button
+                        variant={
+                          isFresh && canTrackRow ? "primary" : "secondary"
+                        }
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRecentRowAction(row);
+                        }}
+                      >
+                        {actionLabel}
+                      </Button>
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        ) : (
+          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
+            <div className="font-medium text-[var(--color-text-primary)]">
+              No recent sightings
+            </div>
+            <p className="mt-1">
+              Be the first to spot and boost a live signal.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => router.navigate({ to: "/spot" })}
+            >
+              Be the first to spot
+            </Button>
+          </div>
+        )}
       </section>
+
+      {trackingRow && plannerContext.toPlace && plannerContext.fromStage ? (
+        <SearchResultsOverlayV2
+          isOpen
+          onClose={() => setTrackingRow(null)}
+          fromStage={plannerContext.fromStage}
+          toPlace={plannerContext.toPlace}
+          preference="SPECIFIC"
+          preferredNganya={{
+            id: trackingRow.nganyaId,
+            name: trackingRow.nganyaName,
+          }}
+        />
+      ) : null}
+
+      {trackingNganya && plannerContext.toPlace && plannerContext.fromStage ? (
+        <SearchResultsOverlayV2
+          isOpen
+          onClose={() => setTrackingNganya(null)}
+          fromStage={plannerContext.fromStage}
+          toPlace={plannerContext.toPlace}
+          preference="SPECIFIC"
+          preferredNganya={{
+            id: trackingNganya.id,
+            name: trackingNganya.name,
+          }}
+        />
+      ) : null}
 
       {featuredNganya && (
         <section>
@@ -379,7 +818,7 @@ export default function HomeScreen() {
             <Card
               nganya={mapSupabaseToCardProps(featuredNganya) as any}
               variant="feature"
-              isFollowing={following.has(featuredNganya.id)}
+              isFollowing={followedIds.has(featuredNganya.id)}
               onFollow={toggleFollow}
             />
           </div>
@@ -387,7 +826,7 @@ export default function HomeScreen() {
             <Card
               nganya={mapSupabaseToCardProps(featuredNganya) as any}
               variant="standard"
-              isFollowing={following.has(featuredNganya.id)}
+              isFollowing={followedIds.has(featuredNganya.id)}
               onFollow={toggleFollow}
             />
           </div>
@@ -411,11 +850,57 @@ export default function HomeScreen() {
                 key={cardData.id}
                 nganya={cardData as any}
                 variant="standard"
-                isFollowing={following.has(cardData.id)}
+                isFollowing={followedIds.has(cardData.id)}
                 onFollow={toggleFollow}
+                primaryAction={{
+                  label:
+                    cardData.isLive &&
+                    canTrackWithPlannerContext(plannerContext, cardData)
+                      ? "Track"
+                      : "Plan ride",
+                  onClick: () => handleBrowseCardAction(cardData),
+                }}
+                secondaryAction={{
+                  label: followedIds.has(cardData.id) ? "Following" : "Follow",
+                  onClick: () => void toggleFollow(cardData.id),
+                  variant: "secondary",
+                }}
               />
             );
           })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function HomeScreenSkeleton() {
+  return (
+    <div className="page-container py-8 md:py-10 space-y-10 md:space-y-12">
+      <section className="space-y-2">
+        <Skeleton className="h-4 w-28" variant="text" />
+        <Skeleton className="h-10 w-72" variant="text" />
+        <Skeleton className="h-4 w-[32rem] max-w-full" variant="text" />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
+        <div className="lg:col-span-4 space-y-3">
+          <Skeleton className="h-64 rounded-[var(--radius-xl)]" />
+        </div>
+        <div className="lg:col-span-8">
+          <Skeleton className="h-72 rounded-[var(--radius-xl)]" />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <Skeleton className="h-7 w-40" variant="text" />
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton
+              key={index}
+              className="h-[68px] rounded-[var(--radius-md)]"
+            />
+          ))}
         </div>
       </section>
     </div>

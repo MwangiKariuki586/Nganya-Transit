@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { ClipboardList, RadioTower, ShieldAlert, UserCog } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { AlertCard } from "@/modules/admin/components/AlertCard";
 import { WorkQueuePanel } from "@/modules/admin/components/WorkQueuePanel";
 import { RecentActivityFeed } from "@/modules/admin/components/RecentActivityFeed";
@@ -14,7 +14,6 @@ import {
 } from "@/lib/admin-utils";
 
 export default function AdminHomeScreen() {
-  const { addToast } = useToast();
   const overview = useAdminStore((state) => state.overview);
   const registrations = useAdminStore((state) => state.registrations);
   const crewManagement = useAdminStore((state) => state.crewManagement);
@@ -27,13 +26,25 @@ export default function AdminHomeScreen() {
     fetchOverviewDeep();
   }, [fetchOverviewDeep]);
 
-  useEffect(() => {
-    if (!overviewError) return;
-    addToast(
-      overviewError.message || "Failed to load admin overview.",
-      "error",
+  if (overviewError && !overview && !isLoadingOverview) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <div className="mb-6">
+          <div className="text-tag text-[var(--color-accent)]">
+            Admin operations
+          </div>
+          <h1 className="mt-1 text-h2 text-white">Control room</h1>
+        </div>
+        <InlineErrorState
+          title="Admin overview failed to load"
+          message="The control room data is temporarily unavailable."
+          onRetry={() => {
+            void fetchOverviewDeep();
+          }}
+        />
+      </div>
     );
-  }, [addToast, overviewError]);
+  }
 
   // Compute work queue items
   const workQueue = useMemo(() => {

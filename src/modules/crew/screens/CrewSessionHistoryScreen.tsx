@@ -1,29 +1,30 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useToast } from '@/components/ui/Toast'
+import { InlineErrorState } from '@/components/error/InlineErrorState'
 import { crewLiveService } from '@/features/crew-live/services/crew-live-service'
 import { formatRelativeTime } from '@/lib/formatters'
 
 export default function CrewSessionHistoryScreen() {
-  const { addToast } = useToast()
   const [sessions, setSessions] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadHistory() {
       setIsLoading(true)
+      setLoadError(null)
       try {
         const data = await crewLiveService.listHistory(12)
         setSessions(data || [])
-      } catch (loadError: any) {
-        addToast(loadError?.message || 'Failed to load session history.', 'error')
+      } catch (error: any) {
+        setLoadError(error?.message || 'Failed to load session history.')
       } finally {
         setIsLoading(false)
       }
     }
 
     void loadHistory()
-  }, [addToast])
+  }, [])
 
   return (
     <div className="page-container py-8 md:py-10 max-w-2xl">
@@ -37,6 +38,12 @@ export default function CrewSessionHistoryScreen() {
 
       {isLoading ? (
         <div className="text-sm text-[var(--color-text-secondary)]">Loading history...</div>
+      ) : loadError ? (
+        <InlineErrorState
+          title="Session history failed to load"
+          message={loadError}
+          onRetry={() => window.location.reload()}
+        />
       ) : sessions.length > 0 ? (
         <div className="space-y-3">
           {sessions.map((session) => (

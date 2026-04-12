@@ -1,63 +1,52 @@
-﻿﻿/**
- * Discover Screen â€” Search, filters, and card grid.
- * Desktop: persistent sidebar filters. Mobile: horizontal chip scroll.
- */
-
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
+import { useToast } from "@/components/ui/Toast";
 import SearchInput from "@/components/ui/SearchInput";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import EmptyState from "@/components/ui/EmptyState";
+import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
 import { toNganyaSlug } from "@/lib/formatters";
 import { vibeTagColors } from "@/lib/mockData";
 import { SlidersHorizontal } from "lucide-react";
-import { useNganyaStore } from "@/stores/useNganyaStore";
-import { useFollowStore } from "@/stores/useFollowStore";
+import { followNganya, unfollowNganya } from "@/lib/queries/follows";
+import {
+  canTrackWithPlannerContext,
+  readPlannerStorageContext,
+  seedPlannerStorage,
+} from "@/modules/fan/services/planner-storage";
+import type { DiscoverRouteData } from "@/modules/fan/services/route-data";
 
 const allVibeTags = Object.keys(vibeTagColors);
 
-function DiscoverScreen() {
-  // UI state (filters remain local as they're not global state)
-  const [search, setSearch] = useState("");
-  const [activeCorridor, setActiveCorridor] = useState<string | null>(null);
-  const [activeVibe, setActiveVibe] = useState<string | null>(null);
+interface DiscoverScreenProps {
+  data: DiscoverRouteData;
+  onSearchChange: (
+    search: string,
+    activeCorridor: string | null,
+    activeVibe: string | null,
+  ) => void;
+}
 
-  // Use Zustand stores for data and loading states
+function DiscoverScreen({ data, onSearchChange }: DiscoverScreenProps) {
+  const router = useRouter();
+  const { showErrorToast, addToast } = useToast();
+  const [trackingNganya, setTrackingNganya] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const {
+    search,
+    activeCorridor,
+    activeVibe,
     nganyas,
     corridors,
     liveNganyas,
-    isLoadingNganyas,
-    isLoadingCorridors,
-    isLoadingLiveNganyas,
-    fetchNganyas,
-    fetchCorridors,
-    fetchLiveNganyas,
-  } = useNganyaStore();
-
-  const { isFollowing, followNganya, unfollowNganya, fetchFollowedNganyas } =
-    useFollowStore();
-
-  const isLoading =
-    isLoadingNganyas || isLoadingCorridors || isLoadingLiveNganyas;
-
-  // Load data on mount - single useEffect calling store actions
-  useEffect(() => {
-    fetchNganyas(search, activeCorridor || undefined);
-    fetchCorridors();
-    fetchLiveNganyas(activeCorridor || undefined);
-    fetchFollowedNganyas();
-  }, [
-    search,
-    activeCorridor,
-    fetchNganyas,
-    fetchCorridors,
-    fetchLiveNganyas,
-    fetchFollowedNganyas,
-  ]);
+    followedIds,
+  } = data;
 
   const filtered = useMemo(() => {
-    return (nganyas || []).filter((n) => {
+    return nganyas.filter((n) => {
       const matchesCorridor =
         !activeCorridor || n.corridor_id === activeCorridor;
       const matchesVibe =
@@ -68,28 +57,26 @@ function DiscoverScreen() {
 
   const toggleFollow = async (id: string) => {
     try {
-      if (isFollowing(id)) {
+      if (followedIds.has(id)) {
         await unfollowNganya(id);
       } else {
         await followNganya(id);
       }
+      await router.invalidate();
     } catch (error) {
-      console.error("Failed to toggle follow:", error);
+      showErrorToast(error, "Failed to update follow.");
     }
   };
 
   const clearFilters = () => {
-    setSearch("");
-    setActiveCorridor(null);
-    setActiveVibe(null);
+    onSearchChange("", null, null);
   };
 
-  // Map Supabase models to the exact Card component props expectation
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
 
     const isLive =
-      (liveNganyas || []).some((ln) => ln.nganya_id === dbNganya.id) ||
+      liveNganyas.some((ln) => ln.nganya_id === dbNganya.id) ||
       dbNganya.status === "LIVE";
 
     return {
@@ -99,6 +86,9 @@ function DiscoverScreen() {
         dbNganya.nganya_slug ||
         toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
       name: dbNganya.nganya_name || dbNganya.name,
+      corridorId: dbNganya.corridor_id || dbNganya.nganyas?.corridor_id || null,
+      corridorName:
+        dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       corridor:
         dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
@@ -106,7 +96,7 @@ function DiscoverScreen() {
         dbNganya.nganya_media?.[0]?.media_url ||
         dbNganya.image_url ||
         "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
-      isLive: isLive,
+      isLive,
       isNewBuild: dbNganya.tags?.includes("NEW_BUILD") || dbNganya.is_new_build,
       isVerified: dbNganya.is_verified,
       followers: dbNganya.follower_count || 0,
@@ -115,9 +105,40 @@ function DiscoverScreen() {
     };
   };
 
+  const handleBrowseCardAction = (cardData: any) => {
+    const plannerContext = readPlannerStorageContext();
+
+    if (cardData.isLive && canTrackWithPlannerContext(plannerContext, cardData)) {
+      setTrackingNganya({ id: cardData.id, name: cardData.name });
+      return;
+    }
+
+    seedPlannerStorage(
+      plannerContext,
+      {
+        id: cardData.id,
+        name: cardData.name,
+        corridorId: cardData.corridorId,
+        corridorName: cardData.corridorName,
+      },
+      { clearStageOnRouteChange: true },
+    );
+
+    addToast(
+      `Route set to ${cardData.corridorName}. Pick your pickup stage on Home to plan with ${cardData.name}.`,
+      "info",
+    );
+
+    router.navigate({
+      to: "/",
+      search: {
+        corridor: cardData.corridorId || undefined,
+      } as any,
+    });
+  };
+
   return (
     <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-h1 mb-2">Discover</h1>
         <p className="text-body-sm text-[var(--color-text-secondary)]">
@@ -125,9 +146,7 @@ function DiscoverScreen() {
         </p>
       </div>
 
-      {/* Layout: sidebar on desktop, stacked on mobile */}
       <div className="flex gap-8">
-        {/* â"€â"€â"€ Desktop Sidebar Filters â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
         <aside className="hidden lg:block w-60 shrink-0 space-y-6">
           <div>
             <h3 className="text-caption text-[var(--color-text-tertiary)] mb-3">
@@ -135,11 +154,15 @@ function DiscoverScreen() {
               Corridors
             </h3>
             <div className="space-y-1.5">
-              {(corridors || []).map((c) => (
+              {corridors.map((c) => (
                 <button
                   key={c.id}
                   onClick={() =>
-                    setActiveCorridor(activeCorridor === c.id ? null : c.id)
+                    onSearchChange(
+                      search,
+                      activeCorridor === c.id ? null : c.id,
+                      activeVibe,
+                    )
                   }
                   className={`w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-all cursor-pointer ${
                     activeCorridor === c.id
@@ -164,40 +187,52 @@ function DiscoverScreen() {
                   label={tag}
                   variant="vibe"
                   color={activeVibe === tag ? vibeTagColors[tag] : undefined}
-                  onClick={() => setActiveVibe(activeVibe === tag ? null : tag)}
+                  onClick={() =>
+                    onSearchChange(
+                      search,
+                      activeCorridor,
+                      activeVibe === tag ? null : tag,
+                    )
+                  }
                 />
               ))}
             </div>
           </div>
         </aside>
 
-        {/* â"€â"€â"€ Main Content â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
         <div className="flex-1 min-w-0">
-          {/* Search */}
-          <SearchInput value={search} onChange={setSearch} className="mb-4" />
+          <SearchInput
+            value={search}
+            onChange={(nextSearch) =>
+              onSearchChange(nextSearch, activeCorridor, activeVibe)
+            }
+            className="mb-4"
+          />
 
-          {/* Mobile filters â€" horizontal scroll */}
           <div className="lg:hidden flex gap-2 overflow-x-auto scroll-hidden pb-3 mb-4 -mx-5 px-5">
             <Chip
               label="All Routes"
               variant="route"
               isActive={!activeCorridor}
-              onClick={() => setActiveCorridor(null)}
+              onClick={() => onSearchChange(search, null, activeVibe)}
             />
-            {(corridors || []).map((c) => (
+            {corridors.map((c) => (
               <Chip
                 key={c.id}
                 label={c.name}
                 variant="route"
                 isActive={activeCorridor === c.id}
                 onClick={() =>
-                  setActiveCorridor(activeCorridor === c.id ? null : c.id)
+                  onSearchChange(
+                    search,
+                    activeCorridor === c.id ? null : c.id,
+                    activeVibe,
+                  )
                 }
               />
             ))}
           </div>
 
-          {/* Mobile vibe filter */}
           <div className="lg:hidden flex gap-2 overflow-x-auto scroll-hidden pb-3 mb-4 -mx-5 px-5">
             {allVibeTags.map((tag) => (
               <Chip
@@ -205,23 +240,21 @@ function DiscoverScreen() {
                 label={tag}
                 variant="vibe"
                 color={activeVibe === tag ? vibeTagColors[tag] : undefined}
-                onClick={() => setActiveVibe(activeVibe === tag ? null : tag)}
+                onClick={() =>
+                  onSearchChange(
+                    search,
+                    activeCorridor,
+                    activeVibe === tag ? null : tag,
+                  )
+                }
               />
             ))}
           </div>
 
-          {/* Results count */}
-          {isLoading ? (
-            <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4 animate-pulse">
-              Loading nganyas...
-            </p>
-          ) : (
-            <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
-              {filtered.length} nganya{filtered.length !== 1 ? "s" : ""} found
-            </p>
-          )}
+          <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
+            {filtered.length} nganya{filtered.length !== 1 ? "s" : ""} found
+          </p>
 
-          {/* Grid of cards */}
           {filtered.length > 0 ? (
             <div className="grid-cards">
               {filtered.map((n) => {
@@ -232,17 +265,53 @@ function DiscoverScreen() {
                     key={cardProps.id}
                     nganya={cardProps as any}
                     variant="standard"
-                    isFollowing={isFollowing(cardProps.id)}
+                    isFollowing={followedIds.has(cardProps.id)}
                     onFollow={toggleFollow}
+                    primaryAction={{
+                      label:
+                        cardProps.isLive &&
+                        canTrackWithPlannerContext(
+                          readPlannerStorageContext(),
+                          cardProps,
+                        )
+                          ? "Track"
+                          : "Plan ride",
+                      onClick: () => handleBrowseCardAction(cardProps),
+                    }}
+                    secondaryAction={{
+                      label: followedIds.has(cardProps.id)
+                        ? "Following"
+                        : "Follow",
+                      onClick: () => void toggleFollow(cardProps.id),
+                      variant: "secondary",
+                    }}
                   />
                 );
               })}
             </div>
-          ) : !isLoading ? (
+          ) : (
             <EmptyState variant="no-results" onAction={clearFilters} />
-          ) : null}
+          )}
         </div>
       </div>
+
+      {trackingNganya ? (
+        (() => {
+          const plannerContext = readPlannerStorageContext();
+          if (!plannerContext.toPlace || !plannerContext.fromStage) return null;
+
+          return (
+            <SearchResultsOverlayV2
+              isOpen
+              onClose={() => setTrackingNganya(null)}
+              fromStage={plannerContext.fromStage}
+              toPlace={plannerContext.toPlace}
+              preference="SPECIFIC"
+              preferredNganya={trackingNganya}
+            />
+          );
+        })()
+      ) : null}
     </div>
   );
 }

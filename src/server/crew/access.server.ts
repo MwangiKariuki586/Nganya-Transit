@@ -1,6 +1,7 @@
 import { normalizeRole } from '@/shared/auth/roles'
 import type { AppRole } from '@/shared/types/rbac'
 import { getUserScopedSupabaseClient } from '@/server/supabase/user-client.server'
+import { authRequired, forbidden, appError } from '@/shared/errors/app-error'
 
 export type CrewDirection = 'TO_TOWN' | 'FROM_TOWN'
 export type CrewSeatsPreset = 10 | 5 | 2 | 0
@@ -14,7 +15,7 @@ export interface CrewAccessContext {
 
 function validateAccessToken(accessToken: string | null | undefined) {
   if (!accessToken) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 }
 
@@ -28,7 +29,7 @@ export async function requireCrewAccess(accessToken: string): Promise<CrewAccess
   } = await supabase.auth.getUser(accessToken)
 
   if (userError || !user) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 
   let role = normalizeRole(user.app_metadata?.role ?? user.user_metadata?.role)
@@ -48,7 +49,7 @@ export async function requireCrewAccess(accessToken: string): Promise<CrewAccess
   }
 
   if (!role || !['crew', 'admin'].includes(role)) {
-    throw new Error('FORBIDDEN')
+    throw forbidden()
   }
 
   return {
@@ -107,7 +108,7 @@ export async function assertMappedNganya(context: CrewAccessContext, nganyaId: s
   }
 
   if (!data) {
-    throw new Error('NOT_MAPPED')
+    throw appError('NOT_MAPPED')
   }
 }
 
@@ -154,7 +155,7 @@ export async function getCrewSessionById(context: CrewAccessContext, sessionId: 
   }
 
   if (!data) {
-    throw new Error('SESSION_NOT_FOUND')
+    throw appError('SESSION_NOT_FOUND')
   }
 
   return data

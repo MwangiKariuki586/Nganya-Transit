@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { useAdminStore } from "@/stores/useAdminStore";
 import { TableSkeleton, InlineTableLoader } from "@/components/ui/loading";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -13,7 +14,7 @@ import { RadioTower, WifiOff } from "lucide-react";
 type HealthFilter = "all" | "healthy" | "warning" | "stale";
 
 export default function AdminLiveSessionsScreen() {
-  const { addToast } = useToast();
+  const { addToast, showErrorToast } = useToast();
   const [healthFilter, setHealthFilter] = useState<HealthFilter>("all");
   const [search, setSearch] = useState("");
   const [isRefetching, setIsRefetching] = useState(false);
@@ -60,10 +61,25 @@ export default function AdminLiveSessionsScreen() {
     );
   }
 
-  useEffect(() => {
-    if (!error) return;
-    addToast(error.message || "Failed to load live sessions.", "error");
-  }, [addToast, error]);
+  if (error && !crewManagement && !isLoading) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <div className="mb-6">
+          <div className="text-tag text-[var(--color-accent)]">
+            Live monitoring
+          </div>
+          <h1 className="text-h2 mt-1 text-white">Active sessions</h1>
+        </div>
+        <InlineErrorState
+          title="Live session monitoring failed to load"
+          message="Session health data could not be loaded."
+          onRetry={() => {
+            void fetchCrewManagement();
+          }}
+        />
+      </div>
+    );
+  }
 
   // Filter sessions
   const filteredSessions = useMemo(() => {
@@ -151,7 +167,7 @@ export default function AdminLiveSessionsScreen() {
       // Refresh data
       await fetchCrewManagement();
     } catch (error: any) {
-      addToast(error?.message || "Failed to terminate session.", "error");
+      showErrorToast(error, "Failed to terminate session.");
     } finally {
       setTerminatingSessionId(null);
     }

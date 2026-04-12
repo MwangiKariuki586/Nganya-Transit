@@ -8,16 +8,17 @@ import type {
   AdminUserRecord,
 } from '@/shared/types/admin-dashboard'
 import type { AppRole } from '@/shared/types/rbac'
+import { authRequired, forbidden, validationError, appError } from '@/shared/errors/app-error'
 
 function assertAdminRole(role: string | null | undefined) {
   if (normalizeRole(role) !== 'admin') {
-    throw new Error('FORBIDDEN')
+    throw forbidden()
   }
 }
 
 function requireAccessToken(accessToken: string | null | undefined) {
   if (!accessToken) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 }
 
@@ -31,7 +32,7 @@ export async function requireAdminDashboardAccess(accessToken: string) {
   } = await supabase.auth.getUser(accessToken)
 
   if (userError || !user) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 
   let role =
@@ -645,7 +646,7 @@ export async function suspendUser(
   assertAdminRole(role)
 
   if (!input.reason || input.reason.trim().length < 10) {
-    throw new Error('Suspension reason must be at least 10 characters')
+    throw validationError('Suspension reason must be at least 10 characters')
   }
 
   const supabase = getServiceRoleSupabaseClient()
@@ -677,14 +678,14 @@ export async function deleteUser(
   assertAdminRole(role)
 
   if (!input.reason || input.reason.trim().length < 20) {
-    throw new Error('Deletion reason must be at least 20 characters')
+    throw validationError('Deletion reason must be at least 20 characters')
   }
 
   const supabase = getServiceRoleSupabaseClient()
 
   // Prevent self-deletion
   if (actorUserId === input.userId) {
-    throw new Error('Cannot delete your own account')
+    throw validationError('Cannot delete your own account')
   }
 
   // Get user info before deletion for audit
@@ -730,7 +731,7 @@ export async function terminateCrewSession(
     .single()
 
   if (fetchError) throw fetchError
-  if (!session) throw new Error('Session not found')
+  if (!session) throw appError('SESSION_NOT_FOUND')
 
   // Terminate the session
   const { error: updateError } = await (supabase.from('live_sessions') as any)

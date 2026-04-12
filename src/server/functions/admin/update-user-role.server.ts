@@ -3,6 +3,7 @@ import { sessionMiddleware } from '@/server/auth/session-middleware.server'
 import { getServiceRoleSupabaseClient } from '@/server/supabase/service-role.server'
 import type { AppRole } from '@/shared/types/rbac'
 import { normalizeRole } from '@/shared/auth/roles'
+import { forbidden } from '@/shared/errors/app-error'
 
 export const updateUserRoleServerFn = createServerFn({ method: 'POST' })
   .middleware([sessionMiddleware])
@@ -10,7 +11,7 @@ export const updateUserRoleServerFn = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }: { data: { userId: string, role: AppRole }, context: { session: { role: string | null } } }) => {
     const requestRole = normalizeRole(context.session.role)
     if (requestRole !== 'admin') {
-      throw new Error('FORBIDDEN')
+      throw forbidden()
     }
 
     const supabase = getServiceRoleSupabaseClient()

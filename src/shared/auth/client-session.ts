@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { browserSupabase } from '@/shared/supabase/browser-client'
+import { authRequired } from '@/shared/errors/app-error'
 
 let pendingSessionResolution: Promise<Session | null> | null = null
 
@@ -56,7 +57,7 @@ export async function getClientAccessToken(): Promise<string | null> {
 export async function requireClientAccessToken(): Promise<string> {
   const accessToken = await getClientAccessToken()
   if (!accessToken) {
-    throw new Error('Not authenticated')
+    throw authRequired()
   }
 
   return accessToken

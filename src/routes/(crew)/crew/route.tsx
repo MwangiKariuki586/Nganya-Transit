@@ -2,6 +2,7 @@ import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { CrewShellSkeleton } from '@/modules/crew/components/CrewShellSkeleton'
 import { CrewRouteFrame } from '@/modules/crew/components/CrewRouteFrame'
 import { requireCrewRouteAccess } from '@/modules/crew/services/route-access'
+import { RouteErrorFallback } from '@/components/error/RouteErrorFallback'
 
 export const Route = createFileRoute('/(crew)/crew')({
   beforeLoad: async ({ location }) => {
@@ -10,6 +11,15 @@ export const Route = createFileRoute('/(crew)/crew')({
   },
   pendingComponent: CrewShellSkeleton,
   component: CrewLayout,
+  errorComponent: ({ error, reset }) => (
+    <RouteErrorFallback
+      error={error}
+      reset={reset}
+      title="Crew tools are temporarily unavailable"
+      homeTarget="/crew"
+      routeId="(crew)/crew"
+    />
+  ),
 })
 
 function CrewLayout() {

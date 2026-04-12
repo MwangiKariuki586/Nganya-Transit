@@ -1,6 +1,35 @@
 import { supabase } from '../supabase'
 import { toNganyaSlug } from '../formatters'
 
+function dedupeNganyas<T extends { id: string; nganya_media?: any[] }>(rows: T[] | null) {
+    const items = rows || []
+    const byId = new Map<string, T>()
+
+    for (const row of items) {
+        const existing = byId.get(row.id)
+        if (!existing) {
+            byId.set(row.id, row)
+            continue
+        }
+
+        const mergedMedia = [
+            ...(existing.nganya_media || []),
+            ...(row.nganya_media || []),
+        ].filter((media, index, list) => {
+            const key = `${media?.media_url || ''}:${media?.media_type || ''}`
+            return index === list.findIndex((item) => `${item?.media_url || ''}:${item?.media_type || ''}` === key)
+        })
+
+        byId.set(row.id, {
+            ...existing,
+            ...row,
+            nganya_media: mergedMedia,
+        })
+    }
+
+    return Array.from(byId.values())
+}
+
 export async function getCorridors() {
     const { data, error } = await supabase.from('corridors').select('*')
     if (error) throw error
@@ -21,7 +50,7 @@ export async function searchNganyas(queryText: string, corridorId?: string) {
 
     const { data, error } = await query
     if (error) throw error
-    return data
+    return dedupeNganyas(data)
 }
 
 export async function getNganya(id: string) {
@@ -59,7 +88,7 @@ export async function getNganyasByCorridor(corridorId: string, excludeNganyaId?:
 
     const { data, error } = await query.limit(4)
     if (error) throw error
-    return data
+    return dedupeNganyas(data)
 }
 
 export async function createNganya(nganyaData: {

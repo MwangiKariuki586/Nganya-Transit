@@ -6,6 +6,8 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import { getUserMessage, toAppError } from '@/shared/errors/app-error'
+import { reportAppError } from '@/shared/errors/reporting'
 
 // ─── Types ─────────────────────────────────────────────────
 type ToastType = 'info' | 'success' | 'error'
@@ -18,6 +20,7 @@ interface ToastMessage {
 
 interface ToastContextType {
     addToast: (message: string, type?: ToastType) => void
+    showErrorToast: (error: unknown, fallbackMessage?: string) => void
 }
 
 // ─── Context ───────────────────────────────────────────────
@@ -49,8 +52,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         setToasts((prev) => prev.filter((t) => t.id !== id))
     }, [])
 
+    const showErrorToast = useCallback((error: unknown, fallbackMessage?: string) => {
+        const normalized = toAppError(error)
+        reportAppError(normalized, { area: 'mutation' })
+        addToast(fallbackMessage || getUserMessage(normalized), 'error')
+    }, [addToast])
+
     return (
-        <ToastContext.Provider value={{ addToast }}>
+        <ToastContext.Provider value={{ addToast, showErrorToast }}>
             {children}
 
             {/* Toast container — fixed bottom center */}

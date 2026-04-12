@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { AdminStatusBadge } from "@/modules/admin/components/AdminStatusBadge";
 import { UserDetailDrawer } from "@/modules/admin/components/UserDetailDrawer";
 import { useAdminStore } from "@/stores/useAdminStore";
@@ -27,7 +28,7 @@ function formatRoleLabel(role: AppRole | null) {
 }
 
 export default function AdminUsersScreen() {
-  const { addToast } = useToast();
+  const { addToast, showErrorToast } = useToast();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<AppRole | "all" | "misaligned">(
     "all",
@@ -69,10 +70,23 @@ export default function AdminUsersScreen() {
     }
   }, [roleFilter]);
 
-  useEffect(() => {
-    if (!error) return;
-    addToast(error.message || "Failed to load users.", "error");
-  }, [addToast, error]);
+  if (error && !users.length && !isLoading) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <div className="mb-6">
+          <div className="text-tag text-[var(--color-accent)]">Admin users</div>
+          <h1 className="mt-1 text-h2 text-white">Users and roles</h1>
+        </div>
+        <InlineErrorState
+          title="Users failed to load"
+          message="The admin user directory is temporarily unavailable."
+          onRetry={() => {
+            void fetchUsers();
+          }}
+        />
+      </div>
+    );
+  }
 
   const filteredUsers = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -96,12 +110,10 @@ export default function AdminUsersScreen() {
 
     try {
       await updateUserRole(userId, role);
+      await fetchUsers();
       addToast(`Role updated to ${role.toUpperCase()}.`, "success");
     } catch (mutationError: any) {
-      addToast(
-        mutationError?.message || "Failed to update user role.",
-        "error",
-      );
+      showErrorToast(mutationError, "Failed to update user role.");
     } finally {
       setIsMutatingUserId(null);
     }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { AdminStatusBadge } from "@/modules/admin/components/AdminStatusBadge";
 import { useAdminStore } from "@/stores/useAdminStore";
 import {
@@ -23,7 +24,7 @@ function formatDate(value: string | null) {
 }
 
 export default function AdminCrewScreen() {
-  const { addToast } = useToast();
+  const { addToast, showErrorToast } = useToast();
   const [search, setSearch] = useState("");
   const [assignmentDrafts, setAssignmentDrafts] = useState<
     Record<string, string>
@@ -70,10 +71,23 @@ export default function AdminCrewScreen() {
     );
   }
 
-  useEffect(() => {
-    if (!error) return;
-    addToast(error.message || "Failed to load crew operations data.", "error");
-  }, [addToast, error]);
+  if (error && !crewManagement && !isLoading) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <div className="mb-6">
+          <div className="text-tag text-[var(--color-accent)]">Admin crew</div>
+          <h1 className="mt-1 text-h2 text-white">Crew operations</h1>
+        </div>
+        <InlineErrorState
+          title="Crew operations failed to load"
+          message="Crew mapping and session data could not be loaded."
+          onRetry={() => {
+            void fetchCrewManagement();
+          }}
+        />
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!crewRows.length) return;
@@ -134,6 +148,7 @@ export default function AdminCrewScreen() {
 
     try {
       await assignCrewNganyaAction(crewUserId, nganyaId);
+      await fetchCrewManagement();
       addToast("Crew assignment saved.", "success");
 
       // Clear dirty state
@@ -143,10 +158,7 @@ export default function AdminCrewScreen() {
         return next;
       });
     } catch (mutationError: any) {
-      addToast(
-        mutationError?.message || "Failed to assign crew nganya.",
-        "error",
-      );
+      showErrorToast(mutationError, "Failed to assign crew nganya.");
     } finally {
       setIsMutatingCrewId(null);
     }
@@ -157,6 +169,7 @@ export default function AdminCrewScreen() {
 
     try {
       await unassignCrewNganyaAction(crewUserId);
+      await fetchCrewManagement();
       addToast("Crew assignment removed.", "success");
       setShowUnassignConfirm(null);
 
@@ -167,10 +180,7 @@ export default function AdminCrewScreen() {
         return next;
       });
     } catch (mutationError: any) {
-      addToast(
-        mutationError?.message || "Failed to remove crew assignment.",
-        "error",
-      );
+      showErrorToast(mutationError, "Failed to remove crew assignment.");
     } finally {
       setIsMutatingCrewId(null);
     }

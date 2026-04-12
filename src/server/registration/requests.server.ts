@@ -1,6 +1,7 @@
 import { normalizeRole } from '@/shared/auth/roles'
 import type { AppRole } from '@/shared/types/rbac'
 import { getUserScopedSupabaseClient } from '@/server/supabase/user-client.server'
+import { authRequired, forbidden, notFound, validationError } from '@/shared/errors/app-error'
 
 export interface RegistrationAccessContext {
   accessToken: string
@@ -36,7 +37,7 @@ function buildRequestSelect() {
 
 function validateAccessToken(accessToken: string | null | undefined) {
   if (!accessToken) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 }
 
@@ -67,12 +68,12 @@ export async function requireRegistrationAccess(accessToken: string): Promise<Re
   } = await supabase.auth.getUser(accessToken)
 
   if (userError || !user) {
-    throw new Error('AUTH_REQUIRED')
+    throw authRequired()
   }
 
   const role = await resolveRole(supabase, user.id, user)
   if (!role || !['crew', 'admin'].includes(role)) {
-    throw new Error('FORBIDDEN')
+    throw forbidden()
   }
 
   return {
@@ -86,7 +87,7 @@ export async function requireRegistrationAccess(accessToken: string): Promise<Re
 export async function requireAdminRegistrationAccess(accessToken: string) {
   const context = await requireRegistrationAccess(accessToken)
   if (context.role !== 'admin') {
-    throw new Error('FORBIDDEN')
+    throw forbidden()
   }
   return context
 }
@@ -118,7 +119,7 @@ export async function createRegistrationRequest(
   input: RegistrationCreateInput,
 ) {
   if (!input.media?.length) {
-    throw new Error('At least one photo is required.')
+    throw validationError('At least one photo is required.')
   }
 
   const { data: existingRequest, error: existingRequestError } = await (context.supabase
@@ -130,7 +131,10 @@ export async function createRegistrationRequest(
   if (existingRequestError) throw existingRequestError
 
   if (existingRequest) {
-    throw new Error(`REGISTRATION_ALREADY_EXISTS:${existingRequest.status}`)
+    throw validationError(
+      `A registration already exists for this account (${existingRequest.status}).`,
+      { existingStatus: existingRequest.status },
+    )
   }
 
   const requestPayload = {
@@ -185,7 +189,7 @@ export async function getRegistrationRequestById(
 
   const { data, error } = await query.maybeSingle()
   if (error) throw error
-  if (!data) throw new Error('REQUEST_NOT_FOUND')
+  if (!data) throw notFound()
   return data
 }
 

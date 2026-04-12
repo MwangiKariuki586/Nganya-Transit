@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import Button from "../components/ui/Button";
@@ -24,6 +24,7 @@ export const Route = createFileRoute("/signin")({
 
 function SignInScreen() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { addToast } = useToast();
   const search = Route.useSearch();
   const [email, setEmail] = useState("");
@@ -47,6 +48,7 @@ function SignInScreen() {
 
       // Invalidate cached role on auth state change
       useAuthStore.getState().invalidateRole();
+      await router.invalidate();
 
       const role = await resolveClientRole();
       const returnTo = search.returnTo;

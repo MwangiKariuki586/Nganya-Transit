@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { useAdminStore } from "@/stores/useAdminStore";
 import type { NganyaRegistrationRequestStatus } from "@/shared/types/nganya-registration";
 import {
@@ -36,7 +37,7 @@ const NOTE_TEMPLATES = [
 ];
 
 export default function AdminRegistrationQueueScreen() {
-  const { addToast } = useToast();
+  const { addToast, showErrorToast } = useToast();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
     null,
   );
@@ -164,18 +165,23 @@ export default function AdminRegistrationQueueScreen() {
     }
   }, [selectedRequestId, fetchRegistrationDetail]);
 
-  useEffect(() => {
-    if (!error) return;
-    addToast(error.message || "Failed to load registration queue.", "error");
-  }, [addToast, error]);
-
-  useEffect(() => {
-    if (!selectedRequestError) return;
-    addToast(
-      selectedRequestError.message || "Failed to load request details.",
-      "error",
+  if (error && !registrations && !isLoading) {
+    return (
+      <div className="page-container py-8 md:py-10">
+        <div className="mb-6">
+          <div className="text-tag text-[var(--color-accent)]">Admin queue</div>
+          <h1 className="text-h2 mt-1 text-white">Nganya registrations</h1>
+        </div>
+        <InlineErrorState
+          title="Registration queue failed to load"
+          message="Registration review data is temporarily unavailable."
+          onRetry={() => {
+            void fetchRegistrations(100);
+          }}
+        />
+      </div>
     );
-  }, [addToast, selectedRequestError]);
+  }
 
   useEffect(() => {
     if (!filteredRequests.length) {
@@ -220,15 +226,13 @@ export default function AdminRegistrationQueueScreen() {
 
     try {
       await approveRequest(selectedRequestId, reviewNotes || undefined);
+      await fetchRegistrations(100);
       addToast("Registration approved and mapped.", "success");
 
       // Auto-advance to next pending
       advanceToNext();
     } catch (mutationError: any) {
-      addToast(
-        mutationError?.message || "Failed to approve registration request.",
-        "error",
-      );
+      showErrorToast(mutationError, "Failed to approve registration request.");
     } finally {
       setIsMutating(false);
     }
@@ -250,6 +254,7 @@ export default function AdminRegistrationQueueScreen() {
 
     try {
       await reviewRequest(selectedRequestId, status, reviewNotes || undefined);
+      await fetchRegistrations(100);
       addToast(
         status === "NEEDS_INFO"
           ? "Change request sent to crew."
@@ -261,10 +266,7 @@ export default function AdminRegistrationQueueScreen() {
       advanceToNext();
       setShowRejectConfirm(false);
     } catch (mutationError: any) {
-      addToast(
-        mutationError?.message || "Failed to update registration request.",
-        "error",
-      );
+      showErrorToast(mutationError, "Failed to update registration request.");
     } finally {
       setIsMutating(false);
     }
@@ -462,7 +464,17 @@ export default function AdminRegistrationQueueScreen() {
 
         {/* RIGHT PANEL: Detail */}
         <section className="rounded-[28px] border border-[var(--glass-border)] bg-[rgba(23,23,31,0.94)] p-5 shadow-[var(--shadow-md)] md:p-6">
-          {!selectedRequest ? (
+          {selectedRequestError && !selectedRequestData ? (
+            <InlineErrorState
+              title="Request details failed to load"
+              message="The selected registration could not be loaded."
+              onRetry={() => {
+                if (selectedRequestId) {
+                  void fetchRegistrationDetail(selectedRequestId);
+                }
+              }}
+            />
+          ) : !selectedRequest ? (
             isLoadingDetail ? (
               <DetailSkeleton />
             ) : (

@@ -5,6 +5,7 @@ import Chip from '@/components/ui/Chip'
 import Card from '@/components/ui/Card'
 import LiveBadge from '@/components/ui/LiveBadge'
 import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
+import { ResponsiveNganyaImage } from '@/components/ui/ResponsiveNganyaImage'
 import { vibeTagColors } from '@/lib/mockData'
 import { getNganyaBySlug, getNganyasByCorridor } from '@/lib/queries/discover'
 import { getLiveNow } from '@/lib/queries/live'
@@ -119,7 +120,12 @@ export default function NganyaDetailScreen() {
     return (
         <div className="animate-slide-up">
             <div className="relative h-[280px] md:h-[400px] overflow-hidden">
-                <img src={imageUrl} alt={nganya.name} className="w-full h-full object-cover" />
+                <ResponsiveNganyaImage
+                    src={imageUrl}
+                    alt={nganya.name}
+                    variant="detail"
+                    className="w-full h-full object-cover"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg-base)] via-[var(--color-bg-base)]/40 to-transparent" />
 
                 <Link

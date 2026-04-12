@@ -1,7 +1,6 @@
 import { redirect } from '@tanstack/react-router'
 import { getStableClientSession } from '@/shared/auth/client-session'
 import { getCrewBootstrapServerFn } from '@/shared/server-fns/crew-bootstrap'
-import { useCrewStore } from '@/stores/useCrewStore'
 import type { CrewBootstrapSnapshot, CrewStatusState } from '@/shared/types/crew-bootstrap'
 
 function isCrewRouteRole(role: CrewBootstrapSnapshot['bootstrap']['role']) {
@@ -58,30 +57,12 @@ export function getCrewStatusState(snapshot: CrewBootstrapSnapshot): CrewStatusS
 export async function loadCrewBootstrapSnapshot() {
   if (typeof window !== 'undefined') {
     const session = await getStableClientSession()
-    const userId = session?.user?.id ?? null
-
-    if (!userId) {
+    if (!session?.user?.id) {
       return getUnauthenticatedSnapshot()
     }
-
-    // Use Zustand store to get cached bootstrap data
-    const store = useCrewStore.getState()
-    const cachedSnapshot = store.bootstrap
-
-    // Check if cache is fresh and valid
-    if (cachedSnapshot && !store.isStale() && cachedSnapshot.userId === userId) {
-      return cachedSnapshot
-    }
   }
 
-  const snapshot = await getCrewBootstrapServerFn()
-  
-  // Update Zustand store with fresh data
-  if (typeof window !== 'undefined') {
-    useCrewStore.getState().setBootstrap(snapshot)
-  }
-  
-  return snapshot
+  return getCrewBootstrapServerFn()
 }
 
 export async function requireCrewRouteAccess(requestedPath: string) {

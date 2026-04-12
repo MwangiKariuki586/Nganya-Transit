@@ -53,6 +53,14 @@ export default function CrewLiveSessionScreenV2({
 
       try {
         const session = await crewLiveService.getSession(sessionId);
+
+        // Redirect if session is not active
+        if (session.status !== "LIVE" || session.ended_at) {
+          addToast("This session has ended", "error");
+          navigate({ to: "/crew/live" });
+          return;
+        }
+
         setInitialSession(session);
       } catch (error: any) {
         setLoadError(error?.message || "Failed to load live session.");
@@ -62,7 +70,7 @@ export default function CrewLiveSessionScreenV2({
     }
 
     void loadSession();
-  }, [sessionId]);
+  }, [sessionId, navigate, addToast]);
 
   const {
     session,

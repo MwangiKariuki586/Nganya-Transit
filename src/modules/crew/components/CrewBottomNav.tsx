@@ -1,11 +1,10 @@
 import { Radio, History, Shield, LogOut, LogIn } from "lucide-react";
-import { Link, useMatches } from "@tanstack/react-router";
+import { Link, useMatches, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
-import { useCrewStore } from "@/stores/useCrewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 interface NavProps {
@@ -15,6 +14,7 @@ interface NavProps {
 
 export default function CrewBottomNav({ session, profile }: NavProps) {
   const matches = useMatches();
+  const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/crew/live";
   const { snapshot } = useCrewBootstrap();
   const crewState = getCrewStatusState(snapshot);
@@ -42,9 +42,9 @@ export default function CrewBottomNav({ session, profile }: NavProps) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     clearAuthSessionCookie();
-    useCrewStore.getState().invalidateBootstrap();
     useAuthStore.getState().invalidateRole();
-    window.location.href = "/signin";
+    await router.invalidate();
+    window.location.assign("/signin");
   };
 
   return (

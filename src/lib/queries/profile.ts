@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { authRequired } from '@/shared/errors/app-error'
 
 export async function getProfile(userId: string) {
     const { data, error } = await supabase
@@ -32,7 +33,7 @@ export async function updateCurrentUserProfile(payload: {
 }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError) throw authError
-    if (!user) throw new Error('Not authenticated')
+    if (!user) throw authRequired()
 
     const normalizedHandle = payload.handle.replace(/^@+/, '').trim()
 

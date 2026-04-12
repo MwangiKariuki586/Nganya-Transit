@@ -1,6 +1,7 @@
 import { browserSupabase } from '@/shared/supabase/browser-client'
 import { nganyaRegistrationRepository } from '@/entities/nganya-registration/repository'
 import { requireClientAccessToken } from '@/shared/auth/client-session'
+import { authRequired } from '@/shared/errors/app-error'
 
 function sanitizeFileName(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9.\-_]+/g, '-').replace(/-+/g, '-')
@@ -91,7 +92,7 @@ export const nganyaRegistrationService = {
     } = await browserSupabase.auth.getUser()
 
     if (userError || !user) {
-      throw new Error('Not authenticated')
+      throw authRequired()
     }
 
     const uploads: RegistrationUploadItem[] = []

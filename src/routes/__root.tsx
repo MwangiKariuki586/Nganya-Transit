@@ -1,7 +1,8 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import AppShell from '../components/layout/AppShell'
 import { AuthSessionBridge } from '@/shared/auth/AuthSessionBridge'
-import { RoleAccessBoundary } from '@/shared/auth/RoleAccessBoundary'
+import { RouteErrorFallback } from '@/components/error/RouteErrorFallback'
+import { AppRenderBoundary } from '@/components/error/AppRenderBoundary'
 
 import appCss from '../styles.css?url'
 
@@ -22,17 +23,26 @@ export const Route = createRootRoute({
   }),
   component: RootComponent,
   shellComponent: RootDocument,
+  errorComponent: ({ error, reset }) => (
+    <RouteErrorFallback
+      error={error}
+      reset={reset}
+      title="The app hit an unexpected problem"
+      homeTarget="/"
+      routeId="__root"
+    />
+  ),
 })
 
 function RootComponent() {
   return (
     <>
       <AuthSessionBridge />
-      <RoleAccessBoundary>
+      <AppRenderBoundary>
         <AppShell>
           <Outlet />
         </AppShell>
-      </RoleAccessBoundary>
+      </AppRenderBoundary>
     </>
   )
 }

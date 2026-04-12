@@ -426,7 +426,7 @@ export default function SearchResultsOverlayV2({
         ) : (
           <div className="text-center p-8 border border-dashed border-[var(--color-line)] rounded-[var(--radius-lg)]">
             <p className="text-[var(--color-text-secondary)] mb-2">
-              No active rides found for this corridor right now.
+              No active rides found for this route right now.
             </p>
             <Button variant="secondary" onClick={onClose}>
               Adjust Search
