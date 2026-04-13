@@ -188,3 +188,18 @@ export async function getPlaces() {
     if (error) throw error
     return data
 }
+
+export async function getNganyaMediaPaginated(nganyaId: string, page: number = 0, pageSize: number = 10) {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error } = await supabase
+        .from('nganya_media')
+        .select('id, media_url, media_type, nganya_id')
+        .eq('nganya_id', nganyaId)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+    if (error) throw error
+    return data || []
+}

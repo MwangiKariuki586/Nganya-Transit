@@ -6,14 +6,20 @@ import Modal from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Settings, Camera, MapPin, Clock, Calendar } from "lucide-react";
-import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
+import SignalBadge from "@/components/ui/SignalBadge";
+import CredibilityBadge from "@/components/ui/CredibilityBadge";
 import {
   formatHandle,
   formatMonthYear,
-  formatRelativeTime,
   getInitials,
   toNganyaSlug,
 } from "@/lib/formatters";
+import {
+  getSignalStrength,
+  formatRecencyLabel,
+  getUserCredibility,
+  getNganyaActivitySignal,
+} from "@/lib/signal-intelligence";
 import { updateCurrentUserProfile } from "@/lib/queries/profile";
 import type { ProfileRouteData } from "@/modules/fan/services/route-data";
 
@@ -25,6 +31,8 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
   const navigate = useNavigate();
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
+  const [showAllSightings, setShowAllSightings] = useState(false);
+  const [showAllFollowing, setShowAllFollowing] = useState(false);
   const useSheet = typeof window !== "undefined" && window.innerWidth < 768;
   const { authUser, profile, followedNganyas, liveNganyas, userSightings } =
     data;
@@ -46,16 +54,82 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     profile?.created_at || authUser?.created_at,
   );
 
+  // Calculate user credibility and activity metrics
+  const credibility = useMemo(
+    () => getUserCredibility(userSightings),
+    [userSightings],
+  );
+
+  // Separate fresh and expired sightings
+  const { freshSightings, expiredSightings } = useMemo(() => {
+    const fresh: any[] = [];
+    const expired: any[] = [];
+
+    userSightings.forEach((sighting) => {
+      const strength = getSignalStrength(sighting.created_at);
+      if (strength === "expired") {
+        expired.push(sighting);
+      } else {
+        fresh.push(sighting);
+      }
+    });
+
+    return { freshSightings: fresh, expiredSightings: expired };
+  }, [userSightings]);
+
+  // Sort followed nganyas by activity (fresh first)
+  const sortedFollowedNganyas = useMemo(() => {
+    return [...followedNganyas].sort((a, b) => {
+      const aSightings = liveNganyas.filter(
+        (live: any) => live.nganya_id === (a.nganyas?.id || a.id),
+      );
+      const bSightings = liveNganyas.filter(
+        (live: any) => live.nganya_id === (b.nganyas?.id || b.id),
+      );
+
+      const aSignal = getNganyaActivitySignal(aSightings);
+      const bSignal = getNganyaActivitySignal(bSightings);
+
+      // Fresh first
+      if (aSignal.isFresh && !bSignal.isFresh) return -1;
+      if (!aSignal.isFresh && bSignal.isFresh) return 1;
+
+      // Then by count
+      return bSignal.count - aSignal.count;
+    });
+  }, [followedNganyas, liveNganyas]);
+
+  // Pagination logic
+  const ITEMS_PER_PAGE = 5;
+  const displayedSightings = showAllSightings
+    ? [...freshSightings, ...expiredSightings]
+    : [...freshSightings, ...expiredSightings].slice(0, ITEMS_PER_PAGE);
+  const hasMoreSightings =
+    freshSightings.length + expiredSightings.length > ITEMS_PER_PAGE;
+
+  const displayedFollowing = showAllFollowing
+    ? sortedFollowedNganyas
+    : sortedFollowedNganyas.slice(0, ITEMS_PER_PAGE);
+  const hasMoreFollowing = sortedFollowedNganyas.length > ITEMS_PER_PAGE;
+
+  // Map nganya data to Card props format (same as homepage)
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
 
     const nganyaData = dbNganya.nganyas || dbNganya;
+    const nganyaId = nganyaData.id || nganyaData.nganya_id;
     const isLive = liveNganyas.some(
-      (liveNganya) => liveNganyas && liveNganya.nganya_id === nganyaData.id,
+      (liveNganya: any) => liveNganya.nganya_id === nganyaId,
     );
 
+    // Get activity signal for this nganya
+    const nganyaSightings = liveNganyas.filter(
+      (live: any) => live.nganya_id === nganyaId,
+    );
+    const activitySignal = getNganyaActivitySignal(nganyaSightings);
+
     return {
-      id: nganyaData.nganya_id || nganyaData.id,
+      id: nganyaId,
       slug:
         nganyaData.slug ||
         nganyaData.nganya_slug ||
@@ -76,26 +150,22 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
       isVerified: nganyaData.is_verified,
       followers: nganyaData.follower_count || 0,
       sightingsToday: nganyaData.sighting_count_today || 0,
-      lastSeen: isLive ? "Live now" : "Recently",
+      lastSeen: activitySignal.isFresh
+        ? activitySignal.label
+        : isLive
+          ? "Live now"
+          : activitySignal.label,
     };
   };
 
+  // Auth is now guaranteed by route loader, so this check is just for type safety
   if (!authUser) {
-    return (
-      <div className="page-container pt-8 pb-12 md:pt-12 md:pb-16">
-        <EmptyState
-          variant="no-following"
-          title="Sign in to open your profile"
-          message="Your follows, sightings, and account settings live here once you sign in."
-          actionLabel="Sign In"
-          onAction={() => navigate({ to: "/signin" })}
-        />
-      </div>
-    );
+    return null; // This should never happen due to route-level redirect
   }
 
   return (
     <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10">
+      {/* Header - Identity + Credibility */}
       <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
         <div className="relative">
           {avatarUrl ? (
@@ -115,23 +185,33 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         </div>
 
         <div className="flex-1 text-center md:text-left">
-          <h1 className="text-h2 text-[var(--color-text-primary)]">
-            {displayName}
-          </h1>
+          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+            <h1 className="text-h2 text-[var(--color-text-primary)]">
+              {displayName}
+            </h1>
+            <CredibilityBadge
+              level={credibility.level}
+              label={credibility.label}
+            />
+          </div>
           <p className="text-body-sm text-[var(--color-text-secondary)] mb-1">
             {handle}
           </p>
-          <p className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
-            Role: {profile?.role || "fan"}
-          </p>
+
+          {credibility.lastActivity && (
+            <div className="flex items-center justify-center md:justify-start gap-1.5 text-xs text-[var(--color-text-tertiary)] mb-4">
+              <Clock className="w-3 h-3" />
+              <span>Last spotted {credibility.lastActivity}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-center md:justify-start gap-6">
             <div className="text-center">
               <span className="text-h4 text-[var(--color-text-primary)] block">
-                {userSightings.length}
+                {credibility.sightingsLast7d}
               </span>
               <span className="text-caption text-[var(--color-text-tertiary)]">
-                Sightings
+                Last 7d
               </span>
             </div>
             <div className="w-px h-8 bg-[var(--color-line)]" />
@@ -161,66 +241,129 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         </Button>
       </div>
 
+      {/* Your Sightings - Signal Intelligence */}
       <section>
-        <h2 className="text-h3 mb-4">Your Sightings</h2>
+        <h2 className="text-h3 !mb-3">Your Sightings</h2>
         {userSightings.length > 0 ? (
-          <div className="space-y-2">
-            {userSightings.map((sighting) => (
-              <div
-                key={sighting.id}
-                className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)]"
-              >
-                <Camera className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {sighting.nganya?.name || "Nganya"}
-                  </span>
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-                    <MapPin className="w-3 h-3" />
-                    <span>
-                      {sighting.stage?.name ||
-                        sighting.nganya?.corridors?.name ||
-                        "Unknown route"}
-                    </span>
-                    <span>-</span>
-                    <Clock className="w-3 h-3" />
-                    <span>{formatRelativeTime(sighting.created_at)}</span>
+          <>
+            <div className="space-y-2">
+              {/* Fresh Sightings */}
+              {displayedSightings.map((sighting) => {
+                const strength = getSignalStrength(sighting.created_at);
+                const recency = formatRecencyLabel(sighting.created_at);
+                const isExpired = strength === "expired";
+
+                return (
+                  <div
+                    key={sighting.id}
+                    className={`flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all ${
+                      isExpired ? "opacity-60" : ""
+                    }`}
+                    style={{
+                      boxShadow:
+                        strength === "fresh" ? "var(--glow-accent-sm)" : "none",
+                    }}
+                  >
+                    <Camera
+                      className={`w-4 h-4 shrink-0 ${isExpired ? "text-[var(--color-text-tertiary)]" : "text-[var(--color-accent)]"}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`text-sm font-semibold ${isExpired ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-primary)]"}`}
+                        >
+                          {sighting.nganya?.name || "Nganya"}
+                        </span>
+                        {sighting.stage?.name && (
+                          <span className="text-xs text-[var(--color-text-tertiary)]">
+                            • {sighting.stage.name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+                        <MapPin className="w-3 h-3" />
+                        <span>
+                          {sighting.nganya?.corridors?.name || "Unknown route"}
+                        </span>
+                        <span>•</span>
+                        <Clock className="w-3 h-3" />
+                        <span>{recency}</span>
+                      </div>
+                    </div>
+                    <SignalBadge strength={strength} />
                   </div>
-                </div>
-                <ConfidenceBadge
-                  level={sighting.confidence?.confidence_level || "HIGH"}
-                />
+                );
+              })}
+            </div>
+
+            {hasMoreSightings && (
+              <div className="mt-3 text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAllSightings(!showAllSightings)}
+                >
+                  {showAllSightings
+                    ? "Show Less"
+                    : `Show ${freshSightings.length + expiredSightings.length - ITEMS_PER_PAGE} More`}
+                </Button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
-          <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
-            No sightings yet. Hit Spot when you see one outside.
-          </div>
+          <EmptyState
+            variant="no-sightings"
+            title="No recent sightings"
+            message="Start spotting nganyas to build your contributor profile."
+            actionLabel="Spot Now"
+            onAction={() => navigate({ to: "/spot" })}
+          />
         )}
       </section>
 
+      {/* Divider */}
+      <div className="border-t border-[var(--color-line)]" />
+
+      {/* Following - Actionable Intelligence */}
       <section>
-        <h2 className="text-h3 mb-4">Following</h2>
+        <h2 className="text-h3 !mb-3">Following</h2>
         {followedNganyas.length > 0 ? (
-          <div className="space-y-2">
-            {followedNganyas.map((nganya) => {
-              const cardProps = mapSupabaseToCardProps(nganya);
-              if (!cardProps) return null;
-              return (
-                <Card
-                  key={cardProps.id}
-                  nganya={cardProps as any}
-                  variant="compact"
-                  isFollowing
-                />
-              );
-            })}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayedFollowing.map((nganya) => {
+                const cardProps = mapSupabaseToCardProps(nganya);
+                if (!cardProps) return null;
+                return (
+                  <Card
+                    key={cardProps.id}
+                    nganya={cardProps as any}
+                    variant="standard"
+                    isFollowing
+                  />
+                );
+              })}
+            </div>
+
+            {hasMoreFollowing && (
+              <div className="mt-4 text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAllFollowing(!showAllFollowing)}
+                >
+                  {showAllFollowing
+                    ? "Show Less"
+                    : `Show ${sortedFollowedNganyas.length - ITEMS_PER_PAGE} More`}
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="text-center py-8 text-[var(--color-text-tertiary)] text-body-sm">
-            You are not following any nganyas yet.
-          </div>
+          <EmptyState
+            variant="no-following"
+            title="Not following any nganyas"
+            message="Discover and follow nganyas to track their live activity."
+            actionLabel="Discover"
+            onAction={() => navigate({ to: "/discover" })}
+          />
         )}
       </section>
 
