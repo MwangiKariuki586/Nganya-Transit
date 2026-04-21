@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { AdminStatusBadge } from "@/modules/admin/components/AdminStatusBadge";
 import { useAdminStore } from "@/stores/useAdminStore";
 import type { AppRole } from "@/shared/types/rbac";

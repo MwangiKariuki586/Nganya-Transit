@@ -12,7 +12,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { InlineTableLoader } from "@/components/ui/loading";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";

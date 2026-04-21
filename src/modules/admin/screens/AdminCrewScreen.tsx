@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { InlineErrorState } from "@/components/error/InlineErrorState";
 import { AdminStatusBadge } from "@/modules/admin/components/AdminStatusBadge";
 import { useAdminStore } from "@/stores/useAdminStore";

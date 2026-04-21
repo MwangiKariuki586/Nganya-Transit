@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { SectionBoundary } from "@/components/error/SectionBoundary";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";

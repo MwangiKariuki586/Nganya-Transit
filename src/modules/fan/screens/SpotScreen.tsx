@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -23,7 +29,7 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { LoadingButton } from "@/components/ui/loading";
 import { ListSkeleton } from "@/components/ui/loading";
 import { ResponsiveNganyaImage } from "@/components/ui/ResponsiveNganyaImage";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { formatRelativeTime } from "@/lib/formatters";
 import { postSighting } from "@/lib/queries/sightings";
 import { supabase } from "@/lib/supabase";
@@ -118,7 +124,8 @@ function getDirectionOptions(corridorName: string | null) {
 
 function getSignalCue(candidate: any) {
   if (candidate.liveCue) return "Live on this route";
-  if (candidate.lastSeenAt) return `Seen ${formatRelativeTime(candidate.lastSeenAt)}`;
+  if (candidate.lastSeenAt)
+    return `Seen ${formatRelativeTime(candidate.lastSeenAt)}`;
   if (candidate.isFollowed) return "You follow this build";
   return `Popular on this route`;
 }
@@ -149,12 +156,16 @@ function buildQualitySummary(params: {
     {
       label: "Direction set",
       passed: Boolean(params.direction),
-      detail: params.direction ? "Structured route direction added" : "Choose a direction",
+      detail: params.direction
+        ? "Structured route direction added"
+        : "Choose a direction",
     },
     {
       label: "Live location on submit",
       passed: params.locationGranted,
-      detail: params.locationGranted ? "Real device location available" : "Location still pending",
+      detail: params.locationGranted
+        ? "Real device location available"
+        : "Location still pending",
     },
     {
       label: "Location fits route",
@@ -180,7 +191,9 @@ function buildQualitySummary(params: {
     },
     {
       label: "Recent corroboration",
-      passed: params.corroborationMinutes !== null && params.corroborationMinutes <= 10,
+      passed:
+        params.corroborationMinutes !== null &&
+        params.corroborationMinutes <= 10,
       detail:
         params.corroborationMinutes !== null
           ? `Another fan spotted it ${params.corroborationMinutes}m ago`
@@ -194,14 +207,17 @@ function buildQualitySummary(params: {
   if (params.direction) score += 10;
   if (params.photoName) score += 15;
   if (params.evidenceTags.length > 0) score += 10;
-  if (params.corroborationMinutes !== null && params.corroborationMinutes <= 10) score += 15;
+  if (params.corroborationMinutes !== null && params.corroborationMinutes <= 10)
+    score += 15;
   if (params.duplicatePenalty) score -= 25;
 
   const reasons: string[] = [];
-  if (params.locationGranted && params.corridorFit) reasons.push("Verified route fit");
+  if (params.locationGranted && params.corridorFit)
+    reasons.push("Verified route fit");
   if (params.direction) reasons.push("Direction set");
   if (params.photoName) reasons.push("Photo evidence");
-  if (params.corroborationMinutes !== null && params.corroborationMinutes <= 10) reasons.push("Recent corroboration");
+  if (params.corroborationMinutes !== null && params.corroborationMinutes <= 10)
+    reasons.push("Recent corroboration");
   if (params.duplicatePenalty) reasons.push("Repeat spotting penalty");
 
   let level: SignalQuality = "LOW";
@@ -210,7 +226,8 @@ function buildQualitySummary(params: {
     params.corridorFit &&
     params.direction &&
     (Boolean(params.photoName) ||
-      (params.corroborationMinutes !== null && params.corroborationMinutes <= 10)) &&
+      (params.corroborationMinutes !== null &&
+        params.corroborationMinutes <= 10)) &&
     !params.duplicatePenalty
   ) {
     level = "HIGH";
@@ -221,7 +238,11 @@ function buildQualitySummary(params: {
   return { level, score, reasons, factors };
 }
 
-async function findClosestStagesForCorridor(corridorId: string, lat: number, lng: number) {
+async function findClosestStagesForCorridor(
+  corridorId: string,
+  lat: number,
+  lng: number,
+) {
   const { data, error } = await (supabase.rpc as any)("closest_stages", {
     p_corridor_id: corridorId,
     p_lat: lat,
@@ -236,8 +257,10 @@ async function findClosestStagesForCorridor(corridorId: string, lat: number, lng
 
 function getRouteFitMessage(distance: number | null) {
   if (distance === null) return "Route fit will be checked on submit";
-  if (distance <= 350) return `Strong route fit - nearest stage ${formatDistance(distance)} away`;
-  if (distance <= 1200) return `Usable route fit - nearest stage ${formatDistance(distance)} away`;
+  if (distance <= 350)
+    return `Strong route fit - nearest stage ${formatDistance(distance)} away`;
+  if (distance <= 1200)
+    return `Usable route fit - nearest stage ${formatDistance(distance)} away`;
   return `Route fit uncertain - nearest stage ${formatDistance(distance)} away`;
 }
 
@@ -286,27 +309,38 @@ export default function SpotScreen({ data }: SpotScreenProps) {
     evidenceTags: [],
     photoName: null,
   });
-  const [locationSuggestion, setLocationSuggestion] = useState<CorridorSuggestion>({
-    corridorId: null,
-    corridorName: null,
-    source: null,
-  });
+  const [locationSuggestion, setLocationSuggestion] =
+    useState<CorridorSuggestion>({
+      corridorId: null,
+      corridorName: null,
+      source: null,
+    });
   const [isDetectingCorridor, setIsDetectingCorridor] = useState(false);
   const [routeFitDistance, setRouteFitDistance] = useState<number | null>(null);
   const [routeFitStageId, setRouteFitStageId] = useState<string | null>(null);
-  const [routeFitStageName, setRouteFitStageName] = useState<string | null>(null);
+  const [routeFitStageName, setRouteFitStageName] = useState<string | null>(
+    null,
+  );
   const [routeFitChecked, setRouteFitChecked] = useState(false);
   const [confirmationChecked, setConfirmationChecked] = useState(false);
-  const [selectedPhotoName, setSelectedPhotoName] = useState<string | null>(null);
-  const [selectedPhotoPreviewUrl, setSelectedPhotoPreviewUrl] = useState<string | null>(null);
+  const [selectedPhotoName, setSelectedPhotoName] = useState<string | null>(
+    null,
+  );
+  const [selectedPhotoPreviewUrl, setSelectedPhotoPreviewUrl] = useState<
+    string | null
+  >(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [corridorWarning, setCorridorWarning] = useState<string | null>(null);
   const [isValidatingRoute, setIsValidatingRoute] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCorridorBlocking, setIsCorridorBlocking] = useState(false);
-  const [submittedQuality, setSubmittedQuality] = useState<QualitySummary | null>(null);
-  const [submittedNganyaName, setSubmittedNganyaName] = useState<string | null>(null);
-  const [submittedCorroborationMinutes, setSubmittedCorroborationMinutes] = useState<number | null>(null);
+  const [submittedQuality, setSubmittedQuality] =
+    useState<QualitySummary | null>(null);
+  const [submittedNganyaName, setSubmittedNganyaName] = useState<string | null>(
+    null,
+  );
+  const [submittedCorroborationMinutes, setSubmittedCorroborationMinutes] =
+    useState<number | null>(null);
 
   const geolocation = useGeolocation({
     enableHighAccuracy: true,
@@ -349,7 +383,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
   const liveByNganyaId = useMemo(
     () =>
-      new Map<string, any>((liveNganyas || []).map((row: any) => [row.nganya_id, row])),
+      new Map<string, any>(
+        (liveNganyas || []).map((row: any) => [row.nganya_id, row]),
+      ),
     [liveNganyas],
   );
 
@@ -373,14 +409,21 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
   const corroboratingSighting = useMemo(() => {
     if (!draft.nganyaId) return null;
-    return recentSightings.find((sighting: any) => sighting.nganya_id === draft.nganyaId) || null;
+    return (
+      recentSightings.find(
+        (sighting: any) => sighting.nganya_id === draft.nganyaId,
+      ) || null
+    );
   }, [draft.nganyaId, recentSightings]);
 
   const corroborationMinutes = useMemo(() => {
     if (!corroboratingSighting?.created_at) return null;
     return Math.max(
       0,
-      Math.floor((Date.now() - new Date(corroboratingSighting.created_at).getTime()) / 60000),
+      Math.floor(
+        (Date.now() - new Date(corroboratingSighting.created_at).getTime()) /
+          60000,
+      ),
     );
   }, [corroboratingSighting]);
 
@@ -403,7 +446,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
         direction: draft.direction,
         photoName: selectedPhotoName,
         evidenceTags: draft.evidenceTags,
-        locationGranted: geolocation.permissionStatus === "granted" || routeFitChecked,
+        locationGranted:
+          geolocation.permissionStatus === "granted" || routeFitChecked,
         corridorFit: routeFitChecked ? !isCorridorBlocking : false,
         corridorDistance: routeFitDistance,
         corroborationMinutes,
@@ -427,7 +471,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
     const corridorId = draft.corridorId;
     const query = searchQuery.trim().toLowerCase();
     const uniqueNganyas = Array.from(
-      new Map((nganyas || []).map((nganya: any) => [nganya.id, nganya])).values(),
+      new Map(
+        (nganyas || []).map((nganya: any) => [nganya.id, nganya]),
+      ).values(),
     );
 
     const scoped = uniqueNganyas
@@ -464,7 +510,14 @@ export default function SpotScreen({ data }: SpotScreenProps) {
       );
 
     return scoped.sort((left: any, right: any) => right.rank - left.rank);
-  }, [draft.corridorId, nganyas, searchQuery, liveByNganyaId, recentByNganyaId, followedIds]);
+  }, [
+    draft.corridorId,
+    nganyas,
+    searchQuery,
+    liveByNganyaId,
+    recentByNganyaId,
+    followedIds,
+  ]);
 
   const topSuggestions = useMemo(
     () =>
@@ -480,7 +533,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
   );
 
   const remainingSpotCandidates = useMemo(
-    () => spotCandidates.filter((candidate: any) => !topSuggestionIds.has(candidate.id)),
+    () =>
+      spotCandidates.filter(
+        (candidate: any) => !topSuggestionIds.has(candidate.id),
+      ),
     [spotCandidates, topSuggestionIds],
   );
 
@@ -489,7 +545,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
   const applyLocationSuggestion = async () => {
     if (!draft.corridorId && locationSuggestion.corridorId) {
-      setDraft((current) => ({ ...current, corridorId: locationSuggestion.corridorId }));
+      setDraft((current) => ({
+        ...current,
+        corridorId: locationSuggestion.corridorId,
+      }));
       return;
     }
 
@@ -498,7 +557,11 @@ export default function SpotScreen({ data }: SpotScreenProps) {
       const coords = await geolocation.getCurrentPosition();
       const candidates = await Promise.all(
         corridors.map(async (corridor: any) => {
-          const nearest = await findClosestStagesForCorridor(corridor.id, coords.lat, coords.lng);
+          const nearest = await findClosestStagesForCorridor(
+            corridor.id,
+            coords.lat,
+            coords.lng,
+          );
           return { corridor, nearest: nearest[0] || null };
         }),
       );
@@ -507,7 +570,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
         .filter((item) => item.nearest)
         .sort(
           (left, right) =>
-            (left.nearest?.distance_m || Infinity) - (right.nearest?.distance_m || Infinity),
+            (left.nearest?.distance_m || Infinity) -
+            (right.nearest?.distance_m || Infinity),
         )[0];
 
       if (best?.corridor) {
@@ -558,8 +622,16 @@ export default function SpotScreen({ data }: SpotScreenProps) {
     }));
   };
 
-  const verifyCorridorFit = async (corridorId: string, lat: number, lng: number) => {
-    const nearestStages = await findClosestStagesForCorridor(corridorId, lat, lng);
+  const verifyCorridorFit = async (
+    corridorId: string,
+    lat: number,
+    lng: number,
+  ) => {
+    const nearestStages = await findClosestStagesForCorridor(
+      corridorId,
+      lat,
+      lng,
+    );
     const nearest = nearestStages[0] || null;
     const distance = nearest?.distance_m ?? null;
 
@@ -570,7 +642,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
     if (distance === null || distance > 1500) {
       setIsCorridorBlocking(true);
-      const message = "Your location does not seem to match this route. Change route or cancel.";
+      const message =
+        "Your location does not seem to match this route. Change route or cancel.";
       setCorridorWarning(message);
       addToast(message, "error");
       return { valid: false, nearest };
@@ -589,7 +662,11 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
     try {
       const coords = await geolocation.getCurrentPosition();
-      const fit = await verifyCorridorFit(draft.corridorId, coords.lat, coords.lng);
+      const fit = await verifyCorridorFit(
+        draft.corridorId,
+        coords.lat,
+        coords.lng,
+      );
 
       if (!fit.valid) {
         return;
@@ -641,10 +718,15 @@ export default function SpotScreen({ data }: SpotScreenProps) {
         stage_id: routeFitStageId,
         location: `POINT(${coords.lng} ${coords.lat})`,
         direction: draft.direction,
-        note: [draft.evidenceTags.join(" - "), draft.note.trim()].filter(Boolean).join("\n"),
+        note: [draft.evidenceTags.join(" - "), draft.note.trim()]
+          .filter(Boolean)
+          .join("\n"),
       });
 
-      addToast("Sighting posted. You just boosted this live signal.", "success");
+      addToast(
+        "Sighting posted. You just boosted this live signal.",
+        "success",
+      );
       setSubmittedNganyaName(selectedNganyaData?.name || null);
       setSubmittedQuality(qualitySummary);
       setSubmittedCorroborationMinutes(corroborationMinutes);
@@ -661,24 +743,33 @@ export default function SpotScreen({ data }: SpotScreenProps) {
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-green-soft)] animate-scale-in">
           <CheckCircle className="h-10 w-10 text-[var(--color-success)]" />
         </div>
-        <h2 className="text-h2 text-[var(--color-text-primary)]">Sighting posted</h2>
+        <h2 className="text-h2 text-[var(--color-text-primary)]">
+          Sighting posted
+        </h2>
         <p className="mt-2 text-body text-[var(--color-text-secondary)]">
-          You just boosted this signal for <strong>{submittedNganyaName}</strong>.
+          You just boosted this signal for{" "}
+          <strong>{submittedNganyaName}</strong>.
         </p>
         <div className="mt-5 rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 text-left">
           <div className="text-sm font-semibold text-[var(--color-text-primary)]">
             Signal quality: {submittedQuality.level}
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {submittedQuality.reasons.join(" + ") || "Fresh live verification posted"}
+            {submittedQuality.reasons.join(" + ") ||
+              "Fresh live verification posted"}
           </p>
           {submittedCorroborationMinutes !== null ? (
             <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-              Another fan had this sighting {submittedCorroborationMinutes}m ago.
+              Another fan had this sighting {submittedCorroborationMinutes}m
+              ago.
             </p>
           ) : null}
         </div>
-        <Button variant="primary" className="mt-6" onClick={() => navigate({ to: "/" })}>
+        <Button
+          variant="primary"
+          className="mt-6"
+          onClick={() => navigate({ to: "/" })}
+        >
           Back Home
         </Button>
       </div>
@@ -726,7 +817,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
           <div
             key={item}
             className={`h-1 flex-1 rounded-full transition-colors ${
-              index <= stepIndex ? "bg-[var(--color-accent)]" : "bg-[var(--glass-bg)]"
+              index <= stepIndex
+                ? "bg-[var(--color-accent)]"
+                : "bg-[var(--glass-bg)]"
             }`}
           />
         ))}
@@ -742,7 +835,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   We verify your route before you continue
                 </div>
                 <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
-                  Pick the route now. MATWANA checks it against your live device location before you move on.
+                  Pick the route now. MATWANA checks it against your live device
+                  location before you move on.
                 </p>
               </div>
             </div>
@@ -827,7 +921,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                     <span className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {corridor.name}
                     </span>
-                    {suggested ? <Chip label="Suggested" variant="route" /> : null}
+                    {suggested ? (
+                      <Chip label="Suggested" variant="route" />
+                    ) : null}
                   </div>
                 </button>
               );
@@ -835,7 +931,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
           </div>
 
           <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
-            <div className="text-caption text-[var(--color-text-tertiary)]">Direction</div>
+            <div className="text-caption text-[var(--color-text-tertiary)]">
+              Direction
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {directionOptions.map((option) => (
                 <Chip
@@ -872,7 +970,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
           <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
             <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
               <Search className="h-4 w-4 text-[var(--color-accent)]" />
-              Candidates are filtered to {selectedCorridor?.name || "this route"} and ranked by live/recent route signal.
+              Candidates are filtered to{" "}
+              {selectedCorridor?.name || "this route"} and ranked by live/recent
+              route signal.
             </div>
           </div>
 
@@ -897,7 +997,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                     <button
                       key={candidate.id}
                       onClick={() =>
-                        setDraft((current) => ({ ...current, nganyaId: candidate.id }))
+                        setDraft((current) => ({
+                          ...current,
+                          nganyaId: candidate.id,
+                        }))
                       }
                       className={`grid w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-all ${
                         selected
@@ -925,7 +1028,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                           {getSignalCue(candidate)}
                         </div>
                       </div>
-                      {selected ? <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" /> : null}
+                      {selected ? (
+                        <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" />
+                      ) : null}
                     </button>
                   );
                 })}
@@ -941,7 +1046,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   <button
                     key={candidate.id}
                     onClick={() =>
-                      setDraft((current) => ({ ...current, nganyaId: candidate.id }))
+                      setDraft((current) => ({
+                        ...current,
+                        nganyaId: candidate.id,
+                      }))
                     }
                     className={`grid h-[84px] w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-all ${
                       selected
@@ -969,7 +1077,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                         {getSignalCue(candidate)}
                       </div>
                     </div>
-                    {selected ? <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" /> : null}
+                    {selected ? (
+                      <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" />
+                    ) : null}
                   </button>
                 );
               })
@@ -1003,7 +1113,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   Photos improve trust and visibility
                 </div>
                 <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
-                  Photo helps confirm build, livery, and route presence. It stays optional so the flow stays quick.
+                  Photo helps confirm build, livery, and route presence. It
+                  stays optional so the flow stays quick.
                 </p>
               </div>
             </div>
@@ -1067,7 +1178,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   URL.revokeObjectURL(selectedPhotoPreviewUrl);
                 }
                 setSelectedPhotoName(fileName);
-                setSelectedPhotoPreviewUrl(file ? URL.createObjectURL(file) : null);
+                setSelectedPhotoPreviewUrl(
+                  file ? URL.createObjectURL(file) : null,
+                );
                 setDraft((current) => ({
                   ...current,
                   photoName: fileName,
@@ -1077,7 +1190,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
           </label>
 
           <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
-            <div className="text-sm font-medium text-[var(--color-text-primary)]">Quick context</div>
+            <div className="text-sm font-medium text-[var(--color-text-primary)]">
+              Quick context
+            </div>
             <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
               Pick what riders should know right now.
             </p>
@@ -1102,7 +1217,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
               What stood out?
             </label>
             <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-              Stage, crowd, sound, direction, or timing. Keep it short and useful.
+              Stage, crowd, sound, direction, or timing. Keep it short and
+              useful.
             </p>
             <textarea
               id="spot-note"
@@ -1120,10 +1236,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
           </div>
 
           <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.03)] p-4">
-              <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                Signal preview
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+            <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+              Signal preview
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Chip label="Route fit already checked" variant="status" />
               <Chip
                 label={draft.photoName ? "Photo: added" : "Photo: not added"}
@@ -1191,13 +1307,17 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.03)] p-4">
-                  <div className="text-caption text-[var(--color-text-tertiary)]">Photo</div>
+                  <div className="text-caption text-[var(--color-text-tertiary)]">
+                    Photo
+                  </div>
                   <div className="mt-2 text-sm font-semibold text-[var(--color-text-primary)]">
                     {draft.photoName ? "Added" : "Not added"}
                   </div>
                 </div>
                 <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.03)] p-4">
-                  <div className="text-caption text-[var(--color-text-tertiary)]">Timing freshness</div>
+                  <div className="text-caption text-[var(--color-text-tertiary)]">
+                    Timing freshness
+                  </div>
                   <div className="mt-2 text-sm font-semibold text-[var(--color-text-primary)]">
                     Posting now
                   </div>
@@ -1234,7 +1354,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
               {duplicateWindowSighting ? (
                 <div className="rounded-[var(--radius-lg)] border border-[var(--color-warning)]/40 bg-[rgba(251,191,36,0.08)] p-4 text-sm text-[var(--color-text-secondary)]">
-                  You already posted this nganya recently. Wait a few minutes before sending another confirmation.
+                  You already posted this nganya recently. Wait a few minutes
+                  before sending another confirmation.
                 </div>
               ) : null}
 
@@ -1292,7 +1413,9 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   <input
                     type="checkbox"
                     checked={confirmationChecked}
-                    onChange={(event) => setConfirmationChecked(event.target.checked)}
+                    onChange={(event) =>
+                      setConfirmationChecked(event.target.checked)
+                    }
                     className="mt-0.5 h-4 w-4 rounded border-[var(--glass-border)] bg-transparent text-[var(--color-accent)]"
                   />
                   <span>I confirm this sighting is accurate right now.</span>
@@ -1313,7 +1436,11 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   isLoading={isSubmitting}
                   loadingLabel="Verifying live signal..."
                   onClick={handleSubmit}
-                  disabled={!confirmationChecked || duplicateWindowSighting || isCorridorBlocking}
+                  disabled={
+                    !confirmationChecked ||
+                    duplicateWindowSighting ||
+                    isCorridorBlocking
+                  }
                 >
                   Confirm & Share Live
                 </LoadingButton>
@@ -1335,7 +1462,10 @@ export function SpotScreenSkeleton() {
       </div>
       <div className="mb-8 flex gap-1.5">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-1 flex-1 rounded-full bg-[var(--glass-bg)]" />
+          <div
+            key={index}
+            className="h-1 flex-1 rounded-full bg-[var(--glass-bg)]"
+          />
         ))}
       </div>
       <div className="space-y-4">
@@ -1345,4 +1475,3 @@ export function SpotScreenSkeleton() {
     </div>
   );
 }
-

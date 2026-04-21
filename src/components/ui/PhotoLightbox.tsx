@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { copyToClipboard } from "@/lib/admin-utils";
-import { useToast } from "./Toast";
+import { useToast } from "./ToastContainer";
 
 interface PhotoLightboxProps {
   photos: Array<{ id: string; url: string; alt?: string }>;

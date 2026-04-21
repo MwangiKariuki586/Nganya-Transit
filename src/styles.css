@@ -68,6 +68,7 @@
   --color-warning: #FFB800;
   --color-warning-soft: rgba(255, 184, 0, 0.15);
   --color-error: #FF4444;
+  --color-error-soft: rgba(255, 68, 68, 0.15);
 
   /* Confidence indicators */
   --color-confidence-low: #FFB800;
@@ -471,6 +472,23 @@ body::after {
 
 .animate-slide-up-sheet {
   animation: slide-up-sheet 400ms var(--ease-out-expo) both;
+}
+
+/* Slide in from top — for toast notifications */
+@keyframes slide-in-right {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 300ms var(--ease-out-expo) both;
 }
 
 /* Skeleton loading */

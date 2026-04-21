@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { browserSupabase } from '@/shared/supabase/browser-client'
 import { authRequired } from '@/shared/errors/app-error'
+import { reportAppError } from '@/shared/errors/reporting'
 
 let pendingSessionResolution: Promise<Session | null> | null = null
 
@@ -36,7 +37,17 @@ async function waitForInitialSession(timeoutMs: number = 400): Promise<Session |
 export async function getStableClientSession(): Promise<Session | null> {
   const {
     data: { session },
-  } = await browserSupabase.auth.getSession()
+  } = await browserSupabase.auth.getSession().catch((error) => {
+    reportAppError(error, {
+      area: 'render',
+      action: 'client-session:get-session',
+    })
+
+    return {
+      data: { session: null },
+      error,
+    }
+  })
 
   if (session) {
     return session

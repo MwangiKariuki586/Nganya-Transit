@@ -1,9 +1,14 @@
-import { createFileRoute, useNavigate, useRouter, Link } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useRouter,
+  Link,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import Button from "../components/ui/Button";
 import { LogIn, Mail, Lock, ChevronLeft } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import {
   enforceGuestOnlyRoute,
   getHomePathForRole,
@@ -48,12 +53,12 @@ function SignInScreen() {
 
       // Invalidate cached role on auth state change
       useAuthStore.getState().invalidateRole();
-      await router.invalidate();
 
       const role = await resolveClientRole();
       const returnTo = search.returnTo;
 
       if (returnTo?.startsWith("/crew")) {
+        await router.invalidate();
         navigate({ to: "/crew" });
         return;
       }
@@ -63,6 +68,7 @@ function SignInScreen() {
         return;
       }
 
+      await router.invalidate();
       navigate({ to: role ? getHomePathForRole(role) : "/" });
     } catch (err: any) {
       addToast(

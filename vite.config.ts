@@ -11,7 +11,7 @@ import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
   plugins: [
-    devtools(),
+    devtools({ eventBusConfig: { enabled: false } }),
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
     contentCollections(),
     tsconfigPaths({ projects: ['./tsconfig.json'] }),

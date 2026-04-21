@@ -28,14 +28,14 @@ export default function CrewBottomNav({ session, profile }: NavProps) {
   const tabs = [
     { to: "/crew/live", icon: Radio, label: "Live" },
     {
-      to: showRegisterEntry ? "/crew/register" : "/crew/live",
+      to: showRegisterEntry ? "/crew/register" : "/crew/history",
       icon: showRegisterEntry ? Shield : History,
       label: showRegisterEntry ? "Register" : "History",
     },
     {
-      to: "/profile",
+      to: "/crew/profile",
       icon: session ? LogOut : LogIn,
-      label: session ? "Sign Out" : "Profile",
+      label: session ? "Profile" : "Sign In",
     },
   ] as const;
 
@@ -61,7 +61,7 @@ export default function CrewBottomNav({ session, profile }: NavProps) {
           const isActive =
             currentPath === tab.to ||
             (tab.to === "/crew/live" && currentPath === "/crew/live");
-          const isSignOut = tab.to === "/profile" && session;
+          const isSignOut = tab.to === "/crew/profile" && session;
           const targetTo = isSignOut ? "#" : tab.to;
 
           return (

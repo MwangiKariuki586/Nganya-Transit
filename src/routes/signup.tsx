@@ -12,7 +12,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import { enforceGuestOnlyRoute } from "@/shared/auth/guards";
 
 export const Route = createFileRoute("/signup")({

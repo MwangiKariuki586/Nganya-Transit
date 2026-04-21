@@ -1,13 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
+import { getServerSupabaseServiceRoleEnv } from '@/shared/supabase/env'
 
 export function getServiceRoleSupabaseClient() {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-
-  if (!url || !serviceRoleKey) {
-    throw new Error('Missing Supabase server environment for service-role operations.')
-  }
+  const { url, serviceRoleKey } = getServerSupabaseServiceRoleEnv()
 
   return createClient<Database>(url, serviceRoleKey, {
     auth: {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/components/ui/ToastContainer";
 import SearchInput from "@/components/ui/SearchInput";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
@@ -108,7 +108,10 @@ function DiscoverScreen({ data, onSearchChange }: DiscoverScreenProps) {
   const handleBrowseCardAction = (cardData: any) => {
     const plannerContext = readPlannerStorageContext();
 
-    if (cardData.isLive && canTrackWithPlannerContext(plannerContext, cardData)) {
+    if (
+      cardData.isLive &&
+      canTrackWithPlannerContext(plannerContext, cardData)
+    ) {
       setTrackingNganya({ id: cardData.id, name: cardData.name });
       return;
     }
@@ -295,23 +298,24 @@ function DiscoverScreen({ data, onSearchChange }: DiscoverScreenProps) {
         </div>
       </div>
 
-      {trackingNganya ? (
-        (() => {
-          const plannerContext = readPlannerStorageContext();
-          if (!plannerContext.toPlace || !plannerContext.fromStage) return null;
+      {trackingNganya
+        ? (() => {
+            const plannerContext = readPlannerStorageContext();
+            if (!plannerContext.toPlace || !plannerContext.fromStage)
+              return null;
 
-          return (
-            <SearchResultsOverlayV2
-              isOpen
-              onClose={() => setTrackingNganya(null)}
-              fromStage={plannerContext.fromStage}
-              toPlace={plannerContext.toPlace}
-              preference="SPECIFIC"
-              preferredNganya={trackingNganya}
-            />
-          );
-        })()
-      ) : null}
+            return (
+              <SearchResultsOverlayV2
+                isOpen
+                onClose={() => setTrackingNganya(null)}
+                fromStage={plannerContext.fromStage}
+                toPlace={plannerContext.toPlace}
+                preference="SPECIFIC"
+                preferredNganya={trackingNganya}
+              />
+            );
+          })()
+        : null}
     </div>
   );
 }

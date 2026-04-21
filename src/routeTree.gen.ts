@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as DemoProfileRouteImport } from './routes/demo-profile'
 import { Route as fanRouteRouteImport } from './routes/(fan)/route'
 import { Route as fanIndexRouteImport } from './routes/(fan)/index'
 import { Route as fanSpotRouteImport } from './routes/(fan)/spot'
@@ -24,6 +25,7 @@ import { Route as crewCrewIndexRouteImport } from './routes/(crew)/crew/index'
 import { Route as adminAdminIndexRouteImport } from './routes/(admin)/admin/index'
 import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
 import { Route as crewCrewRegisterRouteImport } from './routes/(crew)/crew/register'
+import { Route as crewCrewProfileRouteImport } from './routes/(crew)/crew/profile'
 import { Route as crewCrewPendingRouteImport } from './routes/(crew)/crew/pending'
 import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
@@ -41,6 +43,11 @@ const SignupRoute = SignupRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoProfileRoute = DemoProfileRouteImport.update({
+  id: '/demo-profile',
+  path: '/demo-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const fanRouteRoute = fanRouteRouteImport.update({
@@ -107,6 +114,11 @@ const crewCrewRegisterRoute = crewCrewRegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => crewCrewRouteRoute,
 } as any)
+const crewCrewProfileRoute = crewCrewProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
 const crewCrewPendingRoute = crewCrewPendingRouteImport.update({
   id: '/pending',
   path: '/pending',
@@ -149,6 +161,7 @@ const crewCrewSessionIdRoute = crewCrewSessionIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/demo-profile': typeof DemoProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/admin': typeof adminAdminRouteRouteWithChildren
@@ -166,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
   '/crew/pending': typeof crewCrewPendingRoute
+  '/crew/profile': typeof crewCrewProfileRoute
   '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
   '/admin/': typeof adminAdminIndexRoute
@@ -173,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/crew/session/$id': typeof crewCrewSessionIdRoute
 }
 export interface FileRoutesByTo {
+  '/demo-profile': typeof DemoProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/create-nganya': typeof fanCreateNganyaRoute
@@ -188,6 +203,7 @@ export interface FileRoutesByTo {
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
   '/crew/pending': typeof crewCrewPendingRoute
+  '/crew/profile': typeof crewCrewProfileRoute
   '/crew/register': typeof crewCrewRegisterRoute
   '/nganya/$slug': typeof fanNganyaSlugRoute
   '/admin': typeof adminAdminIndexRoute
@@ -197,6 +213,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(fan)': typeof fanRouteRouteWithChildren
+  '/demo-profile': typeof DemoProfileRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/(admin)/admin': typeof adminAdminRouteRouteWithChildren
@@ -214,6 +231,7 @@ export interface FileRoutesById {
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
   '/(crew)/crew/live': typeof crewCrewLiveRoute
   '/(crew)/crew/pending': typeof crewCrewPendingRoute
+  '/(crew)/crew/profile': typeof crewCrewProfileRoute
   '/(crew)/crew/register': typeof crewCrewRegisterRoute
   '/(fan)/nganya/$slug': typeof fanNganyaSlugRoute
   '/(admin)/admin/': typeof adminAdminIndexRoute
@@ -223,6 +241,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/demo-profile'
     | '/signin'
     | '/signup'
     | '/admin'
@@ -240,6 +259,7 @@ export interface FileRouteTypes {
     | '/crew/history'
     | '/crew/live'
     | '/crew/pending'
+    | '/crew/profile'
     | '/crew/register'
     | '/nganya/$slug'
     | '/admin/'
@@ -247,6 +267,7 @@ export interface FileRouteTypes {
     | '/crew/session/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/demo-profile'
     | '/signin'
     | '/signup'
     | '/create-nganya'
@@ -262,6 +283,7 @@ export interface FileRouteTypes {
     | '/crew/history'
     | '/crew/live'
     | '/crew/pending'
+    | '/crew/profile'
     | '/crew/register'
     | '/nganya/$slug'
     | '/admin'
@@ -270,6 +292,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/(fan)'
+    | '/demo-profile'
     | '/signin'
     | '/signup'
     | '/(admin)/admin'
@@ -287,6 +310,7 @@ export interface FileRouteTypes {
     | '/(crew)/crew/history'
     | '/(crew)/crew/live'
     | '/(crew)/crew/pending'
+    | '/(crew)/crew/profile'
     | '/(crew)/crew/register'
     | '/(fan)/nganya/$slug'
     | '/(admin)/admin/'
@@ -296,6 +320,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   fanRouteRoute: typeof fanRouteRouteWithChildren
+  DemoProfileRoute: typeof DemoProfileRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   adminAdminRouteRoute: typeof adminAdminRouteRouteWithChildren
@@ -316,6 +341,13 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo-profile': {
+      id: '/demo-profile'
+      path: '/demo-profile'
+      fullPath: '/demo-profile'
+      preLoaderRoute: typeof DemoProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(fan)': {
@@ -407,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/crew/register'
       preLoaderRoute: typeof crewCrewRegisterRouteImport
+      parentRoute: typeof crewCrewRouteRoute
+    }
+    '/(crew)/crew/profile': {
+      id: '/(crew)/crew/profile'
+      path: '/profile'
+      fullPath: '/crew/profile'
+      preLoaderRoute: typeof crewCrewProfileRouteImport
       parentRoute: typeof crewCrewRouteRoute
     }
     '/(crew)/crew/pending': {
@@ -516,6 +555,7 @@ interface crewCrewRouteRouteChildren {
   crewCrewHistoryRoute: typeof crewCrewHistoryRoute
   crewCrewLiveRoute: typeof crewCrewLiveRoute
   crewCrewPendingRoute: typeof crewCrewPendingRoute
+  crewCrewProfileRoute: typeof crewCrewProfileRoute
   crewCrewRegisterRoute: typeof crewCrewRegisterRoute
   crewCrewIndexRoute: typeof crewCrewIndexRoute
   crewCrewSessionIdRoute: typeof crewCrewSessionIdRoute
@@ -525,6 +565,7 @@ const crewCrewRouteRouteChildren: crewCrewRouteRouteChildren = {
   crewCrewHistoryRoute: crewCrewHistoryRoute,
   crewCrewLiveRoute: crewCrewLiveRoute,
   crewCrewPendingRoute: crewCrewPendingRoute,
+  crewCrewProfileRoute: crewCrewProfileRoute,
   crewCrewRegisterRoute: crewCrewRegisterRoute,
   crewCrewIndexRoute: crewCrewIndexRoute,
   crewCrewSessionIdRoute: crewCrewSessionIdRoute,
@@ -536,6 +577,7 @@ const crewCrewRouteRouteWithChildren = crewCrewRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   fanRouteRoute: fanRouteRouteWithChildren,
+  DemoProfileRoute: DemoProfileRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   adminAdminRouteRoute: adminAdminRouteRouteWithChildren,

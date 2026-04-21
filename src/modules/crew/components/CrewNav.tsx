@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import { Radio, History, LogOut, Shield, User, Zap } from "lucide-react";
-import { Link, useMatches, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  Link,
+  useMatches,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
@@ -113,7 +118,7 @@ export function CrewNav({ session, profile }: NavProps) {
             {session ? (
               <div className="flex items-center gap-3">
                 <Link
-                  to="/profile"
+                  to="/crew/profile"
                   className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"
                 >
                   <div className="w-7 h-7 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">

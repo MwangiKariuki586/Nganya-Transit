@@ -3,7 +3,7 @@ import Modal from "../ui/Modal";
 import BottomSheet from "../ui/BottomSheet";
 import SearchInput from "../ui/SearchInput";
 import Button from "../ui/Button";
-import { useToast } from "../ui/Toast";
+import { useToast } from "../ui/ToastContainer";
 import { getStages } from "../../lib/queries/discover";
 import { supabase } from "../../lib/supabase";
 import { MapPin, Navigation, AlertCircle } from "lucide-react";

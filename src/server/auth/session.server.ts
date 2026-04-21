@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
 import { normalizeRole } from '@/shared/auth/roles'
+import { appError, isAppError } from '@/shared/errors/app-error'
 import { AUTH_ACCESS_COOKIE } from '@/shared/auth/session-cookie'
+import { getServerSupabaseUserEnv, isSupabaseConnectionError } from '@/shared/supabase/env'
 
 export interface ServerSessionSnapshot {
   userId: string | null
@@ -9,10 +11,7 @@ export interface ServerSessionSnapshot {
 }
 
 function getServerSupabaseEnv() {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
-
-  return { url, anonKey }
+  return getServerSupabaseUserEnv()
 }
 
 function createServerSupabaseClient() {
@@ -102,7 +101,28 @@ export async function resolveSessionSnapshotFromRequest(
   const {
     data: { user },
     error: userError,
-  } = await supabase.auth.getUser(accessToken)
+  } = await supabase.auth.getUser(accessToken).catch((error: unknown) => {
+    if (isSupabaseConnectionError(error)) {
+      return {
+        data: { user: null },
+        error: appError(
+          'NETWORK_ERROR',
+          'Supabase auth is temporarily unreachable while resolving the current session.',
+          {
+            cause: error,
+          },
+        ),
+      }
+    }
+
+    if (isAppError(error)) {
+      throw error
+    }
+
+    throw appError('UNKNOWN', 'Failed to resolve the current session.', {
+      cause: error,
+    })
+  })
 
   if (userError || !user) {
     return {

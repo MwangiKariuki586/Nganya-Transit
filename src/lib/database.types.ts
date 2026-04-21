@@ -15,24 +15,48 @@ export interface Database {
                     handle: string
                     full_name: string | null
                     avatar_url: string | null
+                    bio: string | null
                     role: 'fan' | 'crew' | 'admin'
                     created_at: string
+                    updated_at: string | null
+                    cover_media_url: string | null
+                    cover_media_type: 'image' | 'video' | null
+                    cover_poster_url: string | null
+                    cover_position_x: number
+                    cover_position_y: number
+                    cover_scale: number
                 }
                 Insert: {
                     id: string
                     handle: string
                     full_name?: string | null
                     avatar_url?: string | null
+                    bio?: string | null
                     role?: 'fan' | 'crew' | 'admin'
                     created_at?: string
+                    updated_at?: string | null
+                    cover_media_url?: string | null
+                    cover_media_type?: 'image' | 'video' | null
+                    cover_poster_url?: string | null
+                    cover_position_x?: number
+                    cover_position_y?: number
+                    cover_scale?: number
                 }
                 Update: {
                     id?: string
                     handle?: string
                     full_name?: string | null
                     avatar_url?: string | null
+                    bio?: string | null
                     role?: 'fan' | 'crew' | 'admin'
                     created_at?: string
+                    updated_at?: string | null
+                    cover_media_url?: string | null
+                    cover_media_type?: 'image' | 'video' | null
+                    cover_poster_url?: string | null
+                    cover_position_x?: number
+                    cover_position_y?: number
+                    cover_scale?: number
                 }
             }
             corridors: {
@@ -130,6 +154,35 @@ export interface Database {
                     nganya_id?: string
                     media_url?: string
                     media_type?: 'image' | 'video'
+                    created_at?: string
+                }
+            }
+            profile_media: {
+                Row: {
+                    id: string
+                    user_id: string
+                    media_url: string
+                    media_type: 'image' | 'video'
+                    storage_path: string
+                    sort_order: number
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    media_url: string
+                    media_type: 'image' | 'video'
+                    storage_path: string
+                    sort_order?: number
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    media_url?: string
+                    media_type?: 'image' | 'video'
+                    storage_path?: string
+                    sort_order?: number
                     created_at?: string
                 }
             }
