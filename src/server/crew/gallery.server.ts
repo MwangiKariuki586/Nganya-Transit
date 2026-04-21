@@ -95,3 +95,54 @@ export async function deleteGalleryItem(
 
   return { storage_path: item.storage_path }
 }
+
+/**
+ * Fetches profile_media items uploaded by the crew member(s) assigned to a
+ * given nganya, via the crew_nganyas join table.
+ * This is used to surface crew-uploaded photos on the public nganya detail page.
+ */
+export async function getNganyaCrewGallery(nganyaId: string) {
+  const supabase = getServiceRoleSupabaseClient()
+
+  // Find the crew user(s) assigned to this nganya
+  const { data: mappings, error: mappingError } = await (supabase
+    .from('crew_nganyas') as any)
+    .select('crew_user_id')
+    .eq('nganya_id', nganyaId)
+
+  if (mappingError) throw appError('UNKNOWN', 'Failed to load crew mapping', { cause: mappingError })
+  if (!mappings || mappings.length === 0) return []
+
+  const crewUserIds = mappings.map((m: { crew_user_id: string }) => m.crew_user_id)
+
+  const { data, error } = await supabase
+    .from('profile_media')
+    .select('id, media_url, media_type, created_at')
+    .in('user_id', crewUserIds)
+    .order('created_at', { ascending: false })
+    .limit(GALLERY_LIMIT)
+
+  if (error) throw appError('UNKNOWN', 'Failed to load crew gallery', { cause: error })
+  return data ?? []
+}
+
+/**
+ * Fetches the crew member's profile (avatar + cover) for a given nganya,
+ * via the crew_nganyas join table. Used to render the correct images on
+ * the public nganya detail page.
+ */
+export async function getNganyaCrewProfile(nganyaId: string) {
+  const supabase = getServiceRoleSupabaseClient()
+
+  const { data, error } = await (supabase
+    .from('crew_nganyas') as any)
+    .select('crew_user_id, profiles(id, avatar_url, cover_media_url, cover_media_type, full_name, handle)')
+    .eq('nganya_id', nganyaId)
+    .maybeSingle()
+
+  if (error) throw appError('UNKNOWN', 'Failed to load crew profile', { cause: error })
+  if (!data) return null
+
+  const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles
+  return profile ? { ...profile, id: data.crew_user_id } : null
+}

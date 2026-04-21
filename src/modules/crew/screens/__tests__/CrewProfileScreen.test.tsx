@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CrewProfileScreen } from "@/modules/crew/screens/CrewProfileScreen";
 
-const mockNavigate = vi.fn();
+const mockInvalidate = vi.fn();
 const mockUseLoaderData = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => mockNavigate,
+  useRouter: () => ({
+    invalidate: mockInvalidate,
+  }),
 }));
 
 vi.mock("@/routes/(crew)/crew/profile", () => ({
@@ -96,8 +98,9 @@ describe("CrewProfileScreen", () => {
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: vi.fn(() => "blob:cover-preview"),
+      revokeObjectURL: vi.fn(),
     });
-    mockNavigate.mockReset();
+    mockInvalidate.mockReset();
     mockUseLoaderData.mockReturnValue({
       profile: {
         id: "profile-1",
@@ -134,6 +137,88 @@ describe("CrewProfileScreen", () => {
       "blob:cover-preview",
     );
     expect(screen.getByText(/you have unsaved changes/i)).toBeTruthy();
+  });
+
+  it("uploads avatar independently after confirmation", async () => {
+    mockUseLoaderData.mockReturnValue({
+      profile: {
+        id: "profile-1",
+        handle: "matwana",
+        full_name: "Matwana Crew",
+        avatar_url: "https://example.com/original-avatar.jpg",
+        bio: null,
+        role: "crew",
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: null,
+        cover_media_url: null,
+        cover_media_type: null,
+        cover_poster_url: null,
+        cover_position_x: 50,
+        cover_position_y: 32,
+        cover_scale: 1.08,
+      },
+    });
+
+    const { retryWithBackoff } = await import("@/lib/utils/retry");
+    const { compressImage } = await import("@/lib/utils/image-compress");
+    const { replaceAvatar } = await import("@/lib/storage/profile-media");
+    const { updateCrewProfileServerFn } = await import(
+      "@/shared/server-fns/crew-profile"
+    );
+
+    vi.mocked(retryWithBackoff).mockImplementation(async (fn: any) => fn());
+    vi.mocked(compressImage).mockResolvedValue(
+      new File(["avatar"], "avatar.jpg", { type: "image/jpeg" }),
+    );
+    vi.mocked(replaceAvatar).mockResolvedValue({
+      url: "https://example.com/uploaded-avatar.jpg",
+      path: "avatars/user-1/avatar.jpg",
+      type: "image",
+    });
+    vi.mocked(updateCrewProfileServerFn).mockResolvedValue(undefined as never);
+
+    render(<CrewProfileScreen />);
+
+    const avatar = screen.getByAltText("matwana") as HTMLImageElement;
+    expect(avatar.src).toBe("https://example.com/original-avatar.jpg");
+
+    const uploadInput = document.getElementById(
+      "avatar-upload-input",
+    ) as HTMLInputElement;
+    const avatarFile = new File(["avatar"], "avatar.jpg", {
+      type: "image/jpeg",
+    });
+
+    fireEvent.change(uploadInput, { target: { files: [avatarFile] } });
+
+    expect(
+      screen.getByRole("button", { name: /confirm avatar change/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /discard avatar change/i }),
+    ).toBeTruthy();
+    expect((screen.getByAltText("matwana") as HTMLImageElement).src).toBe(
+      "blob:cover-preview",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /confirm avatar change/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /confirm avatar change/i })).toBeNull();
+      expect((screen.getByAltText("matwana") as HTMLImageElement).src).toBe(
+        "https://example.com/uploaded-avatar.jpg",
+      );
+      expect(replaceAvatar).toHaveBeenCalled();
+      expect(updateCrewProfileServerFn).toHaveBeenCalledWith({
+        data: {
+          accessToken: "token-1",
+          avatar_url: "https://example.com/uploaded-avatar.jpg",
+        },
+      });
+      expect(mockInvalidate).toHaveBeenCalled();
+    });
   });
 
   it("lets the user drag the cover image to reposition it", () => {

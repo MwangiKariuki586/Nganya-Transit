@@ -9,11 +9,10 @@ import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
 import { compressImage, formatFileSize } from "@/lib/utils/image-compress";
 import { browserSupabase } from "@/shared/supabase/browser-client";
-import UploadProgress from "@/components/ui/UploadProgress";
 import AvatarRing, { computeCompleteness } from "@/components/ui/AvatarRing";
 import MediaLightbox from "@/components/ui/MediaLightbox";
 import { ProfileGallery } from "@/modules/crew/components/ProfileGallery";
-import { User, Check, Camera, Pencil } from "lucide-react";
+import { User, Check, ImagePlus, Pencil, X } from "lucide-react";
 
 export function CrewProfileScreen() {
   const router = useRouter();
@@ -47,17 +46,17 @@ export function CrewProfileScreen() {
     full_name: initialProfile.full_name || "",
     handle: initialProfile.handle || "",
     bio: initialProfile.bio || "",
-    avatar_url: initialProfile.avatar_url || "",
   });
   const [originalData, setOriginalData] = useState(formData);
   const [displayData, setDisplayData] = useState(formData);
 
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(
-    null,
-  );
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(
     initialProfile.avatar_url || null,
   );
+  const [pendingAvatarPreviewUrl, setPendingAvatarPreviewUrl] = useState<
+    string | null
+  >(null);
 
   // ── Cover photo editor state ──────────────────────────────────────────────
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -84,14 +83,112 @@ export function CrewProfileScreen() {
   const hasChanges =
     formData.full_name !== originalData.full_name ||
     formData.handle !== originalData.handle ||
-    formData.bio !== originalData.bio ||
-    formData.avatar_url !== originalData.avatar_url ||
-    selectedAvatarFile !== null;
+    formData.bio !== originalData.bio;
 
   // ── Avatar handlers ───────────────────────────────────────────────────────
   const handleAvatarSelect = (file: File) => {
-    setSelectedAvatarFile(file);
-    setAvatarPreviewUrl(URL.createObjectURL(file));
+    if (pendingAvatarPreviewUrl) {
+      URL.revokeObjectURL(pendingAvatarPreviewUrl);
+    }
+
+    setPendingAvatarFile(file);
+    setPendingAvatarPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleAvatarConfirm = async () => {
+    if (!pendingAvatarFile || !pendingAvatarPreviewUrl || !session?.user?.id) {
+      return;
+    }
+
+    const avatarFile = pendingAvatarFile;
+    const previewUrl = pendingAvatarPreviewUrl;
+    const previousAvatarUrl = avatarPreviewUrl;
+
+    setAvatarPreviewUrl(previewUrl);
+    setPendingAvatarFile(null);
+    setPendingAvatarPreviewUrl(null);
+    setIsUploadingAvatar(true);
+    setAvatarUploadProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setAvatarUploadProgress((prev) => (prev >= 85 ? prev : prev + 2));
+    }, 100);
+
+    try {
+      const fileToUpload = await compressImage(avatarFile, {
+        maxWidthOrHeight: 400,
+        quality: 0.88,
+        maxSizeMB: 1,
+      });
+
+      if (fileToUpload.size < avatarFile.size) {
+        toast.info(
+          "Avatar compressed",
+          `${formatFileSize(avatarFile.size)} → ${formatFileSize(fileToUpload.size)}`,
+        );
+      }
+
+      const result = await retryWithBackoff(
+        () =>
+          replaceAvatar(
+            fileToUpload,
+            session.user.id,
+            initialProfile.avatar_url || undefined,
+          ),
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            toast.info(
+              `Retrying avatar upload...`,
+              `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue detected." : ""}`,
+            );
+          },
+        },
+      );
+
+      await retryWithBackoff(
+        () =>
+          updateCrewProfileServerFn({
+            data: {
+              accessToken: session.access_token ?? "",
+              avatar_url: result.url,
+            },
+          }),
+        { maxAttempts: 3 },
+      );
+
+      clearInterval(progressInterval);
+      setAvatarUploadProgress(100);
+      setAvatarPreviewUrl(result.url);
+      toast.success("Avatar updated!", "Your profile image has been saved.");
+      router.invalidate();
+    } catch (err: any) {
+      clearInterval(progressInterval);
+      setAvatarUploadProgress(0);
+      setAvatarPreviewUrl(previousAvatarUrl);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      toast.error(
+        "Avatar upload failed",
+        isNetworkError(err)
+          ? "Network error. Please check your connection and try again."
+          : err.message || "An unexpected error occurred.",
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      setAvatarUploadProgress(0);
+    }
+  };
+
+  const handleAvatarDiscard = () => {
+    if (pendingAvatarPreviewUrl) {
+      URL.revokeObjectURL(pendingAvatarPreviewUrl);
+    }
+
+    setPendingAvatarFile(null);
+    setPendingAvatarPreviewUrl(null);
   };
 
   // ── Cover upload (staged: pick → preview → confirm) ──────────────────────
@@ -202,65 +299,7 @@ export function CrewProfileScreen() {
     setIsSaving(true);
 
     const previousDisplayData = displayData;
-    const previousAvatarUrl = avatarPreviewUrl;
-
     try {
-      let avatarUrl = formData.avatar_url;
-
-      if (selectedAvatarFile && session?.user?.id) {
-        setIsUploadingAvatar(true);
-        setAvatarUploadProgress(0);
-
-        const fileToUpload = await compressImage(selectedAvatarFile, {
-          maxWidthOrHeight: 400,
-          quality: 0.88,
-          maxSizeMB: 1,
-        });
-        if (fileToUpload.size < selectedAvatarFile.size) {
-          toast.info(
-            "Avatar compressed",
-            `${formatFileSize(selectedAvatarFile.size)} → ${formatFileSize(fileToUpload.size)}`,
-          );
-        }
-
-        const progressInterval = setInterval(() => {
-          setAvatarUploadProgress((prev) => {
-            if (prev >= 90) return prev;
-            return prev + 10;
-          });
-        }, 200);
-
-        try {
-          const result = await retryWithBackoff(
-            () =>
-              replaceAvatar(
-                fileToUpload,
-                session.user.id,
-                initialProfile.avatar_url || undefined,
-              ),
-            {
-              maxAttempts: 3,
-              onRetry: (attempt, error) => {
-                toast.info(
-                  `Retrying avatar upload...`,
-                  `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue detected." : ""}`,
-                );
-              },
-            },
-          );
-          clearInterval(progressInterval);
-          setAvatarUploadProgress(100);
-          avatarUrl = result.url;
-          setAvatarPreviewUrl(result.url);
-        } catch (uploadError: any) {
-          clearInterval(progressInterval);
-          setAvatarUploadProgress(0);
-          throw new Error(`Avatar upload failed: ${uploadError.message}`);
-        } finally {
-          setIsUploadingAvatar(false);
-        }
-      }
-
       await retryWithBackoff(
         () =>
           updateCrewProfileServerFn({
@@ -269,7 +308,6 @@ export function CrewProfileScreen() {
               full_name: formData.full_name || undefined,
               handle: formData.handle || undefined,
               bio: formData.bio || undefined,
-              avatar_url: avatarUrl || undefined,
             },
           }),
         {
@@ -284,13 +322,11 @@ export function CrewProfileScreen() {
       );
 
       toast.success("Profile updated!", "Your changes have been saved.");
-      setSelectedAvatarFile(null);
       // Commit saved values as the new baseline — no reload needed
       const savedData = {
         full_name: formData.full_name,
         handle: formData.handle,
         bio: formData.bio,
-        avatar_url: avatarUrl || formData.avatar_url,
       };
       setFormData(savedData);
       setOriginalData(savedData);
@@ -300,7 +336,6 @@ export function CrewProfileScreen() {
     } catch (err: any) {
       console.error("Profile update error:", err);
       setDisplayData(previousDisplayData);
-      setAvatarPreviewUrl(previousAvatarUrl);
       setIsEditing(true);
 
       toast.error(
@@ -311,14 +346,11 @@ export function CrewProfileScreen() {
       );
     } finally {
       setIsSaving(false);
-      setIsUploadingAvatar(false);
     }
   };
 
   const resetEditorState = () => {
     setFormData(originalData);
-    setSelectedAvatarFile(null);
-    setAvatarPreviewUrl(initialProfile.avatar_url || null);
   };
 
   const handleCancel = () => {
@@ -342,8 +374,26 @@ export function CrewProfileScreen() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isEditing, isSaving]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingAvatarPreviewUrl) {
+        URL.revokeObjectURL(pendingAvatarPreviewUrl);
+      }
+    };
+  }, [pendingAvatarPreviewUrl]);
+
+  const displayedAvatarSrc = pendingAvatarPreviewUrl || avatarPreviewUrl;
+
   return (
     <div className="pb-10 md:pb-16">
+      {isUploadingAvatar && (
+        <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
+          <div
+            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
+            style={{ width: `${avatarUploadProgress}%` }}
+          />
+        </div>
+      )}
       {/* Cover upload progress bar — fixed below top nav (desktop) */}
       {isUploadingCover && (
         <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
@@ -473,7 +523,7 @@ export function CrewProfileScreen() {
                 fullName: displayData.full_name,
                 handle: displayData.handle,
                 bio: displayData.bio,
-                avatarUrl: avatarPreviewUrl || "",
+                avatarUrl: displayedAvatarSrc || "",
                 coverMediaUrl: coverPreviewUrl || "",
               });
               return (
@@ -485,18 +535,16 @@ export function CrewProfileScreen() {
                   <div
                     className="group relative h-24 w-24 overflow-hidden rounded-full bg-[var(--glass-bg)] ring-2 ring-[var(--color-bg-base)]"
                     onClick={() =>
-                      !isEditing &&
-                      avatarPreviewUrl &&
-                      setLightbox({ src: avatarPreviewUrl, type: "image" })
+                      displayedAvatarSrc &&
+                      setLightbox({ src: displayedAvatarSrc, type: "image" })
                     }
                     style={{
-                      cursor:
-                        !isEditing && avatarPreviewUrl ? "pointer" : "default",
+                      cursor: displayedAvatarSrc ? "pointer" : "default",
                     }}
                   >
-                    {avatarPreviewUrl ? (
+                    {displayedAvatarSrc ? (
                       <img
-                        src={avatarPreviewUrl}
+                        src={displayedAvatarSrc}
                         alt={displayData.handle}
                         className="h-full w-full object-cover"
                       />
@@ -506,12 +554,17 @@ export function CrewProfileScreen() {
                           "??"}
                       </div>
                     )}
-                    {isEditing && (
+                    {
+                      <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/45" />
+                    }
+                    {!pendingAvatarFile && (
                       <label
                         htmlFor="avatar-upload-input"
-                        className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+                        className="absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/25 bg-black/75 text-white opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:bg-black"
+                        aria-label="Upload profile image"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Camera className="h-6 w-6 text-white" />
+                        <ImagePlus className="h-4 w-4" />
                         <input
                           id="avatar-upload-input"
                           type="file"
@@ -524,6 +577,32 @@ export function CrewProfileScreen() {
                           }}
                         />
                       </label>
+                    )}
+                    {pendingAvatarFile && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Discard avatar change"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAvatarDiscard();
+                          }}
+                          className="absolute left-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white shadow-lg transition-colors hover:bg-black"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Confirm avatar change"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleAvatarConfirm();
+                          }}
+                          className="absolute right-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </AvatarRing>
@@ -574,20 +653,6 @@ export function CrewProfileScreen() {
                 </span>
               </div>
             </div>
-            {isUploadingAvatar && (
-              <div className="mx-auto mt-3 max-w-xs md:mx-0">
-                <UploadProgress
-                  fileName={selectedAvatarFile?.name || "Avatar"}
-                  progress={avatarUploadProgress}
-                  size={
-                    selectedAvatarFile
-                      ? `${(selectedAvatarFile.size / 1024 / 1024).toFixed(2)} MB`
-                      : undefined
-                  }
-                  type="avatar"
-                />
-              </div>
-            )}
           </div>
         </div>
 

@@ -26,3 +26,17 @@ export const deleteGalleryItemServerFn = createServerFn({ method: 'POST' })
     const gallery = await import('@/server/crew/gallery.server')
     return gallery.deleteGalleryItem(null, data.itemId, data.accessToken)
   })
+
+export const getNganyaCrewGalleryServerFn = createServerFn({ method: 'GET' })
+  .inputValidator((data: { nganyaId: string }) => data)
+  .handler(async ({ data }) => {
+    const gallery = await import('@/server/crew/gallery.server')
+    return gallery.getNganyaCrewGallery(data.nganyaId)
+  })
+
+export const getNganyaCrewProfileServerFn = createServerFn({ method: 'GET' })
+  .inputValidator((data: { nganyaId: string }) => data)
+  .handler(async ({ data }) => {
+    const gallery = await import('@/server/crew/gallery.server')
+    return gallery.getNganyaCrewProfile(data.nganyaId)
+  })
