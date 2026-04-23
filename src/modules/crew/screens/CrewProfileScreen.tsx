@@ -659,8 +659,8 @@ export function CrewProfileScreen() {
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Profile details section ──────────────────────────────────── */}
-        <section className="mt-8 space-y-6">
-          <div className="flex items-center justify-between">
+        <section className="mt-8">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-h3">Profile Details</h2>
             {!isEditing ? (
               <button
@@ -715,6 +715,7 @@ export function CrewProfileScreen() {
             )}
           </div>
 
+          <div className="space-y-6">
           <div>
             <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
               Display Name
@@ -803,6 +804,7 @@ export function CrewProfileScreen() {
                 )}
               </p>
             )}
+          </div>
           </div>
         </section>
 

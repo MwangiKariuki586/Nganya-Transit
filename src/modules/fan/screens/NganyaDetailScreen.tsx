@@ -18,6 +18,7 @@ import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
 import { compressImage } from "@/lib/utils/image-compress";
 import { vibeTagColors } from "@/lib/mockData";
 import { getNganyaBySlug, getNganyasByCorridor } from "@/lib/queries/discover";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { getLiveNow } from "@/lib/queries/live";
 import { getCorridorSightings } from "@/lib/queries/sightings";
 import {
@@ -427,9 +428,9 @@ export default function NganyaDetailScreen() {
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Profile Details ─────────────────────────────────────────────── */}
-        <section className="mt-8 space-y-6">
-          <h2 className="text-h3">Profile Details</h2>
-
+        <section className="mt-8">
+          <h2 className="text-h3 mb-4">Profile Details</h2>
+          <div className="space-y-6">
           <div>
             <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
               Name
@@ -463,6 +464,7 @@ export default function NganyaDetailScreen() {
                 </span>
               )}
             </p>
+          </div>
           </div>
         </section>
 
@@ -565,9 +567,7 @@ export default function NganyaDetailScreen() {
                       isNewBuild: (relatedNganya.tags || []).includes(
                         "NEW_BUILD",
                       ),
-                      imageUrl:
-                        relatedNganya.nganya_media?.[0]?.media_url ||
-                        "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
+                      imageUrl: pickPrimaryNganyaImageUrl(relatedNganya) ?? '',
                       description: "",
                     }}
                     variant="standard"

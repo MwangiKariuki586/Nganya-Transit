@@ -28,35 +28,40 @@ export async function getCurrentAuthUser() {
 }
 
 export async function updateCurrentUserProfile(payload: {
-    full_name: string
-    handle: string
+    full_name?: string
+    handle?: string
+    avatar_url?: string
+    cover_media_url?: string
+    cover_media_type?: 'image' | 'video'
 }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError) throw authError
     if (!user) throw authRequired()
 
-    const normalizedHandle = payload.handle.replace(/^@+/, '').trim()
+    const updatePayload: Record<string, any> = {}
+    if (payload.full_name !== undefined) updatePayload.full_name = payload.full_name.trim() || null
+    if (payload.handle !== undefined) updatePayload.handle = payload.handle.replace(/^@+/, '').trim()
+    if (payload.avatar_url !== undefined) updatePayload.avatar_url = payload.avatar_url
+    if (payload.cover_media_url !== undefined) updatePayload.cover_media_url = payload.cover_media_url
+    if (payload.cover_media_type !== undefined) updatePayload.cover_media_type = payload.cover_media_type
 
     const { data, error } = await supabase
         .from('profiles')
-        .upsert({
-            id: user.id,
-            full_name: payload.full_name.trim() || null,
-            handle: normalizedHandle,
-        })
+        .update(updatePayload)
+        .eq('id', user.id)
         .select()
         .single()
 
     if (error) throw error
 
-    const { error: updateUserError } = await supabase.auth.updateUser({
-        data: {
-            full_name: payload.full_name.trim(),
-            handle: normalizedHandle,
-        },
-    })
-
-    if (updateUserError) throw updateUserError
+    // Keep auth user metadata in sync
+    const metaUpdate: Record<string, any> = {}
+    if (payload.full_name !== undefined) metaUpdate.full_name = payload.full_name.trim()
+    if (payload.handle !== undefined) metaUpdate.handle = payload.handle.replace(/^@+/, '').trim()
+    if (Object.keys(metaUpdate).length > 0) {
+        const { error: updateUserError } = await supabase.auth.updateUser({ data: metaUpdate })
+        if (updateUserError) throw updateUserError
+    }
 
     return data
 }

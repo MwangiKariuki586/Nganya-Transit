@@ -1,10 +1,5 @@
-const UNRELIABLE_IMAGE_HOST_PATTERNS = [
-  /cdninstagram\.com/i,
-  /scontent-[^.]+\.cdninstagram\.com/i,
-]
-
-function escapeSvgText(value: string) {
-  return value
+function escapeSvgText(value: string | null | undefined) {
+  return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -12,7 +7,10 @@ function escapeSvgText(value: string) {
     .replace(/'/g, '&apos;')
 }
 
-export function createNganyaPlaceholder(name: string) {
+export function createNganyaPlaceholder(
+  name: string,
+  corridorName: string | null | undefined = '',
+) {
   const safeName = escapeSvgText(name || 'NGANYA')
   const initials = escapeSvgText(
     safeName
@@ -42,7 +40,7 @@ export function createNganyaPlaceholder(name: string) {
       <rect x="140" y="160" width="520" height="520" rx="36" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.08)" />
       <text x="400" y="455" text-anchor="middle" font-size="180" font-family="Arial, sans-serif" font-weight="700" fill="url(#glow)">${initials}</text>
       <text x="760" y="430" font-size="64" font-family="Arial, sans-serif" font-weight="700" fill="#ffffff">${safeName}</text>
-      <text x="760" y="510" font-size="30" font-family="Arial, sans-serif" letter-spacing="10" fill="rgba(255,255,255,0.62)">MATWANA VERIFIED IMAGE PLACEHOLDER</text>
+      <text x="760" y="510" font-size="30" font-family="Arial, sans-serif" letter-spacing="10" fill="rgba(255,255,255,0.62)">${escapeSvgText(corridorName)}</text>
       <rect x="760" y="565" width="360" height="10" rx="5" fill="url(#glow)" opacity="0.9" />
     </svg>
   `.trim()
@@ -50,20 +48,41 @@ export function createNganyaPlaceholder(name: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
-export function isUnreliableNganyaImage(url?: string | null) {
-  if (!url) {
-    return true
+/**
+ * Prefer crew profile avatar, then first gallery media, then legacy `image_url`.
+ * For cards, use `pickPrimaryNganyaImageUrl(n) ?? ''` so missing data shows the SVG placeholder (not a stock photo).
+ */
+export function pickPrimaryNganyaImageUrl(nganya: {
+  crew_nganyas?: Array<{ profiles?: { avatar_url?: string | null } | { avatar_url?: string | null }[] | null } | null> | null
+  nganya_media?: Array<{ media_url?: string | null }> | null
+  image_url?: string | null
+} | null | undefined): string | null {
+  if (!nganya) {
+    return null
   }
-
-  return UNRELIABLE_IMAGE_HOST_PATTERNS.some((pattern) => pattern.test(url))
+  const crewRows = nganya.crew_nganyas
+  if (Array.isArray(crewRows) && crewRows.length > 0) {
+    const raw = crewRows[0]?.profiles
+    const p = Array.isArray(raw) ? raw[0] : raw
+    if (p?.avatar_url) {
+      return p.avatar_url
+    }
+  }
+  return nganya.nganya_media?.[0]?.media_url || nganya.image_url || null
 }
 
-export function resolveNganyaImageUrl(url: string | null | undefined, name: string) {
-  if (!url || isUnreliableNganyaImage(url)) {
-    return createNganyaPlaceholder(name)
+export function resolveNganyaImageUrl(
+  url: string | null | undefined,
+  name: string,
+  corridorName?: string | null,
+) {
+  const s = url?.trim()
+  if (!s) {
+    return createNganyaPlaceholder(name, corridorName)
   }
-
-  return url
+  // Let the real URL load; <img onError> in ResponsiveNganyaImage swaps to placeholder if it fails
+  // (e.g. hotlink 403) — we do not pre-emptively block Instagram or other CDNs.
+  return s
 }
 
 export function buildNganyaImageSrcSet(

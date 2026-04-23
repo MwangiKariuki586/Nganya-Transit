@@ -1,11 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import Button from "@/components/ui/Button";
-import BottomSheet from "@/components/ui/BottomSheet";
-import Modal from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import { Settings, Camera, MapPin, Clock, Calendar } from "lucide-react";
+import MediaLightbox from "@/components/ui/MediaLightbox";
+import {
+  Check,
+  ImagePlus,
+  Pencil,
+  X,
+  Camera,
+  MapPin,
+  Clock,
+} from "lucide-react";
 import SignalBadge from "@/components/ui/SignalBadge";
 import CredibilityBadge from "@/components/ui/CredibilityBadge";
 import {
@@ -21,7 +28,12 @@ import {
   getNganyaActivitySignal,
 } from "@/lib/signal-intelligence";
 import { updateCurrentUserProfile } from "@/lib/queries/profile";
+import { replaceAvatar, replaceCoverMedia } from "@/lib/storage/profile-media";
+import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
+import { compressImage, formatFileSize } from "@/lib/utils/image-compress";
+import { useToast } from "@/components/ui/ToastContainer";
 import type { ProfileRouteData } from "@/modules/fan/services/route-data";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 
 interface ProfileScreenProps {
   data: ProfileRouteData;
@@ -30,23 +42,25 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ data }: ProfileScreenProps) {
   const navigate = useNavigate();
   const router = useRouter();
-  const [editOpen, setEditOpen] = useState(false);
+  const toast = useToast();
+
   const [showAllSightings, setShowAllSightings] = useState(false);
   const [showAllFollowing, setShowAllFollowing] = useState(false);
-  const useSheet = typeof window !== "undefined" && window.innerWidth < 768;
+
+  // ── Profile edit state ────────────────────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const { authUser, profile, followedNganyas, liveNganyas, userSightings } =
     data;
 
-  const displayName = useMemo(
-    () =>
-      profile?.full_name ||
-      authUser?.user_metadata?.full_name ||
-      "Matwana Member",
-    [profile, authUser],
-  );
-  const handle = useMemo(
-    () => formatHandle(profile?.handle || authUser?.user_metadata?.handle),
-    [profile, authUser],
+  const displayName =
+    profile?.full_name ||
+    authUser?.user_metadata?.full_name ||
+    "Matwana Member";
+  const handle = formatHandle(
+    profile?.handle || authUser?.user_metadata?.handle,
   );
   const avatarUrl =
     profile?.avatar_url || authUser?.user_metadata?.avatar_url || null;
@@ -54,80 +68,284 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     profile?.created_at || authUser?.created_at,
   );
 
-  // Calculate user credibility and activity metrics
+  const [formData, setFormData] = useState({
+    full_name: profile?.full_name || authUser?.user_metadata?.full_name || "",
+    handle: profile?.handle || authUser?.user_metadata?.handle || "",
+  });
+  const [originalData, setOriginalData] = useState(formData);
+
+  // ── Avatar staged upload state ────────────────────────────────────────────
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [pendingAvatarPreviewUrl, setPendingAvatarPreviewUrl] = useState<
+    string | null
+  >(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(
+    avatarUrl,
+  );
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+
+  // ── Cover upload state ────────────────────────────────────────────────────
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(
+    profile?.cover_media_url || null,
+  );
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadProgress, setCoverUploadProgress] = useState(0);
+
+  const [lightbox, setLightbox] = useState<{
+    src: string;
+    type: "image" | "video";
+  } | null>(null);
+
+  const displayedAvatarSrc = pendingAvatarPreviewUrl || avatarPreviewUrl;
+  const currentCoverSrc = coverPreviewUrl || profile?.cover_media_url || "";
+  const hasChanges =
+    formData.full_name !== originalData.full_name ||
+    formData.handle !== originalData.handle;
+
+  // ── Avatar handlers ───────────────────────────────────────────────────────
+  const handleAvatarSelect = (file: File) => {
+    if (pendingAvatarPreviewUrl) URL.revokeObjectURL(pendingAvatarPreviewUrl);
+    setPendingAvatarFile(file);
+    setPendingAvatarPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleAvatarDiscard = () => {
+    if (pendingAvatarPreviewUrl) URL.revokeObjectURL(pendingAvatarPreviewUrl);
+    setPendingAvatarFile(null);
+    setPendingAvatarPreviewUrl(null);
+  };
+
+  const handleAvatarConfirm = async () => {
+    if (!pendingAvatarFile || !pendingAvatarPreviewUrl || !authUser?.id) return;
+
+    const avatarFile = pendingAvatarFile;
+    const previewUrl = pendingAvatarPreviewUrl;
+    const previousAvatarUrl = avatarPreviewUrl;
+
+    setAvatarPreviewUrl(previewUrl);
+    setPendingAvatarFile(null);
+    setPendingAvatarPreviewUrl(null);
+    setIsUploadingAvatar(true);
+    setAvatarUploadProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setAvatarUploadProgress((prev) => (prev >= 85 ? prev : prev + 2));
+    }, 100);
+
+    try {
+      const fileToUpload = await compressImage(avatarFile, {
+        maxWidthOrHeight: 400,
+        quality: 0.88,
+        maxSizeMB: 1,
+      });
+
+      if (fileToUpload.size < avatarFile.size) {
+        toast.info(
+          "Avatar compressed",
+          `${formatFileSize(avatarFile.size)} → ${formatFileSize(fileToUpload.size)}`,
+        );
+      }
+
+      const result = await retryWithBackoff(
+        () =>
+          replaceAvatar(
+            fileToUpload,
+            authUser.id,
+            profile?.avatar_url || undefined,
+          ),
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            toast.info(
+              "Retrying upload...",
+              `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue." : ""}`,
+            );
+          },
+        },
+      );
+
+      await updateCurrentUserProfile({ avatar_url: result.url });
+
+      clearInterval(progressInterval);
+      setAvatarUploadProgress(100);
+      setAvatarPreviewUrl(result.url);
+      URL.revokeObjectURL(previewUrl);
+      toast.success("Avatar updated!");
+      await router.invalidate();
+    } catch (err: any) {
+      clearInterval(progressInterval);
+      setAvatarUploadProgress(0);
+      setAvatarPreviewUrl(previousAvatarUrl);
+      URL.revokeObjectURL(previewUrl);
+      toast.error(
+        "Upload failed",
+        isNetworkError(err) ? "Network error." : err.message,
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      setAvatarUploadProgress(0);
+    }
+  };
+
+  // ── Cover handlers ────────────────────────────────────────────────────────
+  const handleCoverSelect = (file: File) => {
+    setSelectedCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleCoverDiscard = () => {
+    setSelectedCoverFile(null);
+    setCoverPreviewUrl(profile?.cover_media_url || null);
+  };
+
+  const handleCoverConfirm = async () => {
+    if (!selectedCoverFile || !authUser?.id) return;
+
+    setIsUploadingCover(true);
+    setCoverUploadProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setCoverUploadProgress((prev) => (prev >= 85 ? prev : prev + 2));
+    }, 100);
+
+    try {
+      const coverToUpload = await compressImage(selectedCoverFile, {
+        maxWidthOrHeight: 1920,
+        quality: 0.85,
+        maxSizeMB: 3,
+      });
+
+      if (coverToUpload.size < selectedCoverFile.size) {
+        toast.info(
+          "Cover compressed",
+          `${formatFileSize(selectedCoverFile.size)} → ${formatFileSize(coverToUpload.size)}`,
+        );
+      }
+
+      const result = await retryWithBackoff(
+        () =>
+          replaceCoverMedia(
+            coverToUpload,
+            authUser.id,
+            profile?.cover_media_url || undefined,
+          ),
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            toast.info(
+              "Retrying upload...",
+              `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue." : ""}`,
+            );
+          },
+        },
+      );
+
+      await updateCurrentUserProfile({
+        cover_media_url: result.url,
+        cover_media_type: result.type,
+      });
+
+      clearInterval(progressInterval);
+      setCoverUploadProgress(100);
+      setCoverPreviewUrl(result.url);
+      setSelectedCoverFile(null);
+      toast.success("Cover updated!");
+      await router.invalidate();
+    } catch (err: any) {
+      clearInterval(progressInterval);
+      setCoverUploadProgress(0);
+      setCoverPreviewUrl(profile?.cover_media_url || null);
+      setSelectedCoverFile(null);
+      toast.error(
+        "Cover upload failed",
+        isNetworkError(err) ? "Network error." : err.message,
+      );
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
+  // ── Profile save ──────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!hasChanges) {
+      setIsEditing(false);
+      return;
+    }
+    setIsSaving(true);
+    setEditError(null);
+    try {
+      await updateCurrentUserProfile({
+        full_name: formData.full_name,
+        handle: formData.handle,
+      });
+      setOriginalData(formData);
+      setIsEditing(false);
+      await router.invalidate();
+    } catch (err: any) {
+      setEditError(err?.message || "Failed to save changes.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setFormData(originalData);
+    setEditError(null);
+    setIsEditing(false);
+  };
+
+  // ── Credibility + sightings ───────────────────────────────────────────────
   const credibility = useMemo(
     () => getUserCredibility(userSightings),
     [userSightings],
   );
 
-  // Separate fresh and expired sightings
   const { freshSightings, expiredSightings } = useMemo(() => {
     const fresh: any[] = [];
     const expired: any[] = [];
-
-    userSightings.forEach((sighting) => {
-      const strength = getSignalStrength(sighting.created_at);
-      if (strength === "expired") {
-        expired.push(sighting);
-      } else {
-        fresh.push(sighting);
-      }
+    userSightings.forEach((s) => {
+      getSignalStrength(s.created_at) === "expired"
+        ? expired.push(s)
+        : fresh.push(s);
     });
-
     return { freshSightings: fresh, expiredSightings: expired };
   }, [userSightings]);
 
-  // Sort followed nganyas by activity (fresh first)
   const sortedFollowedNganyas = useMemo(() => {
     return [...followedNganyas].sort((a, b) => {
-      const aSightings = liveNganyas.filter(
-        (live: any) => live.nganya_id === (a.nganyas?.id || a.id),
+      const aSignal = getNganyaActivitySignal(
+        liveNganyas.filter((l: any) => l.nganya_id === (a.nganyas?.id || a.id)),
       );
-      const bSightings = liveNganyas.filter(
-        (live: any) => live.nganya_id === (b.nganyas?.id || b.id),
+      const bSignal = getNganyaActivitySignal(
+        liveNganyas.filter((l: any) => l.nganya_id === (b.nganyas?.id || b.id)),
       );
-
-      const aSignal = getNganyaActivitySignal(aSightings);
-      const bSignal = getNganyaActivitySignal(bSightings);
-
-      // Fresh first
       if (aSignal.isFresh && !bSignal.isFresh) return -1;
       if (!aSignal.isFresh && bSignal.isFresh) return 1;
-
-      // Then by count
       return bSignal.count - aSignal.count;
     });
   }, [followedNganyas, liveNganyas]);
 
-  // Pagination logic
   const ITEMS_PER_PAGE = 5;
+  const allSightings = [...freshSightings, ...expiredSightings];
   const displayedSightings = showAllSightings
-    ? [...freshSightings, ...expiredSightings]
-    : [...freshSightings, ...expiredSightings].slice(0, ITEMS_PER_PAGE);
-  const hasMoreSightings =
-    freshSightings.length + expiredSightings.length > ITEMS_PER_PAGE;
-
+    ? allSightings
+    : allSightings.slice(0, ITEMS_PER_PAGE);
+  const hasMoreSightings = allSightings.length > ITEMS_PER_PAGE;
   const displayedFollowing = showAllFollowing
     ? sortedFollowedNganyas
     : sortedFollowedNganyas.slice(0, ITEMS_PER_PAGE);
   const hasMoreFollowing = sortedFollowedNganyas.length > ITEMS_PER_PAGE;
 
-  // Map nganya data to Card props format (same as homepage)
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
-
     const nganyaData = dbNganya.nganyas || dbNganya;
     const nganyaId = nganyaData.id || nganyaData.nganya_id;
-    const isLive = liveNganyas.some(
-      (liveNganya: any) => liveNganya.nganya_id === nganyaId,
+    const isLive = liveNganyas.some((l: any) => l.nganya_id === nganyaId);
+    const activitySignal = getNganyaActivitySignal(
+      liveNganyas.filter((l: any) => l.nganya_id === nganyaId),
     );
-
-    // Get activity signal for this nganya
-    const nganyaSightings = liveNganyas.filter(
-      (live: any) => live.nganya_id === nganyaId,
-    );
-    const activitySignal = getNganyaActivitySignal(nganyaSightings);
-
     return {
       id: nganyaId,
       slug:
@@ -140,10 +358,7 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         nganyaData.corridors?.name ||
         "Unknown Route",
       vibeTags: nganyaData.vibeTags || nganyaData.tags || [],
-      imageUrl:
-        nganyaData.nganya_media?.[0]?.media_url ||
-        nganyaData.image_url ||
-        "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
+      imageUrl: pickPrimaryNganyaImageUrl(nganyaData) ?? '',
       isLive,
       isNewBuild:
         nganyaData.tags?.includes("NEW_BUILD") || nganyaData.is_new_build,
@@ -158,355 +373,479 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     };
   };
 
-  // Auth is now guaranteed by route loader, so this check is just for type safety
-  if (!authUser) {
-    return null; // This should never happen due to route-level redirect
-  }
+  if (!authUser) return null;
 
   return (
-    <div className="page-container pt-8 pb-10 md:pt-12 md:pb-16 space-y-10">
-      {/* Header - Identity + Credibility */}
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-5">
-        <div className="relative">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-[var(--glass-border)] object-cover"
-            />
-          ) : (
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-[var(--glass-border)] bg-[var(--glass-bg)] flex items-center justify-center text-xl font-bold text-[var(--color-text-primary)]">
-              {getInitials(displayName)}
-            </div>
-          )}
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-accent)] flex items-center justify-center border-2 border-[var(--color-bg-base)]">
-            <Camera className="w-3 h-3 text-white" />
-          </div>
-        </div>
-
-        <div className="flex-1 text-center md:text-left">
-          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-            <h1 className="text-h2 text-[var(--color-text-primary)]">
-              {displayName}
-            </h1>
-            <CredibilityBadge
-              level={credibility.level}
-              label={credibility.label}
-            />
-          </div>
-          <p className="text-body-sm text-[var(--color-text-secondary)] mb-1">
-            {handle}
-          </p>
-
-          {credibility.lastActivity && (
-            <div className="flex items-center justify-center md:justify-start gap-1.5 text-xs text-[var(--color-text-tertiary)] mb-4">
-              <Clock className="w-3 h-3" />
-              <span>Last spotted {credibility.lastActivity}</span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-center md:justify-start gap-6">
-            <div className="text-center">
-              <span className="text-h4 text-[var(--color-text-primary)] block">
-                {credibility.sightingsLast7d}
-              </span>
-              <span className="text-caption text-[var(--color-text-tertiary)]">
-                Last 7d
-              </span>
-            </div>
-            <div className="w-px h-8 bg-[var(--color-line)]" />
-            <div className="text-center">
-              <span className="text-h4 text-[var(--color-text-primary)] block">
-                {followedNganyas.length}
-              </span>
-              <span className="text-caption text-[var(--color-text-tertiary)]">
-                Following
-              </span>
-            </div>
-            <div className="w-px h-8 bg-[var(--color-line)]" />
-            <div className="text-center">
-              <span className="text-h4 text-[var(--color-text-primary)] block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> {joinedLabel}
-              </span>
-              <span className="text-caption text-[var(--color-text-tertiary)]">
-                Joined
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <Button variant="secondary" onClick={() => setEditOpen(true)}>
-          <Settings className="w-4 h-4" />
-          Edit Profile
-        </Button>
-      </div>
-
-      {/* Your Sightings - Signal Intelligence */}
-      <section>
-        <h2 className="text-h3 !mb-3">Your Sightings</h2>
-        {userSightings.length > 0 ? (
-          <>
-            <div className="space-y-2">
-              {/* Fresh Sightings */}
-              {displayedSightings.map((sighting) => {
-                const strength = getSignalStrength(sighting.created_at);
-                const recency = formatRecencyLabel(sighting.created_at);
-                const isExpired = strength === "expired";
-
-                return (
-                  <div
-                    key={sighting.id}
-                    className={`flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all ${
-                      isExpired ? "opacity-60" : ""
-                    }`}
-                    style={{
-                      boxShadow:
-                        strength === "fresh" ? "var(--glow-accent-sm)" : "none",
-                    }}
-                  >
-                    <Camera
-                      className={`w-4 h-4 shrink-0 ${isExpired ? "text-[var(--color-text-tertiary)]" : "text-[var(--color-accent)]"}`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`text-sm font-semibold ${isExpired ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-primary)]"}`}
-                        >
-                          {sighting.nganya?.name || "Nganya"}
-                        </span>
-                        {sighting.stage?.name && (
-                          <span className="text-xs text-[var(--color-text-tertiary)]">
-                            • {sighting.stage.name}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-                        <MapPin className="w-3 h-3" />
-                        <span>
-                          {sighting.nganya?.corridors?.name || "Unknown route"}
-                        </span>
-                        <span>•</span>
-                        <Clock className="w-3 h-3" />
-                        <span>{recency}</span>
-                      </div>
-                    </div>
-                    <SignalBadge strength={strength} />
-                  </div>
-                );
-              })}
-            </div>
-
-            {hasMoreSightings && (
-              <div className="mt-3 text-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowAllSightings(!showAllSightings)}
-                >
-                  {showAllSightings
-                    ? "Show Less"
-                    : `Show ${freshSightings.length + expiredSightings.length - ITEMS_PER_PAGE} More`}
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <EmptyState
-            variant="no-sightings"
-            title="No recent sightings"
-            message="Start spotting nganyas to build your contributor profile."
-            actionLabel="Spot Now"
-            onAction={() => navigate({ to: "/spot" })}
-          />
-        )}
-      </section>
-
-      {/* Divider */}
-      <div className="border-t border-[var(--color-line)]" />
-
-      {/* Following - Actionable Intelligence */}
-      <section>
-        <h2 className="text-h3 !mb-3">Following</h2>
-        {followedNganyas.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {displayedFollowing.map((nganya) => {
-                const cardProps = mapSupabaseToCardProps(nganya);
-                if (!cardProps) return null;
-                return (
-                  <Card
-                    key={cardProps.id}
-                    nganya={cardProps as any}
-                    variant="standard"
-                    isFollowing
-                  />
-                );
-              })}
-            </div>
-
-            {hasMoreFollowing && (
-              <div className="mt-4 text-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowAllFollowing(!showAllFollowing)}
-                >
-                  {showAllFollowing
-                    ? "Show Less"
-                    : `Show ${sortedFollowedNganyas.length - ITEMS_PER_PAGE} More`}
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <EmptyState
-            variant="no-following"
-            title="Not following any nganyas"
-            message="Discover and follow nganyas to track their live activity."
-            actionLabel="Discover"
-            onAction={() => navigate({ to: "/discover" })}
-          />
-        )}
-      </section>
-
-      {useSheet ? (
-        <BottomSheet
-          isOpen={editOpen}
-          onClose={() => setEditOpen(false)}
-          title="Edit Profile"
-        >
-          <EditProfileForm
-            fullName={displayName}
-            handle={handle.replace(/^@/, "")}
-            avatarUrl={avatarUrl}
-            onClose={() => setEditOpen(false)}
-            onSaved={async (payload) => {
-              await updateCurrentUserProfile(payload);
-              await router.invalidate();
-              setEditOpen(false);
+    <div className="pb-10 md:pb-16">
+      {/* Progress bar */}
+      {(isUploadingAvatar || isUploadingCover) && (
+        <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
+          <div
+            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
+            style={{
+              width: `${isUploadingCover ? coverUploadProgress : avatarUploadProgress}%`,
             }}
           />
-        </BottomSheet>
-      ) : (
-        <Modal
-          isOpen={editOpen}
-          onClose={() => setEditOpen(false)}
-          title="Edit Profile"
-        >
-          <EditProfileForm
-            fullName={displayName}
-            handle={handle.replace(/^@/, "")}
-            avatarUrl={avatarUrl}
-            onClose={() => setEditOpen(false)}
-            onSaved={async (payload) => {
-              await updateCurrentUserProfile(payload);
-              await router.invalidate();
-              setEditOpen(false);
-            }}
-          />
-        </Modal>
+        </div>
       )}
-    </div>
-  );
-}
 
-function EditProfileForm({
-  fullName,
-  handle,
-  avatarUrl,
-  onClose,
-  onSaved,
-}: {
-  fullName: string;
-  handle: string;
-  avatarUrl: string | null;
-  onClose: () => void;
-  onSaved: (payload: { full_name: string; handle: string }) => Promise<void>;
-}) {
-  const [displayName, setDisplayName] = useState(fullName);
-  const [username, setUsername] = useState(handle);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      await onSaved({
-        full_name: displayName,
-        handle: username,
-      });
-    } catch (saveError: any) {
-      setError(saveError?.message || "Failed to save profile changes.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-4">
-        {avatarUrl ? (
+      {/* ── Cover ────────────────────────────────────────────────────────── */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{ height: "clamp(180px, 30vw, 320px)" }}
+      >
+        {currentCoverSrc ? (
           <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-16 h-16 rounded-full object-cover"
+            src={currentCoverSrc}
+            alt="Cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          <div className="w-16 h-16 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center text-sm font-bold text-[var(--color-text-primary)]">
-            {getInitials(displayName)}
-          </div>
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 120% 100% at 60% 40%, rgba(255,45,120,0.18) 0%, rgba(0,240,255,0.08) 50%, transparent 80%), var(--color-bg-elevated)",
+            }}
+          />
         )}
-        <div className="text-sm text-[var(--color-text-tertiary)]">
-          Avatar upload stays on the current auth/profile storage backlog.
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgba(10,10,15,0.15) 0%, rgba(10,10,15,0.1) 50%, rgba(10,10,15,0.7) 85%, var(--color-bg-base) 100%)",
+          }}
+        />
+
+        {/* Cover controls — top-right */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+          {selectedCoverFile && !isUploadingCover ? (
+            <>
+              <button
+                type="button"
+                aria-label="Discard cover change"
+                onClick={handleCoverDiscard}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg transition-colors hover:bg-black/85"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Save cover photo"
+                onClick={handleCoverConfirm}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <div className="relative overflow-hidden rounded-full border border-white/20 bg-black/70 text-white shadow-lg transition-colors hover:bg-black/85">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label="Change cover photo"
+                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCoverSelect(file);
+                  e.target.value = "";
+                }}
+              />
+              <div className="pointer-events-none flex h-10 w-10 items-center justify-center">
+                <Pencil className="h-4 w-4" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <label className="text-caption text-[var(--color-text-tertiary)] mb-1.5 block">
-            Display Name
-          </label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
-          />
+      {/* ── Profile header ───────────────────────────────────────────────── */}
+      <div className="page-container" style={{ marginTop: "-56px" }}>
+        <div className="flex flex-col items-center gap-4 md:flex-row md:items-end md:gap-6">
+          {/* Avatar with staged upload */}
+          <div className="relative z-10 shrink-0">
+            <div
+              className="group relative h-24 w-24 overflow-hidden rounded-full bg-[var(--glass-bg)] ring-2 ring-[var(--color-bg-base)]"
+              onClick={() =>
+                !pendingAvatarFile &&
+                displayedAvatarSrc &&
+                setLightbox({ src: displayedAvatarSrc, type: "image" })
+              }
+              style={{
+                cursor:
+                  !pendingAvatarFile && displayedAvatarSrc
+                    ? "pointer"
+                    : "default",
+              }}
+            >
+              {displayedAvatarSrc ? (
+                <img
+                  src={displayedAvatarSrc}
+                  alt={displayName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xl font-bold text-[var(--color-text-primary)]">
+                  {getInitials(displayName)}
+                </div>
+              )}
+
+              {/* Hover dim */}
+              <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/45" />
+
+              {/* Upload button — shown on hover when no pending file */}
+              {!pendingAvatarFile && (
+                <label
+                  htmlFor="fan-avatar-input"
+                  className="absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/25 bg-black/75 text-white opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:bg-black"
+                  aria-label="Upload profile image"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  <input
+                    id="fan-avatar-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleAvatarSelect(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+
+              {/* Staged: discard (X) + confirm (tick) */}
+              {pendingAvatarFile && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Discard avatar change"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAvatarDiscard();
+                    }}
+                    className="absolute left-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white shadow-lg transition-colors hover:bg-black"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Confirm avatar change"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleAvatarConfirm();
+                    }}
+                    className="absolute right-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Name + stats */}
+          <div className="z-10 flex-1 pb-1 text-center md:text-left">
+            <div className="mb-0.5 flex items-center justify-center gap-2 md:justify-start">
+              <h1 className="text-h2 text-[var(--color-text-primary)]">
+                {displayName}
+              </h1>
+              <CredibilityBadge
+                level={credibility.level}
+                label={credibility.label}
+              />
+            </div>
+            <p className="mb-3 text-body-sm text-[var(--color-text-secondary)]">
+              {handle}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-5 md:justify-start">
+              <div className="text-center">
+                <span className="block text-h4 text-[var(--color-text-primary)]">
+                  {credibility.sightingsLast7d}
+                </span>
+                <span className="text-caption text-[var(--color-text-tertiary)]">
+                  Last 7d
+                </span>
+              </div>
+              <div className="h-7 w-px bg-[var(--color-line)]" />
+              <div className="text-center">
+                <span className="block text-h4 text-[var(--color-text-primary)]">
+                  {followedNganyas.length}
+                </span>
+                <span className="text-caption text-[var(--color-text-tertiary)]">
+                  Following
+                </span>
+              </div>
+              <div className="h-7 w-px bg-[var(--color-line)]" />
+              <div className="text-center">
+                <span className="block text-h4 text-[var(--color-text-primary)]">
+                  {joinedLabel}
+                </span>
+                <span className="text-caption text-[var(--color-text-tertiary)]">
+                  Joined
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="text-caption text-[var(--color-text-tertiary)] mb-1.5 block">
-            Username
-          </label>
-          <input
-            type="text"
-            value={username}
-            onChange={(event) =>
-              setUsername(event.target.value.replace(/\s+/g, ""))
-            }
-            className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] transition-all"
-          />
-        </div>
+
+        <div className="mt-8 border-t border-[var(--color-line)]" />
+
+        {/* ── Profile Details (inline edit) ────────────────────────────── */}
+        <section className="mt-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-h3">Profile Details</h2>
+            {!isEditing ? (
+              <button
+                type="button"
+                aria-label="Edit profile details"
+                onClick={() => setIsEditing(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Discard changes"
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] disabled:opacity-40"
+                >
+                  <svg
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Save changes"
+                  onClick={handleSave}
+                  disabled={isSaving || !hasChanges}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:opacity-40 ${
+                    hasChanges
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]"
+                      : "border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)]"
+                  }`}
+                >
+                  {isSaving ? (
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+              Display Name
+            </label>
+            {isEditing ? (
+              <input
+                type="text"
+                value={formData.full_name}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, full_name: e.target.value }))
+                }
+                placeholder="Your display name"
+                maxLength={100}
+                disabled={isSaving}
+                className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
+              />
+            ) : (
+              <p className="text-body text-[var(--color-text-primary)]">
+                {displayName || (
+                  <span className="text-[var(--color-text-tertiary)]">
+                    Not set
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+              Handle
+            </label>
+            {isEditing ? (
+              <input
+                type="text"
+                value={formData.handle}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, handle: e.target.value }))
+                }
+                placeholder="your_handle"
+                maxLength={30}
+                disabled={isSaving}
+                className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 font-mono text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
+              />
+            ) : (
+              <p className="text-body font-mono text-[var(--color-text-primary)]">
+                {handle}
+              </p>
+            )}
+          </div>
+
+          {editError && (
+            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {editError}
+            </p>
+          )}
+        </section>
+
+        <div className="mt-8 border-t border-[var(--color-line)]" />
+
+        {/* ── Your Sightings ───────────────────────────────────────────── */}
+        <section className="mt-8">
+          <h2 className="text-h3 !mb-3">Your Sightings</h2>
+          {userSightings.length > 0 ? (
+            <>
+              <div className="space-y-2">
+                {displayedSightings.map((sighting) => {
+                  const strength = getSignalStrength(sighting.created_at);
+                  const recency = formatRecencyLabel(sighting.created_at);
+                  const isExpired = strength === "expired";
+                  return (
+                    <div
+                      key={sighting.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] transition-all ${isExpired ? "opacity-60" : ""}`}
+                      style={{
+                        boxShadow:
+                          strength === "fresh"
+                            ? "var(--glow-accent-sm)"
+                            : "none",
+                      }}
+                    >
+                      <Camera
+                        className={`w-4 h-4 shrink-0 ${isExpired ? "text-[var(--color-text-tertiary)]" : "text-[var(--color-accent)]"}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`text-sm font-semibold ${isExpired ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-primary)]"}`}
+                          >
+                            {sighting.nganya?.name || "Nganya"}
+                          </span>
+                          {sighting.stage?.name && (
+                            <span className="text-xs text-[var(--color-text-tertiary)]">
+                              • {sighting.stage.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+                          <MapPin className="w-3 h-3" />
+                          <span>
+                            {sighting.nganya?.corridors?.name ||
+                              "Unknown route"}
+                          </span>
+                          <span>•</span>
+                          <Clock className="w-3 h-3" />
+                          <span>{recency}</span>
+                        </div>
+                      </div>
+                      <SignalBadge strength={strength} />
+                    </div>
+                  );
+                })}
+              </div>
+              {hasMoreSightings && (
+                <div className="mt-3 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAllSightings(!showAllSightings)}
+                  >
+                    {showAllSightings
+                      ? "Show Less"
+                      : `Show ${allSightings.length - ITEMS_PER_PAGE} More`}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <EmptyState
+              variant="no-sightings"
+              title="No recent sightings"
+              message="Start spotting nganyas to build your contributor profile."
+              actionLabel="Spot Now"
+              onAction={() => navigate({ to: "/spot" })}
+            />
+          )}
+        </section>
+
+        <div className="mt-8 border-t border-[var(--color-line)]" />
+
+        {/* ── Following ────────────────────────────────────────────────── */}
+        <section className="mt-8 pb-10 md:pb-16">
+          <h2 className="text-h3 !mb-3">Following</h2>
+          {followedNganyas.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {displayedFollowing.map((nganya) => {
+                  const cardProps = mapSupabaseToCardProps(nganya);
+                  if (!cardProps) return null;
+                  return (
+                    <Card
+                      key={cardProps.id}
+                      nganya={cardProps as any}
+                      variant="standard"
+                      isFollowing
+                    />
+                  );
+                })}
+              </div>
+              {hasMoreFollowing && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAllFollowing(!showAllFollowing)}
+                  >
+                    {showAllFollowing
+                      ? "Show Less"
+                      : `Show ${sortedFollowedNganyas.length - ITEMS_PER_PAGE} More`}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <EmptyState
+              variant="no-following"
+              title="Not following any nganyas"
+              message="Discover and follow nganyas to track their live activity."
+              actionLabel="Discover"
+              onAction={() => navigate({ to: "/discover" })}
+            />
+          )}
+        </section>
       </div>
 
-      {error && (
-        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-md)] px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      <div className="flex gap-3 pt-2">
-        <Button variant="ghost" className="flex-1" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          className="flex-1"
-          isLoading={isSaving}
-          onClick={handleSave}
-        >
-          Save Changes
-        </Button>
-      </div>
+      <MediaLightbox
+        isOpen={!!lightbox}
+        src={lightbox?.src || ""}
+        type={lightbox?.type || "image"}
+        onClose={() => setLightbox(null)}
+      />
     </div>
   );
 }

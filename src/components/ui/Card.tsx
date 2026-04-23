@@ -14,10 +14,22 @@ import { vibeTagColors } from "../../lib/mockData";
 import { Link } from "@tanstack/react-router";
 import { ResponsiveNganyaImage } from "./ResponsiveNganyaImage";
 
+/** Max `vibeTags` on standard cards; tune lower for production if needed. */
+export const CARD_MAX_VIBE_TAGS = 10;
+/** When `extraTag` is set (e.g. Culture pick), cap vibe chips so the row can scroll. */
+export const CARD_MAX_VIBE_TAGS_WITH_EXTRA = 8;
+
+const cardTagScrollRowClass = [
+  "mb-3 flex min-h-7 min-w-0 items-center gap-1.5",
+  "flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x",
+  "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+].join(" ");
+
 interface CardAction {
   label: string;
   onClick: () => void;
-  variant?: "primary" | "secondary" | "ghost";
+  /** Default for primary CTA on cards: pink border, fill on hover (`primaryOutline`). */
+  variant?: "primary" | "primaryOutline" | "secondary" | "ghost";
   isLoading?: boolean;
 }
 
@@ -122,6 +134,7 @@ function StandardCard({
         <ResponsiveNganyaImage
           src={nganya.imageUrl}
           alt={nganya.name}
+          corridorName={nganya.corridor}
           variant="standard"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -186,30 +199,36 @@ function StandardCard({
           </span>
         </div>
 
-        {/* Vibe tags */}
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {nganya.vibeTags?.slice(0, 3).map((tag) => (
-            <Chip
-              key={tag}
-              label={tag}
-              variant="vibe"
-              color={vibeTagColors[tag]}
-            />
-          ))}
+        {/* Single scroll row: Culture pick first, then vibe chips (all tags scroll together) */}
+        <div className={cardTagScrollRowClass}>
           {extraTag ? (
             <span
-              className={`inline-flex items-center rounded-[var(--radius-full)] border px-3 py-1 text-[10px] font-bold ${extraTag.className || ""}`}
+              className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-[var(--radius-full)] border px-3 py-1 text-[10px] font-bold ${extraTag.className || ""}`}
             >
               {extraTag.label}
             </span>
           ) : null}
+          {nganya.vibeTags
+            ?.slice(
+              0,
+              extraTag ? CARD_MAX_VIBE_TAGS_WITH_EXTRA : CARD_MAX_VIBE_TAGS,
+            )
+            .map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                variant="vibe"
+                color={vibeTagColors[tag]}
+                className="shrink-0"
+              />
+            ))}
         </div>
 
         {primaryAction || secondaryAction ? (
           <div className="grid grid-cols-2 gap-2 mb-3">
             {primaryAction ? (
               <Button
-                variant={primaryAction.variant || "primary"}
+                variant={primaryAction.variant || "primaryOutline"}
                 className="w-full"
                 isLoading={primaryAction.isLoading}
                 onClick={handleActionClick(primaryAction.onClick)}
@@ -272,6 +291,7 @@ function CompactCard({ nganya, isFollowing, onFollow, className }: CardProps) {
         <ResponsiveNganyaImage
           src={nganya.imageUrl}
           alt={nganya.name}
+          corridorName={nganya.corridor}
           variant="compact"
           className="w-full h-full object-cover"
         />
@@ -332,6 +352,7 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
       <ResponsiveNganyaImage
         src={nganya.imageUrl}
         alt={nganya.name}
+        corridorName={nganya.corridor}
         variant="feature"
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
@@ -370,13 +391,14 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
 
       {/* Bottom content */}
       <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {nganya.vibeTags?.map((tag) => (
+        <div className={cardTagScrollRowClass}>
+          {nganya.vibeTags?.slice(0, CARD_MAX_VIBE_TAGS).map((tag) => (
             <Chip
               key={tag}
               label={tag}
               variant="vibe"
               color={vibeTagColors[tag]}
+              className="shrink-0"
             />
           ))}
         </div>

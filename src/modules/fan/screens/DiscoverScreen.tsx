@@ -7,6 +7,7 @@ import Chip from "@/components/ui/Chip";
 import EmptyState from "@/components/ui/EmptyState";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
 import { toNganyaSlug } from "@/lib/formatters";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { vibeTagColors } from "@/lib/mockData";
 import { SlidersHorizontal } from "lucide-react";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
@@ -92,10 +93,7 @@ function DiscoverScreen({ data, onSearchChange }: DiscoverScreenProps) {
       corridor:
         dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
-      imageUrl:
-        dbNganya.nganya_media?.[0]?.media_url ||
-        dbNganya.image_url ||
-        "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
+      imageUrl: pickPrimaryNganyaImageUrl(dbNganya) ?? '',
       isLive,
       isNewBuild: dbNganya.tags?.includes("NEW_BUILD") || dbNganya.is_new_build,
       isVerified: dbNganya.is_verified,

@@ -8,6 +8,8 @@ import {
 interface ResponsiveNganyaImageProps {
   src?: string | null
   alt: string
+  /** Shown on generated placeholder SVG; optional. */
+  corridorName?: string | null
   className?: string
   variant?: 'compact' | 'standard' | 'feature' | 'detail'
 }
@@ -29,13 +31,14 @@ const VARIANT_WIDTHS: Record<NonNullable<ResponsiveNganyaImageProps['variant']>,
 export function ResponsiveNganyaImage({
   src,
   alt,
+  corridorName,
   className = '',
   variant = 'standard',
 }: ResponsiveNganyaImageProps) {
   const [hasFailed, setHasFailed] = useState(false)
   const resolvedSrc = hasFailed
-    ? createNganyaPlaceholder(alt)
-    : resolveNganyaImageUrl(src, alt)
+    ? createNganyaPlaceholder(alt, corridorName)
+    : resolveNganyaImageUrl(src, alt, corridorName)
 
   const srcSet = useMemo(
     () => buildNganyaImageSrcSet(resolvedSrc, VARIANT_WIDTHS[variant]),

@@ -1,4 +1,4 @@
-import { Compass, Search, Heart, User, LogIn } from 'lucide-react'
+import { Compass, Search, User, LogIn } from 'lucide-react'
 import { Link, useMatches } from '@tanstack/react-router'
 import type { Session } from '@supabase/supabase-js'
 import FAB from '../ui/FAB'
@@ -13,7 +13,7 @@ const tabs = [
     { to: '/', icon: Compass, label: 'Feed' },
     { to: '/discover', icon: Search, label: 'Discover' },
     // FAB goes here (center)
-    { to: '/following', icon: Heart, label: 'Following' },
+    // { to: '/following', icon: Heart, label: 'Following' },
     { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
@@ -30,7 +30,7 @@ export default function BottomNav({ session, profile }: NavProps) {
             <div className="absolute inset-0 bg-[var(--color-bg-base)]/90 backdrop-blur-lg border-t border-[var(--glass-border)]" />
 
             {/* Tab bar */}
-            <div className="relative grid grid-cols-5 items-center px-2 h-[var(--bottom-nav-height)] pb-[env(safe-area-inset-bottom)]">
+            <div className="relative grid grid-cols-4 items-center px-2 h-[var(--bottom-nav-height)] pb-[env(safe-area-inset-bottom)]">
                 {/* Left side tabs */}
                 {tabs.slice(0, 2).map((tab) => {
                     const isActive = currentPath === tab.to

@@ -4,7 +4,7 @@
  * Glass header with backdrop blur.
  */
 
-import { Compass, Heart, Camera, Zap, LogOut } from "lucide-react";
+import { Compass, Camera, Zap, LogOut } from "lucide-react";
 import { Link, useMatches, useNavigate, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
@@ -18,7 +18,7 @@ interface NavProps {
 
 const navItems = [
   { to: "/", icon: Compass, label: "Discover" },
-  { to: "/following", icon: Heart, label: "Following" },
+  // { to: "/following", icon: Heart, label: "Following" },
   { to: "/spot", icon: Camera, label: "Spot" },
   // { to: '/profile', icon: User, label: 'Profile' },
 ] as const;
@@ -62,29 +62,14 @@ export default function TopNav({ session, profile }: NavProps) {
             const isActive =
               currentPath === item.to ||
               (item.to === "/" && currentPath === "/discover");
-            const isSpot = item.to === "/spot";
-
-            if (isSpot) {
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="ml-2 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm font-semibold shadow-[var(--glow-accent-sm)] hover:shadow-[var(--glow-accent)] hover:bg-[var(--color-accent-hover)] transition-all duration-150 no-underline"
-                >
-                  <Camera className="w-4 h-4" />
-                  Spot
-                </Link>
-              );
-            }
-
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 no-underline ${
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium border transition-all duration-150 no-underline ${
                   isActive
-                    ? "text-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)]"
+                    ? "text-[var(--color-accent)] border-[var(--color-accent)]"
+                    : "text-[var(--color-text-secondary)] border-transparent hover:text-[var(--color-text-primary)]"
                 }`}
               >
                 <item.icon className="w-4 h-4" />

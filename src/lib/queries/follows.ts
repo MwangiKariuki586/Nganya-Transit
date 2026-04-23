@@ -5,7 +5,7 @@ export async function getMyFollows() {
   const { data, error } = await supabase
     .from("follows")
     .select(
-      "*, nganyas(*, corridors(name), nganya_media(media_url, media_type))",
+      "*, nganyas(*, corridors(name), nganya_media(media_url, media_type), crew_nganyas(profiles(avatar_url)))",
     )
     .order("created_at", { ascending: false });
   if (error) throw error;

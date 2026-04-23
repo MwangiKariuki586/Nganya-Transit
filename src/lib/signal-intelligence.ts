@@ -132,24 +132,24 @@ export function getUserCredibility(sightings: any[]): {
 export function getCredibilityStyle(level: CredibilityLevel) {
   const styles = {
     'active-spotter': {
-      color: 'var(--color-green)',
-      bg: 'var(--color-green-soft)',
-      border: 'rgba(57,255,20,0.2)',
+      color: 'var(--color-accent)',
+      bg: 'var(--color-accent-soft)',
+      border: 'rgba(255,45,120,0.3)',
     },
     'reliable-contributor': {
-      color: 'var(--color-cyan)',
-      bg: 'var(--color-cyan-soft)',
-      border: 'rgba(0,229,255,0.2)',
+      color: 'var(--color-accent)',
+      bg: 'var(--color-accent-soft)',
+      border: 'rgba(255,45,120,0.3)',
     },
     'occasional-contributor': {
-      color: 'var(--color-warning)',
-      bg: 'var(--color-warning-soft)',
-      border: 'rgba(255,193,7,0.2)',
+      color: 'var(--color-accent)',
+      bg: 'var(--color-accent-soft)',
+      border: 'rgba(255,45,120,0.3)',
     },
     'new-spotter': {
-      color: 'var(--color-text-secondary)',
-      bg: 'var(--glass-bg)',
-      border: 'var(--glass-border)',
+      color: 'var(--color-accent)',
+      bg: 'var(--color-accent-soft)',
+      border: 'rgba(255,45,120,0.3)',
     },
   };
   return styles[level];

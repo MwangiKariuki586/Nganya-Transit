@@ -11,6 +11,7 @@ import {
   Camera,
   CheckCircle,
   ChevronLeft,
+  Clock,
   X,
   ImagePlus,
   MapPin,
@@ -18,7 +19,6 @@ import {
   Radio,
   Search,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { getUserMessage, toAppError } from "@/shared/errors/app-error";
 import SearchInput from "@/components/ui/SearchInput";
@@ -29,6 +29,7 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { LoadingButton } from "@/components/ui/loading";
 import { ListSkeleton } from "@/components/ui/loading";
 import { ResponsiveNganyaImage } from "@/components/ui/ResponsiveNganyaImage";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { useToast } from "@/components/ui/ToastContainer";
 import { formatRelativeTime } from "@/lib/formatters";
 import { postSighting } from "@/lib/queries/sightings";
@@ -322,7 +323,7 @@ export default function SpotScreen({ data }: SpotScreenProps) {
     null,
   );
   const [routeFitChecked, setRouteFitChecked] = useState(false);
-  const [confirmationChecked, setConfirmationChecked] = useState(false);
+  const [confirmationChecked] = useState(true);
   const [selectedPhotoName, setSelectedPhotoName] = useState<string | null>(
     null,
   );
@@ -505,8 +506,8 @@ export default function SpotScreen({ data }: SpotScreenProps) {
       .filter(
         (candidate: any) =>
           !query ||
-          candidate.rank > 0 ||
-          candidate.name?.toLowerCase().includes(query),
+          candidate.name?.toLowerCase().includes(query) ||
+          candidate.corridorName?.toLowerCase().includes(query),
       );
 
     return scoped.sort((left: any, right: any) => right.rank - left.rank);
@@ -686,10 +687,6 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
   const handleSubmit = async () => {
     if (!draft.nganyaId || !draft.corridorId || !draft.direction) return;
-    if (!confirmationChecked) {
-      showFlowError("Confirm that this sighting is accurate right now.");
-      return;
-    }
     if (duplicateWindowSighting) {
       showFlowError(
         "You already spotted this nganya a moment ago. Give it a few minutes before posting again.",
@@ -827,7 +824,7 @@ export default function SpotScreen({ data }: SpotScreenProps) {
 
       {step === "where" && (
         <section className="space-y-5">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
+          {/* <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
             <div className="flex items-start gap-3">
               <Navigation className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-accent)]" />
               <div>
@@ -840,7 +837,7 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {locationSuggestion.corridorId ? (
             <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.03)] p-4">
@@ -911,10 +908,10 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                       corridorId: corridor.id,
                     }))
                   }
-                  className={`rounded-[var(--radius-md)] border p-4 text-left transition-all ${
+                  className={`rounded-[var(--radius-md)] border p-4 text-left transition-all backdrop-blur-md ${
                     selected
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                      : "border-[var(--glass-border)] bg-[var(--glass-bg)] hover:border-[var(--glass-border-hover)]"
+                      ? "border-[var(--color-accent)]/60 bg-[var(--glass-bg)] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)]"
+                      : "border-[var(--glass-border)] bg-[rgba(255,255,255,0.02)] hover:border-[var(--color-accent)]/25 hover:bg-[var(--glass-bg)]"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -952,96 +949,36 @@ export default function SpotScreen({ data }: SpotScreenProps) {
             </div>
           </div>
 
-          <LoadingButton
-            variant="primary"
-            className="w-full"
-            disabled={!draft.corridorId || !draft.direction}
-            onClick={continueFromWhere}
-            isLoading={isValidatingRoute}
-            loadingLabel="Checking route..."
-          >
-            Continue
-          </LoadingButton>
+          <div className="flex md:justify-center">
+            <LoadingButton
+              variant="primary"
+              className="w-full md:w-auto md:min-w-52"
+              disabled={!draft.corridorId || !draft.direction}
+              onClick={continueFromWhere}
+              isLoading={isValidatingRoute}
+              loadingLabel="Checking route..."
+            >
+              Continue
+            </LoadingButton>
+          </div>
         </section>
       )}
 
       {step === "which" && (
         <section className="space-y-5">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
-            <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <Search className="h-4 w-4 text-[var(--color-accent)]" />
-              Candidates are filtered to{" "}
-              {selectedCorridor?.name || "this route"} and ranked by live/recent
-              route signal.
-            </div>
-          </div>
-
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search by nganya name..."
           />
 
-          {topSuggestions.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-                <Sparkles className="h-4 w-4 text-[var(--color-cyan)]" />
-                {geolocation.permissionStatus === "granted"
-                  ? "Recently spotted near you"
-                  : "Likely on this route"}
-              </div>
-              <div className="space-y-2">
-                {topSuggestions.map((candidate: any) => {
-                  const selected = draft.nganyaId === candidate.id;
-                  return (
-                    <button
-                      key={candidate.id}
-                      onClick={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          nganyaId: candidate.id,
-                        }))
-                      }
-                      className={`grid w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-all ${
-                        selected
-                          ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                          : "border-[var(--glass-border)] bg-[var(--glass-bg)] hover:border-[var(--glass-border-hover)]"
-                      }`}
-                    >
-                      <ResponsiveNganyaImage
-                        src={
-                          candidate.nganya_media?.[0]?.media_url ||
-                          "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80"
-                        }
-                        alt={candidate.name}
-                        variant="compact"
-                        className="h-14 w-14 rounded-[var(--radius-md)] object-cover"
-                      />
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                          {candidate.name}
-                        </div>
-                        <div className="truncate text-xs text-[var(--color-text-tertiary)]">
-                          {candidate.corridorName}
-                        </div>
-                        <div className="truncate text-xs text-[var(--color-accent)]">
-                          {getSignalCue(candidate)}
-                        </div>
-                      </div>
-                      {selected ? (
-                        <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-2">
-            {remainingSpotCandidates.length > 0 ? (
-              remainingSpotCandidates.map((candidate: any) => {
+          <div className="max-h-[460px] overflow-y-auto overscroll-contain space-y-2 pr-0.5">
+            {spotCandidates.length > 0 ? (
+              spotCandidates.map((candidate: any) => {
                 const selected = draft.nganyaId === candidate.id;
+                const lastSeen = candidate.lastSeenAt
+                  ? formatRelativeTime(candidate.lastSeenAt)
+                  : null;
                 return (
                   <button
                     key={candidate.id}
@@ -1051,18 +988,16 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                         nganyaId: candidate.id,
                       }))
                     }
-                    className={`grid h-[84px] w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-all ${
+                    className={`grid w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border p-3 text-left transition-all backdrop-blur-md ${
                       selected
-                        ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                        : "border-[var(--glass-border)] bg-[var(--glass-bg)] hover:border-[var(--glass-border-hover)]"
+                        ? "border-[var(--color-accent)]/60 bg-[var(--glass-bg)] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)]"
+                        : "border-[var(--glass-border)] bg-[rgba(255,255,255,0.02)] hover:border-[var(--color-accent)]/25 hover:bg-[var(--glass-bg)]"
                     }`}
                   >
                     <ResponsiveNganyaImage
-                      src={
-                        candidate.nganya_media?.[0]?.media_url ||
-                        "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80"
-                      }
+                      src={pickPrimaryNganyaImageUrl(candidate) ?? ""}
                       alt={candidate.name}
+                      corridorName={candidate.corridorName}
                       variant="compact"
                       className="h-14 w-14 rounded-[var(--radius-md)] object-cover"
                     />
@@ -1073,33 +1008,48 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                       <div className="truncate text-xs text-[var(--color-text-tertiary)]">
                         {candidate.corridorName}
                       </div>
-                      <div className="truncate text-xs text-[var(--color-accent)]">
-                        {getSignalCue(candidate)}
+                      <div className="mt-1 flex items-center gap-2">
+                        {candidate.liveCue ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-accent)]">
+                            Live
+                          </span>
+                        ) : (
+                          <span className="truncate text-xs text-[var(--color-text-tertiary)]">
+                            {getSignalCue(candidate)}
+                          </span>
+                        )}
+                        {/* {lastSeen && (
+                          <span className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-text-tertiary)]">
+                            <Clock className="h-3 w-3" />
+                            {lastSeen}
+                          </span>
+                        )} */}
                       </div>
                     </div>
-                    {selected ? (
-                      <CheckCircle className="h-4 w-4 text-[var(--color-accent)]" />
-                    ) : null}
+                    <CheckCircle
+                      className={`h-4 w-4 shrink-0 transition-opacity ${selected ? "opacity-100 text-[var(--color-accent)]" : "opacity-0"}`}
+                    />
                   </button>
                 );
               })
             ) : (
               <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--glass-border)] p-5 text-sm text-[var(--color-text-secondary)]">
-                {topSuggestions.length > 0
-                  ? "Top matches are already shown above."
-                  : "No nganyas match this route and search. Try another name or switch route."}
+                No nganyas match this route and search. Try another name or
+                switch route.
               </div>
             )}
           </div>
 
-          <LoadingButton
-            variant="primary"
-            className="w-full"
-            disabled={!draft.nganyaId}
-            onClick={continueFromWhich}
-          >
-            Continue
-          </LoadingButton>
+          <div className="flex md:justify-center">
+            <LoadingButton
+              variant="primary"
+              className="w-full md:w-auto md:min-w-52"
+              disabled={!draft.nganyaId}
+              onClick={continueFromWhich}
+            >
+              Continue
+            </LoadingButton>
+          </div>
         </section>
       )}
 
@@ -1256,28 +1206,33 @@ export default function SpotScreen({ data }: SpotScreenProps) {
             </div>
           </div>
 
-          <LoadingButton
-            variant="primary"
-            className="w-full"
-            onClick={continueFromEvidence}
-          >
-            Review signal
-          </LoadingButton>
+          <div className="flex md:justify-center">
+            <LoadingButton
+              variant="primary"
+              className="w-full md:w-auto md:min-w-52"
+              onClick={continueFromEvidence}
+            >
+              Review signal
+            </LoadingButton>
+          </div>
         </section>
       )}
 
       {step === "confirm" && (
         <section className="space-y-5">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+            {/* ── Left: summary + confirmation ── */}
             <div className="space-y-4">
               <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
                 <div className="flex items-start gap-4">
                   <ResponsiveNganyaImage
-                    src={
-                      selectedNganyaData?.nganya_media?.[0]?.media_url ||
-                      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80"
-                    }
+                    src={pickPrimaryNganyaImageUrl(selectedNganyaData) ?? ""}
                     alt={selectedNganyaData?.name || "Selected nganya"}
+                    corridorName={
+                      selectedCorridor?.name ||
+                      selectedNganyaData?.corridors?.name ||
+                      null
+                    }
                     variant="compact"
                     className="h-16 w-16 rounded-[var(--radius-lg)] object-cover"
                   />
@@ -1369,8 +1324,29 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                   </div>
                 </div>
               ) : null}
+
+              {submitError ? (
+                <p className="text-sm text-red-300">{submitError}</p>
+              ) : null}
+              <div className="flex md:justify-center">
+                <LoadingButton
+                  variant="primary"
+                  className="w-full md:w-auto md:min-w-52"
+                  isLoading={isSubmitting}
+                  loadingLabel="Verifying live signal..."
+                  onClick={handleSubmit}
+                  disabled={
+                    !confirmationChecked ||
+                    duplicateWindowSighting ||
+                    isCorridorBlocking
+                  }
+                >
+                  Confirm & Share Live
+                </LoadingButton>
+              </div>
             </div>
 
+            {/* ── Right: signal quality aside ── */}
             <aside className="space-y-4">
               <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.04)] p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
@@ -1403,47 +1379,6 @@ export default function SpotScreen({ data }: SpotScreenProps) {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="rounded-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
-                <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  Final confirmation
-                </div>
-                <label className="mt-3 flex items-start gap-3 text-sm text-[var(--color-text-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={confirmationChecked}
-                    onChange={(event) =>
-                      setConfirmationChecked(event.target.checked)
-                    }
-                    className="mt-0.5 h-4 w-4 rounded border-[var(--glass-border)] bg-transparent text-[var(--color-accent)]"
-                  />
-                  <span>I confirm this sighting is accurate right now.</span>
-                </label>
-                {routeFitChecked ? (
-                  <p className="mt-3 text-xs text-[var(--color-text-tertiary)]">
-                    {routeFitDistance !== null
-                      ? `Closest route fit: ${routeFitStageName || "Nearby stage"} at ${formatDistance(routeFitDistance)}.`
-                      : "Route fit already verified."}
-                  </p>
-                ) : null}
-                {submitError ? (
-                  <p className="mt-3 text-sm text-red-300">{submitError}</p>
-                ) : null}
-                <LoadingButton
-                  variant="primary"
-                  className="mt-4 w-full"
-                  isLoading={isSubmitting}
-                  loadingLabel="Verifying live signal..."
-                  onClick={handleSubmit}
-                  disabled={
-                    !confirmationChecked ||
-                    duplicateWindowSighting ||
-                    isCorridorBlocking
-                  }
-                >
-                  Confirm & Share Live
-                </LoadingButton>
               </div>
             </aside>
           </div>

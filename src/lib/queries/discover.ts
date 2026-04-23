@@ -1,7 +1,12 @@
 import { supabase } from '../supabase'
 import { toNganyaSlug } from '../formatters'
 
-function dedupeNganyas<T extends { id: string; nganya_media?: any[] }>(rows: T[] | null) {
+const NGANYA_IMAGE_SELECT =
+  '*, corridors(name), nganya_media(media_url, media_type), crew_nganyas(profiles(avatar_url))'
+
+function dedupeNganyas<T extends { id: string; nganya_media?: any[]; crew_nganyas?: any[] }>(
+  rows: T[] | null,
+) {
     const items = rows || []
     const byId = new Map<string, T>()
 
@@ -24,6 +29,10 @@ function dedupeNganyas<T extends { id: string; nganya_media?: any[] }>(rows: T[]
             ...existing,
             ...row,
             nganya_media: mergedMedia,
+            crew_nganyas:
+                existing.crew_nganyas?.length
+                    ? existing.crew_nganyas
+                    : row.crew_nganyas,
         })
     }
 
@@ -37,7 +46,7 @@ export async function getCorridors() {
 }
 
 export async function searchNganyas(queryText: string, corridorId?: string) {
-    let query = supabase.from('nganyas').select('*, corridors(name), nganya_media(media_url, media_type)')
+    let query = supabase.from('nganyas').select(NGANYA_IMAGE_SELECT)
 
     if (corridorId) {
         query = query.eq('corridor_id', corridorId)
@@ -56,7 +65,7 @@ export async function searchNganyas(queryText: string, corridorId?: string) {
 export async function getNganya(id: string) {
     const { data, error } = await supabase
         .from('nganyas')
-        .select('*, corridors(*), nganya_media(*)')
+        .select('*, corridors(*), nganya_media(*), crew_nganyas(profiles(avatar_url))')
         .eq('id', id)
         .single()
 
@@ -67,7 +76,7 @@ export async function getNganya(id: string) {
 export async function getNganyaBySlug(slug: string) {
     const { data, error } = await supabase
         .from('nganyas')
-        .select('*, corridors(*), nganya_media(*)')
+        .select('*, corridors(*), nganya_media(*), crew_nganyas(profiles(avatar_url))')
         .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -78,7 +87,7 @@ export async function getNganyaBySlug(slug: string) {
 export async function getNganyasByCorridor(corridorId: string, excludeNganyaId?: string) {
     let query = supabase
         .from('nganyas')
-        .select('*, corridors(*), nganya_media(*)')
+        .select('*, corridors(*), nganya_media(*), crew_nganyas(profiles(avatar_url))')
         .eq('corridor_id', corridorId)
         .order('created_at', { ascending: false })
 

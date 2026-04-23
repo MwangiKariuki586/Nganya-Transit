@@ -147,16 +147,6 @@ function SignUpScreen() {
               </button>
             </div>
 
-            {accountType === "crew" && (
-              <div className="p-3 rounded-md bg-(--color-accent-soft) border border-(--color-accent-glow) text-[10px] text-(--color-accent) leading-tight">
-                {/* <span className="font-bold flex items-center gap-1 mb-0.5 uppercase tracking-wider">
-                  <AlertCircle className="w-3 h-3" /> Note for Crew
-                </span> */}
-                You will be able to manage sessions once an admin approves your
-                registration.
-              </div>
-            )}
-
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">

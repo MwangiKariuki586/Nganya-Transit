@@ -8,6 +8,7 @@ import Chip from "@/components/ui/Chip";
 import LiveBadge from "@/components/ui/LiveBadge";
 import Skeleton from "@/components/ui/Skeleton";
 import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { Clock, TrendingUp, ChevronRight } from "lucide-react";
 import WhereToCard, {
   type RideSearchPayload,
@@ -355,10 +356,7 @@ export default function HomeScreen({
       corridor:
         dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
       vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
-      imageUrl:
-        dbNganya.nganya_media?.[0]?.media_url ||
-        dbNganya.image_url ||
-        "https://scontent-mba2-1.cdninstagram.com/v/t51.82787-15/631035481_17978430665986282_7566032497949382783_n.webp?_nc_cat=105&ig_cache_key=MzgyNzQxNjM4MTI1MjE5MDEzMw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4MTQ0MC5zZHIuQzMifQ%3D%3D&_nc_ohc=aHTAhdLjyNQQ7kNvwG3i9xI&_nc_oc=Adr5o1K9O4cDLOv7zDDmXPsvWeEy-NaD-MSsqhxfzPECEb6U1tm0isdrOrlHNNQ1c7Y&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-mba2-1.cdninstagram.com&_nc_gid=1b5YNR3If6lkABFGdff4Ug&_nc_ss=7a32e&oh=00_Af0dPpEbY79JVZeawMcoB9AYBsH4x_b-PICb6Ly63Jfk6A&oe=69D5D534",
+      imageUrl: pickPrimaryNganyaImageUrl(dbNganya) ?? "",
       isLive,
       isNewBuild: dbNganya.tags?.includes("NEW_BUILD") || dbNganya.is_new_build,
       isVerified: dbNganya.is_verified,
@@ -760,12 +758,7 @@ export default function HomeScreen({
           </div>
         ) : (
           <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
-            <div className="font-medium text-[var(--color-text-primary)]">
-              No recent sightings
-            </div>
-            <p className="mt-1">
-              Be the first to spot and boost a live signal.
-            </p>
+            <p className="mt-1">No recent sightings</p>
             <Button
               variant="secondary"
               size="sm"

@@ -10,13 +10,17 @@ import {
 } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
+import Card, {
+  CARD_MAX_VIBE_TAGS,
+  CARD_MAX_VIBE_TAGS_WITH_EXTRA,
+} from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import { useToast } from "@/components/ui/ToastContainer";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { InlineTableLoader } from "@/components/ui/loading";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
 import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
+import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import {
   followNganya,
   unfollowNganya,
@@ -242,10 +246,7 @@ function buildDashboardItem(
     corridorId,
     corridorName,
     tags,
-    imageUrl:
-      source.nganya_media?.[0]?.media_url ||
-      source.image_url ||
-      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80",
+    imageUrl: pickPrimaryNganyaImageUrl(source) ?? "",
     followers: source.follower_count || 0,
     isVerified: Boolean(source.is_verified),
     followCreatedAt: options.followMeta?.createdAt || null,
@@ -361,8 +362,11 @@ function mapDashboardItemToCardProps(item: DashboardItem) {
     item.stageLabel ||
     (item.notifyLive && item.status === "OFFLINE" ? "Alerts on" : null);
   const vibeTags = directionOrStage
-    ? [directionOrStage, ...item.tags.slice(0, 2)]
-    : item.tags.slice(0, 3);
+    ? [
+        directionOrStage,
+        ...item.tags.slice(0, CARD_MAX_VIBE_TAGS_WITH_EXTRA - 1),
+      ]
+    : item.tags.slice(0, CARD_MAX_VIBE_TAGS);
   const signalText = getSignalText(item);
 
   return {
@@ -944,7 +948,7 @@ export default function FollowingScreen({ data }: FollowingScreenProps) {
           </Button> */}
         </section>
 
-        {plannerRouteLabel ? (
+        {/* {plannerRouteLabel ? (
           <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[linear-gradient(135deg,rgba(255,0,122,0.14),rgba(0,212,255,0.08))] p-4 md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
@@ -982,7 +986,7 @@ export default function FollowingScreen({ data }: FollowingScreenProps) {
               </div>
             </div>
           </section>
-        ) : null}
+        ) : null} */}
 
         {isRefreshing ? <InlineTableLoader /> : null}
 
