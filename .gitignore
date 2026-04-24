@@ -17,7 +17,7 @@ mcp.json
 __unconfig*
 todos.json
 migrations
-.cursor/skills
+
 
 # Ignore Cursor MCP configs (contains sensitive token)
 .cursor/mcp.json
@@ -27,3 +27,6 @@ migrations
 !src/ARCHITECTURE.md
 !README.md
 !**/README.md
+
+# Always track Cursor skills (new skills added later must not be blocked by *.md above)
+!.cursor/skills/**

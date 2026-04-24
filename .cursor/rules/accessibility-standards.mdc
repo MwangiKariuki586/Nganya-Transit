@@ -1,0 +1,71 @@
+---
+description: Accessibility requirements for all MATWANA UI components
+globs: "**/*.tsx"
+alwaysApply: false
+---
+
+# Accessibility Standards
+
+## Form Labels Must Be Programmatically Associated
+
+Every `<input>`, `<select>`, and `<textarea>` must have an associated label via `htmlFor`/`id` or `aria-label`:
+
+```tsx
+// ✅ GOOD
+<label htmlFor="signup-email">Email</label>
+<input id="signup-email" type="email" />
+
+// ✅ GOOD — for inputs without visible labels
+<input aria-label="Search nganyas" type="search" />
+
+// ❌ BAD — label not associated
+<label>Email</label>
+<input type="email" />
+```
+
+## Error Messages Must Use `role="alert"`
+
+Dynamic error text must be announced to screen readers:
+
+```tsx
+// ✅ GOOD
+{error && <p role="alert" className="text-red-300">{error}</p>}
+
+// ❌ BAD — not announced
+{error && <p className="text-red-300">{error}</p>}
+```
+
+## Icon-Only Buttons Need `aria-label`
+
+Buttons containing only an icon must have an accessible name:
+
+```tsx
+// ✅ GOOD
+<button aria-label="Go back"><ChevronLeft /></button>
+
+// ❌ BAD — no accessible name
+<button><ChevronLeft /></button>
+```
+
+## Clickable Divs Must Be Keyboard-Accessible
+
+If a `<div>` has `onClick`, it needs `role="button"`, `tabIndex={0}`, and keyboard handling:
+
+```tsx
+// ✅ GOOD
+<div role="button" tabIndex={0} onClick={handleClick}
+  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}>
+
+// ❌ BAD — not focusable or keyboard-accessible
+<div onClick={handleClick}>
+```
+
+Prefer using `<button>` instead of `<div>` when possible.
+
+## Modals Must Have Focus Management
+
+Modal/overlay components must:
+1. Set `aria-labelledby` pointing to the title element (use `useId()` for unique IDs)
+2. Move focus into the modal on open (`dialogRef.current?.focus()`)
+3. Handle Escape key to close
+4. Use `role="dialog"` and `aria-modal="true"`

@@ -46,11 +46,13 @@ describe("fan route data", () => {
     getCorridorSightings.mockReset();
   });
 
-  it("loads discover data from route inputs using shared context data", async () => {
+  it("loads discover catalogue data with corridor summaries and full nganya list", async () => {
     const sharedCorridors = [{ id: "1", name: "CBD" }];
-    const sharedLiveNganyas = [{ id: "live-1" }];
+    const sharedLiveNganyas = [{ id: "live-1", corridor_id: "1", nganya_id: "n-1" }];
 
-    searchNganyas.mockResolvedValue([{ id: "n-1" }]);
+    searchNganyas.mockResolvedValue([
+      { id: "n-1", corridor_id: "1", tags: ["NEW_BUILD"], follower_count: 10 },
+    ]);
     getMyFollows.mockResolvedValue([{ nganya_id: "n-1" }]);
     getStableClientSession.mockResolvedValue({ user: { id: "user-1" } });
 
@@ -59,19 +61,18 @@ describe("fan route data", () => {
     );
 
     const shared = { corridors: sharedCorridors, liveNganyas: sharedLiveNganyas };
+    const result = await loadDiscoverRouteData(shared);
 
-    const result = await loadDiscoverRouteData(
-      { search: "mat", corridorId: "1", vibe: "BASS_HEAVY" },
-      shared,
-    );
-
-    expect(searchNganyas).toHaveBeenCalledWith("mat", "1");
-    expect(result.search).toBe("mat");
-    expect(result.activeCorridor).toBe("1");
-    expect(result.activeVibe).toBe("BASS_HEAVY");
-    expect(result.followedIds.has("n-1")).toBe(true);
-    expect(result.corridors).toBe(sharedCorridors);
+    expect(searchNganyas).toHaveBeenCalledWith("");
+    expect(result.corridors).toHaveLength(1);
+    expect(result.corridors[0].name).toBe("CBD");
+    expect(result.corridors[0].nganyaCount).toBe(1);
+    expect(result.corridors[0].liveCount).toBe(1);
+    expect(result.allNganyas).toHaveLength(1);
+    expect(result.featuredLive).toHaveLength(1);
     expect(result.liveNganyas).toBe(sharedLiveNganyas);
+    expect(result.followedIds.has("n-1")).toBe(true);
+    expect(result.totalCount).toBe(1);
   });
 
   it("uses shared corridors when loading home route data", async () => {

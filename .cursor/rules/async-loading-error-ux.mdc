@@ -1,0 +1,66 @@
+---
+description: Loading, pending, error, and retry UX patterns for MATWANA
+globs: "**/*.tsx,**/*.ts"
+alwaysApply: false
+---
+
+# Loading, Error & Async UX Patterns
+
+## Every Route Must Have a `pendingComponent`
+
+No blank screens during data loading. Create a skeleton component and wire it:
+
+```typescript
+export const Route = createFileRoute("/(fan)/profile")({
+  loader: loadProfileRouteData,
+  pendingComponent: ProfileSkeleton,  // ← required
+  component: ProfileScreen,
+});
+```
+
+## Every Async Mutation Must Show Pending State
+
+Use `LoadingButton` with `loadingLabel`, or disable controls and show a spinner during mutations. Never let users submit twice.
+
+```tsx
+// ✅ GOOD
+<LoadingButton isLoading={isSaving} loadingLabel="Saving...">Save</LoadingButton>
+
+// ❌ BAD — no pending feedback
+<button onClick={handleSave}>Save</button>
+```
+
+## Background Refresh Failures Must Be Surfaced
+
+No empty `.catch(() => {})`. At minimum, set an error flag that the UI can display. Use `retryWithBackoff` for automatic retries:
+
+```typescript
+// ✅ GOOD — retry + surface error
+retryWithBackoff(() => fetchData(), { maxAttempts: 2 })
+  .then(data => set({ data, error: null }))
+  .catch(error => set({ error }));
+
+// ❌ BAD — silent failure
+fetchData().catch(() => {});
+```
+
+## Use `InlineErrorState` for Recoverable Errors
+
+When an operation fails and the user can retry, use the existing `InlineErrorState` component with an `onRetry` callback:
+
+```tsx
+{error && (
+  <InlineErrorState
+    message={getUserMessage(error)}
+    onRetry={() => refetch()}
+  />
+)}
+```
+
+## Upload Progress Must Reflect Reality
+
+If the upload API does not support progress events, do not show a fake progress bar. Either implement real progress tracking (XHR `onprogress` or Supabase resumable uploads) or show an indeterminate spinner.
+
+## Validate Media at Selection Time
+
+Validate file size and type immediately when the user selects a file. Do not wait until upload to reject. Use `validateImageFile`, `validateCoverMediaFile`, or `validateGalleryFile` from `@/lib/utils/image-compress`.

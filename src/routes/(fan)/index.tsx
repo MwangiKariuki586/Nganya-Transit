@@ -5,13 +5,22 @@ import type { FanSharedData } from '@/modules/fan/services/route-data'
 
 export const Route = createFileRoute('/(fan)/')({
   validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search.q === 'string' ? search.q : undefined,
     corridor: typeof search.corridor === 'string' ? search.corridor : undefined,
+    vibe: typeof search.vibe === 'string' ? search.vibe : undefined,
     recent: search.recent === 'all' ? 'all' : undefined,
   }),
-  loaderDeps: ({ search }) => ({ corridor: search.corridor ?? null }),
+  loaderDeps: ({ search }) => ({
+    q: search.q ?? '',
+    corridor: search.corridor ?? null,
+    vibe: search.vibe ?? null,
+  }),
   loader: async ({ deps, context }) => {
     const shared = (context as { fanShared: FanSharedData }).fanShared
-    return loadFanHomeRouteData({ corridorId: deps.corridor }, shared)
+    return loadFanHomeRouteData(
+      { search: deps.q, corridorId: deps.corridor, vibe: deps.vibe },
+      shared,
+    )
   },
   component: FanHomeRoute,
   pendingComponent: FanHomePendingRoute,
@@ -25,6 +34,18 @@ function FanHomeRoute() {
   return (
     <HomeScreen
       data={data}
+      onSearchChange={(q, corridor, vibe) =>
+        navigate({
+          to: '/',
+          search: (current) => ({
+            ...current,
+            q: q || undefined,
+            corridor: corridor || undefined,
+            vibe: vibe || undefined,
+          }),
+          replace: true,
+        })
+      }
       onCorridorChange={(corridorId) =>
         navigate({
           to: '/',

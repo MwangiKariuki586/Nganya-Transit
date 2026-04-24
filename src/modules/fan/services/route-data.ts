@@ -26,7 +26,9 @@ export async function loadFanSharedData(): Promise<FanSharedData> {
 // ── Per-route data types ────────────────────────────────────────────
 
 export interface FanHomeRouteData {
+  search: string;
   activeCorridor: string | null;
+  activeVibe: string | null;
   corridors: any[];
   nganyas: any[];
   liveNganyas: any[];
@@ -35,13 +37,28 @@ export interface FanHomeRouteData {
 }
 
 export interface DiscoverRouteData {
-  search: string;
-  activeCorridor: string | null;
-  activeVibe: string | null;
-  corridors: any[];
-  nganyas: any[];
+  corridors: DiscoverCorridorSummary[];
+  /** Up to 6 live nganyas for the curated strip — sourced from shared liveNganyas. */
+  featuredLive: any[];
+  /** Full catalogue (up to 100) for client-side filtering. */
+  allNganyas: any[];
+  /** All live nganyas, required for isLive card state. */
   liveNganyas: any[];
   followedIds: Set<string>;
+  totalCount: number;
+}
+
+export interface DiscoverCorridorSummary {
+  id: string;
+  name: string;
+  nganyaCount: number;
+  liveCount: number;
+}
+
+export interface DiscoverCataloguePageData {
+  nganyas: any[];
+  hasMore: boolean;
+  nextOffset: number;
 }
 
 export interface FollowingRouteData {
@@ -86,14 +103,20 @@ async function getOptionalFollows() {
 // ── Per-route loaders (receive shared data from parent context) ─────
 
 export async function loadFanHomeRouteData(
-  input: { corridorId?: string | null },
+  input: {
+    search?: string;
+    corridorId?: string | null;
+    vibe?: string | null;
+  },
   shared: FanSharedData,
 ): Promise<FanHomeRouteData> {
   const { corridors, liveNganyas } = shared;
+  const search = input.search?.trim() || "";
   const activeCorridor = input.corridorId || null;
+  const activeVibe = input.vibe || null;
 
   const [nganyas, follows] = await Promise.all([
-    searchNganyas("", activeCorridor || undefined),
+    searchNganyas(search, activeCorridor || undefined),
     getOptionalFollows(),
   ]);
 
@@ -106,7 +129,9 @@ export async function loadFanHomeRouteData(
       ).flat();
 
   return {
+    search,
     activeCorridor,
+    activeVibe,
     corridors,
     nganyas,
     liveNganyas,
@@ -116,27 +141,95 @@ export async function loadFanHomeRouteData(
 }
 
 export async function loadDiscoverRouteData(
-  input: { search?: string; corridorId?: string | null; vibe?: string | null },
   shared: FanSharedData,
 ): Promise<DiscoverRouteData> {
   const { corridors, liveNganyas } = shared;
-  const search = input.search?.trim() || "";
-  const activeCorridor = input.corridorId || null;
-  const activeVibe = input.vibe || null;
 
-  const [nganyas, follows] = await Promise.all([
-    searchNganyas(search, activeCorridor || undefined),
+  const [allNganyas, follows] = await Promise.all([
+    searchNganyas(""),
     getOptionalFollows(),
   ]);
 
+  const corridorSummaries: DiscoverCorridorSummary[] = corridors.map(
+    (c: any) => ({
+      id: c.id,
+      name: c.name,
+      nganyaCount: allNganyas.filter((n: any) => n.corridor_id === c.id).length,
+      liveCount: liveNganyas.filter((n: any) => n.corridor_id === c.id).length,
+    }),
+  );
+
+  // Curated strip: first 6 live nganyas, no extra query needed.
+  const featuredLive = liveNganyas.slice(0, 6);
+
   return {
-    search,
-    activeCorridor,
-    activeVibe,
-    corridors,
-    nganyas,
+    corridors: corridorSummaries,
+    featuredLive,
+    allNganyas,
     liveNganyas,
     followedIds: toFollowedIds(follows),
+    totalCount: allNganyas.length,
+  };
+}
+
+export async function loadDiscoverCataloguePage(input: {
+  search?: string;
+  corridorId?: string | null;
+  vibe?: string | null;
+  sort?: "trending" | "newest" | "popular" | "active";
+  verifiedOnly?: boolean;
+  offset?: number;
+  limit?: number;
+}): Promise<DiscoverCataloguePageData> {
+  const search = input.search?.trim() || "";
+  const limit = input.limit || 12;
+  const offset = input.offset || 0;
+
+  // Fetch generously so client-side filters (vibe, verifiedOnly) don't deplete the page.
+  let nganyas = await searchNganyas(
+    search,
+    input.corridorId || undefined,
+    200,
+  );
+
+  if (input.vibe) {
+    nganyas = nganyas.filter((n: any) => n.tags?.includes(input.vibe));
+  }
+  if (input.verifiedOnly) {
+    nganyas = nganyas.filter((n: any) => Boolean(n.is_verified));
+  }
+
+  const sort = input.sort ?? "trending";
+  if (sort === "trending") {
+    nganyas.sort(
+      (a: any, b: any) =>
+        ((b.follower_count || 0) + (b.sighting_count_today || 0)) -
+        ((a.follower_count || 0) + (a.sighting_count_today || 0)),
+    );
+  } else if (sort === "popular") {
+    nganyas.sort(
+      (a: any, b: any) => (b.follower_count || 0) - (a.follower_count || 0),
+    );
+  } else if (sort === "newest") {
+    nganyas.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at || 0).getTime() -
+        new Date(a.created_at || 0).getTime(),
+    );
+  } else if (sort === "active") {
+    nganyas.sort(
+      (a: any, b: any) =>
+        (b.sighting_count_today || 0) - (a.sighting_count_today || 0),
+    );
+  }
+
+  const page = nganyas.slice(offset, offset + limit);
+  const hasMore = nganyas.length > offset + limit;
+
+  return {
+    nganyas: page,
+    hasMore,
+    nextOffset: offset + page.length,
   };
 }
 

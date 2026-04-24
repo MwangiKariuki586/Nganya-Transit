@@ -4,7 +4,7 @@
  * Glass header with backdrop blur.
  */
 
-import { Compass, Camera, Zap, LogOut } from "lucide-react";
+import { Home, Search, Camera, Zap, LogOut } from "lucide-react";
 import { Link, useMatches, useNavigate, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
@@ -17,10 +17,10 @@ interface NavProps {
 }
 
 const navItems = [
-  { to: "/", icon: Compass, label: "Discover" },
+  { to: "/", icon: Home, label: "Home" },
+  { to: "/discover", icon: Search, label: "Explore" },
   // { to: "/following", icon: Heart, label: "Following" },
   { to: "/spot", icon: Camera, label: "Spot" },
-  // { to: '/profile', icon: User, label: 'Profile' },
 ] as const;
 
 export default function TopNav({ session, profile }: NavProps) {
@@ -34,7 +34,7 @@ export default function TopNav({ session, profile }: NavProps) {
     clearAuthSessionCookie();
     useAuthStore.getState().invalidateRole();
     await router.invalidate();
-    navigate({ to: "/", replace: true });
+    navigate({ to: "/", search: { q: undefined, corridor: undefined, vibe: undefined, recent: undefined }, replace: true });
   };
 
   return (
@@ -47,7 +47,7 @@ export default function TopNav({ session, profile }: NavProps) {
 
       <div className="relative page-container flex items-center justify-between h-[var(--top-nav-height)]">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 no-underline group">
+        <Link to="/" search={{ q: undefined, corridor: undefined, vibe: undefined, recent: undefined }} className="flex items-center gap-2 no-underline group">
           <div className="w-8 h-8 rounded-sm bg-[var(--color-accent)] flex items-center justify-center shadow-[var(--glow-accent-sm)]">
             <Zap className="w-4.5 h-4.5 text-white" />
           </div>
@@ -59,9 +59,7 @@ export default function TopNav({ session, profile }: NavProps) {
         {/* Nav links */}
         <nav className="flex items-center gap-1" aria-label="Main navigation">
           {navItems.map((item) => {
-            const isActive =
-              currentPath === item.to ||
-              (item.to === "/" && currentPath === "/discover");
+            const isActive = currentPath === item.to;
             return (
               <Link
                 key={item.to}
@@ -116,6 +114,7 @@ export default function TopNav({ session, profile }: NavProps) {
               <div className="flex items-center gap-2">
                 <Link
                   to="/signin"
+                  search={{} as any}
                   className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all no-underline"
                 >
                   Sign In

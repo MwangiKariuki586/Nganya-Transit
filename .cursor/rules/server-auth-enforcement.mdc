@@ -1,0 +1,61 @@
+---
+description: Server function auth and security rules for MATWANA server code
+globs: src/server/**/*.ts,src/shared/server-fns/**/*.ts
+alwaysApply: false
+---
+
+# Server Functions & Auth Enforcement
+
+## Every Server Function MUST Validate Auth
+
+Every server function that reads or writes user data must call `getUser(accessToken)` and verify the result. No exceptions.
+
+```typescript
+// ✅ GOOD
+export async function updateProfile(accessToken: string, data: ProfileUpdate) {
+  requireAccessToken(accessToken);
+  const supabase = getUserScopedSupabaseClient(accessToken);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw authRequired();
+  // proceed...
+}
+
+// ❌ BAD — trusts client-provided userId without auth
+export async function updateProfile(userId: string, data: ProfileUpdate) {
+  await supabase.from('profiles').update(data).eq('id', userId);
+}
+```
+
+## Service Role Client Requires Role Assertion
+
+Any code using `getServiceRoleSupabaseClient()` must have a preceding auth + role assertion:
+
+```typescript
+// ✅ GOOD
+assertAdminRole(role);
+const supabase = getServiceRoleSupabaseClient();
+
+// ❌ BAD — no role check before privileged client
+const supabase = getServiceRoleSupabaseClient();
+```
+
+## Audit Logging Is Fail-Closed
+
+All destructive admin actions (suspend, delete, role change, session terminate) must log to `admin_actions`. If the log insert fails, the parent operation MUST fail:
+
+```typescript
+// ✅ GOOD
+const { error } = await supabase.from('admin_actions').insert({ ... });
+if (error) throw appError('UNKNOWN', 'Audit log failed — operation aborted');
+
+// ❌ BAD — swallows audit failure
+const { error } = await supabase.from('admin_actions').insert({ ... });
+if (error) console.error('Failed to log'); // silent
+```
+
+## RBAC Source of Truth
+
+- Single role authority: `profiles.role`
+- JWT claims are derived (not authoritative)
+- `user_roles` table is for audit/history only
+- Role changes must invalidate client cache immediately via `invalidateRole()`

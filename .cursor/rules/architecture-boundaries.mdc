@@ -1,0 +1,57 @@
+---
+description: MATWANA architecture and module boundary rules — enforced on every file
+alwaysApply: true
+---
+
+# Architecture & Module Boundaries
+
+## Layer Hierarchy
+
+```
+routes → modules → features → entities → shared
+                                          ↑ server (server-only)
+```
+
+## Import Rules (enforced by `npm run check:boundaries`)
+
+- **routes/** may import from `modules`, `features`, `entities`, `shared`
+- **modules/** may import from `features`, `entities`, `shared` — NEVER cross-role (fan ↛ crew ↛ admin)
+- **features/** may import from `entities`, `shared`
+- **entities/** may import from `shared` only
+- **shared/** may import from `shared` only
+- **server/** may import from `server`, `shared` (server-safe), `entities` (server-safe)
+- Client code must NEVER import `*.server.ts` files
+
+## Route Files Are Thin
+
+A route file may ONLY:
+1. Define `beforeLoad` (auth guard via `enforceRouteRole`)
+2. Define `loader` (data fetch via service function)
+3. Define `pendingComponent` (skeleton)
+4. Render a screen component
+
+```typescript
+// ✅ GOOD — thin route
+export const Route = createFileRoute("/(fan)/profile")({
+  loader: async ({ context }) => loadProfileRouteData(context.fanShared),
+  pendingComponent: ProfileSkeleton,
+  component: ProfileScreen,
+});
+
+// ❌ BAD — business logic in route
+export const Route = createFileRoute("/(fan)/profile")({
+  loader: async ({ context }) => {
+    const data = await supabase.from('profiles').select('*');
+    const transformed = data.map(/* ... */);  // NO transforms here
+    return transformed;
+  },
+});
+```
+
+## Shared Data Loads at Layout Level
+
+Data needed by multiple child routes (corridors, live status) must be loaded in the parent layout's `loader` and passed via route context. Child routes fetch only their specific data.
+
+## No Duplicate Business Logic
+
+If a pattern appears in 2+ modules, extract it to `src/components/`, `src/lib/`, or `src/hooks/`. Examples: `formatDirectionLabel`, `useProfileMediaUpload`, `InlineSpinner`.

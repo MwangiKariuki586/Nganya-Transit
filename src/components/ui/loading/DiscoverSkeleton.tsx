@@ -1,29 +1,70 @@
-import Skeleton from "../Skeleton";
 import { CardSkeleton } from "../Skeleton";
 
 export function DiscoverSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4">
-      {/* Search bar */}
-      <Skeleton variant="rectangular" className="h-12 w-full rounded-full" />
+    <div className="page-container pt-8 pb-16 md:pt-10 space-y-8 md:space-y-10">
+      {/* Hero */}
+      <section className="space-y-1">
+        <div className="h-4 w-14 animate-skeleton rounded-[var(--radius-sm)] bg-[var(--glass-bg)]" />
+        <div className="h-10 w-56 animate-skeleton rounded-[var(--radius-md)] bg-[var(--glass-bg)]" />
+        <div className="h-4 w-72 animate-skeleton rounded-[var(--radius-sm)] bg-[var(--glass-bg)]" />
+      </section>
 
-      {/* Filter chips */}
-      <div className="flex gap-2 overflow-hidden">
-        <Skeleton variant="text" className="h-8 w-20 rounded-full" />
-        <Skeleton variant="text" className="h-8 w-24 rounded-full" />
-        <Skeleton variant="text" className="h-8 w-16 rounded-full" />
-        <Skeleton variant="text" className="h-8 w-28 rounded-full" />
+      {/* Corridor pills */}
+      <section>
+        <div className="h-4 w-20 animate-skeleton rounded-[var(--radius-sm)] bg-[var(--glass-bg)] mb-3" />
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 h-8 w-24 animate-skeleton rounded-full bg-[var(--glass-bg)]"
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Curated strip */}
+      <section>
+        <div className="h-6 w-36 animate-skeleton rounded-[var(--radius-md)] bg-[var(--glass-bg)] mb-3" />
+        <div className="flex gap-4 overflow-hidden">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="shrink-0 w-[260px]">
+              <CardSkeleton />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Control bar */}
+      <div className="space-y-3 border-b border-[var(--glass-border)] pb-3">
+        <div className="h-11 w-full animate-skeleton rounded-[var(--radius-md)] bg-[var(--glass-bg)]" />
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 h-7 w-20 animate-skeleton rounded-full bg-[var(--glass-bg)]"
+            />
+          ))}
+        </div>
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 h-7 w-24 animate-skeleton rounded-full bg-[var(--glass-bg)]"
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Card grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-      </div>
+      {/* Results grid */}
+      <section>
+        <div className="h-6 w-48 animate-skeleton rounded-[var(--radius-md)] bg-[var(--glass-bg)] mb-4" />
+        <div className="grid-cards">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
