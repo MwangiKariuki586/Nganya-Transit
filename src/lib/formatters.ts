@@ -67,3 +67,18 @@ export function getInitials(name: string | null | undefined, fallback: string = 
 
   return parts.map((part) => part[0]?.toUpperCase() || '').join('') || fallback
 }
+
+/**
+ * Unified direction display label for TO_TOWN / FROM_TOWN values
+ * and freeform strings containing "town" or "terminal".
+ */
+export function formatDirectionLabel(
+  direction: string | null | undefined,
+  corridorName?: string | null,
+): string | null {
+  if (!direction) return null;
+  const upper = direction.toUpperCase();
+  if (upper === "TO_TOWN" || upper.includes("TOWN")) return "→ Town";
+  if (upper === "FROM_TOWN" || upper.includes("TERMINAL")) return corridorName ? `→ ${corridorName}` : "→ Terminal";
+  return direction;
+}

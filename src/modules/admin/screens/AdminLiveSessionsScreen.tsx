@@ -663,10 +663,11 @@ export default function AdminLiveSessionsScreen() {
             </p>
 
             <div className="mt-4">
-              <label className="text-caption text-[var(--color-text-tertiary)]">
+              <label htmlFor="termination-reason" className="text-caption text-[var(--color-text-tertiary)]">
                 Reason (optional)
               </label>
               <input
+                id="termination-reason"
                 value={terminationReason}
                 onChange={(e) => setTerminationReason(e.target.value)}
                 placeholder="e.g., Stale session, duplicate session..."

@@ -62,10 +62,6 @@ export async function enforceRouteRole(roles: AppRole[]) {
   const role = await resolveCurrentRole()
 
   if (!role) {
-    if (typeof window === 'undefined') {
-      return null
-    }
-
     throw redirect({ to: '/signin' })
   }
 

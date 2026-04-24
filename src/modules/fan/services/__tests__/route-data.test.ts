@@ -46,10 +46,11 @@ describe("fan route data", () => {
     getCorridorSightings.mockReset();
   });
 
-  it("loads discover data from route inputs instead of shared store state", async () => {
-    getCorridors.mockResolvedValue([{ id: "1", name: "CBD" }]);
+  it("loads discover data from route inputs using shared context data", async () => {
+    const sharedCorridors = [{ id: "1", name: "CBD" }];
+    const sharedLiveNganyas = [{ id: "live-1" }];
+
     searchNganyas.mockResolvedValue([{ id: "n-1" }]);
-    getLiveNow.mockResolvedValue([{ id: "live-1" }]);
     getMyFollows.mockResolvedValue([{ nganya_id: "n-1" }]);
     getStableClientSession.mockResolvedValue({ user: { id: "user-1" } });
 
@@ -57,27 +58,30 @@ describe("fan route data", () => {
       "@/modules/fan/services/route-data"
     );
 
-    const result = await loadDiscoverRouteData({
-      search: "mat",
-      corridorId: "1",
-      vibe: "BASS_HEAVY",
-    });
+    const shared = { corridors: sharedCorridors, liveNganyas: sharedLiveNganyas };
+
+    const result = await loadDiscoverRouteData(
+      { search: "mat", corridorId: "1", vibe: "BASS_HEAVY" },
+      shared,
+    );
 
     expect(searchNganyas).toHaveBeenCalledWith("mat", "1");
-    expect(getLiveNow).toHaveBeenCalledWith("1");
     expect(result.search).toBe("mat");
     expect(result.activeCorridor).toBe("1");
     expect(result.activeVibe).toBe("BASS_HEAVY");
     expect(result.followedIds.has("n-1")).toBe(true);
+    expect(result.corridors).toBe(sharedCorridors);
+    expect(result.liveNganyas).toBe(sharedLiveNganyas);
   });
 
-  it("uses the effective home corridor when loading home route data", async () => {
-    getCorridors.mockResolvedValue([
+  it("uses shared corridors when loading home route data", async () => {
+    const sharedCorridors = [
       { id: "corr-1", name: "CBD" },
       { id: "corr-2", name: "Rongai" },
-    ]);
+    ];
+    const sharedLiveNganyas: any[] = [];
+
     searchNganyas.mockResolvedValue([]);
-    getLiveNow.mockResolvedValue([]);
     getCorridorSightings.mockResolvedValue([]);
     getMyFollows.mockResolvedValue([]);
     getStableClientSession.mockResolvedValue(null);
@@ -86,11 +90,28 @@ describe("fan route data", () => {
       "@/modules/fan/services/route-data"
     );
 
-    const result = await loadFanHomeRouteData({});
+    const shared = { corridors: sharedCorridors, liveNganyas: sharedLiveNganyas };
 
-    expect(result.activeCorridor).toBe("corr-1");
-    expect(searchNganyas).toHaveBeenCalledWith("", "corr-1");
-    expect(getLiveNow).toHaveBeenCalledWith("corr-1");
-    expect(getCorridorSightings).toHaveBeenCalledWith("corr-1");
+    const result = await loadFanHomeRouteData({}, shared);
+
+    expect(result.activeCorridor).toBeNull();
+    expect(result.corridors).toBe(sharedCorridors);
+    expect(result.liveNganyas).toBe(sharedLiveNganyas);
+  });
+
+  it("loads shared data with corridors and live nganyas", async () => {
+    getCorridors.mockResolvedValue([{ id: "c1" }]);
+    getLiveNow.mockResolvedValue([{ id: "l1" }]);
+
+    const { loadFanSharedData } = await import(
+      "@/modules/fan/services/route-data"
+    );
+
+    const shared = await loadFanSharedData();
+
+    expect(getCorridors).toHaveBeenCalledOnce();
+    expect(getLiveNow).toHaveBeenCalledOnce();
+    expect(shared.corridors).toEqual([{ id: "c1" }]);
+    expect(shared.liveNganyas).toEqual([{ id: "l1" }]);
   });
 });

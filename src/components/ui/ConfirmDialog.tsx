@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import Button from "./Button";
 
@@ -22,29 +23,42 @@ export default function ConfirmDialog({
   onCancel,
   variant = "warning",
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    dialogRef.current?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onCancel]);
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[var(--z-modal-backdrop)] animate-fade-in"
         onClick={onCancel}
+        aria-hidden="true"
       />
 
-      {/* Dialog */}
       <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="w-full max-w-md bg-[var(--color-bg-elevated)] border border-[var(--glass-border)] rounded-lg shadow-[0_0_0_1px_var(--color-accent),var(--glow-accent)] pointer-events-auto animate-scale-in"
+          ref={dialogRef}
+          tabIndex={-1}
+          className="w-full max-w-md bg-[var(--color-bg-elevated)] border border-[var(--glass-border)] rounded-lg shadow-[0_0_0_1px_var(--color-accent),var(--glow-accent)] pointer-events-auto animate-scale-in outline-none"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="dialog-title"
+          aria-labelledby={titleId}
         >
-          {/* Header */}
           <div className="p-4 border-b border-[var(--glass-border)]">
             <div className="flex items-start justify-between gap-3">
               <h2
-                id="dialog-title"
+                id={titleId}
                 className="text-lg font-semibold text-[var(--color-text-primary)]"
               >
                 {title}

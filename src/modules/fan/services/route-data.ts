@@ -8,6 +8,23 @@ import {
 import { getCorridorSightings, getMySightings } from "@/lib/queries/sightings";
 import { getStableClientSession } from "@/shared/auth/client-session";
 
+// ── Shared data loaded once at the fan layout level ─────────────────
+
+export interface FanSharedData {
+  corridors: any[];
+  liveNganyas: any[];
+}
+
+export async function loadFanSharedData(): Promise<FanSharedData> {
+  const [corridors, liveNganyas] = await Promise.all([
+    getCorridors(),
+    getLiveNow(),
+  ]);
+  return { corridors, liveNganyas };
+}
+
+// ── Per-route data types ────────────────────────────────────────────
+
 export interface FanHomeRouteData {
   activeCorridor: string | null;
   corridors: any[];
@@ -66,15 +83,17 @@ async function getOptionalFollows() {
   return getMyFollows();
 }
 
-export async function loadFanHomeRouteData(input: {
-  corridorId?: string | null;
-}): Promise<FanHomeRouteData> {
-  const corridors = await getCorridors();
+// ── Per-route loaders (receive shared data from parent context) ─────
+
+export async function loadFanHomeRouteData(
+  input: { corridorId?: string | null },
+  shared: FanSharedData,
+): Promise<FanHomeRouteData> {
+  const { corridors, liveNganyas } = shared;
   const activeCorridor = input.corridorId || null;
 
-  const [nganyas, liveNganyas, follows] = await Promise.all([
+  const [nganyas, follows] = await Promise.all([
     searchNganyas("", activeCorridor || undefined),
-    getLiveNow(activeCorridor || undefined),
     getOptionalFollows(),
   ]);
 
@@ -96,19 +115,17 @@ export async function loadFanHomeRouteData(input: {
   };
 }
 
-export async function loadDiscoverRouteData(input: {
-  search?: string;
-  corridorId?: string | null;
-  vibe?: string | null;
-}): Promise<DiscoverRouteData> {
+export async function loadDiscoverRouteData(
+  input: { search?: string; corridorId?: string | null; vibe?: string | null },
+  shared: FanSharedData,
+): Promise<DiscoverRouteData> {
+  const { corridors, liveNganyas } = shared;
   const search = input.search?.trim() || "";
   const activeCorridor = input.corridorId || null;
   const activeVibe = input.vibe || null;
 
-  const [corridors, nganyas, liveNganyas, follows] = await Promise.all([
-    getCorridors(),
+  const [nganyas, follows] = await Promise.all([
     searchNganyas(search, activeCorridor || undefined),
-    getLiveNow(activeCorridor || undefined),
     getOptionalFollows(),
   ]);
 
@@ -123,22 +140,25 @@ export async function loadDiscoverRouteData(input: {
   };
 }
 
-export async function loadFollowingRouteData(): Promise<FollowingRouteData> {
+export async function loadFollowingRouteData(
+  shared: FanSharedData,
+): Promise<FollowingRouteData> {
+  const { liveNganyas } = shared;
+
   const session = await getStableClientSession();
   if (!session?.user?.id) {
     return {
       isAuthenticated: false,
       followedNganyas: [],
       nganyas: [],
-      liveNganyas: [],
+      liveNganyas,
       recentSightings: [],
     };
   }
 
-  const [followedNganyas, nganyas, liveNganyas] = await Promise.all([
+  const [followedNganyas, nganyas] = await Promise.all([
     getMyFollows(),
     searchNganyas(""),
-    getLiveNow(),
   ]);
 
   const corridorIds = Array.from(
@@ -166,24 +186,27 @@ export async function loadFollowingRouteData(): Promise<FollowingRouteData> {
   };
 }
 
-export async function loadProfileRouteData(): Promise<ProfileRouteData> {
+export async function loadProfileRouteData(
+  shared: FanSharedData,
+): Promise<ProfileRouteData> {
+  const { liveNganyas } = shared;
+
   const session = await getStableClientSession();
   if (!session?.user?.id) {
     return {
       authUser: null,
       profile: null,
       followedNganyas: [],
-      liveNganyas: [],
+      liveNganyas,
       userSightings: [],
     };
   }
 
-  const [authUser, profile, followedNganyas, liveNganyas, userSightings] =
+  const [authUser, profile, followedNganyas, userSightings] =
     await Promise.all([
       getCurrentAuthUser(),
       getCurrentUserProfile(),
       getMyFollows(),
-      getLiveNow(),
       getMySightings(),
     ]);
 
@@ -196,12 +219,14 @@ export async function loadProfileRouteData(): Promise<ProfileRouteData> {
   };
 }
 
-export async function loadSpotRouteData(): Promise<SpotRouteData> {
+export async function loadSpotRouteData(
+  shared: FanSharedData,
+): Promise<SpotRouteData> {
+  const { corridors, liveNganyas } = shared;
+
   const session = await getStableClientSession();
-  const [corridors, nganyas, liveNganyas, follows, mySightings] = await Promise.all([
-    getCorridors(),
+  const [nganyas, follows, mySightings] = await Promise.all([
     searchNganyas(""),
-    getLiveNow(),
     getOptionalFollows(),
     session?.user?.id ? getMySightings() : Promise.resolve([]),
   ]);

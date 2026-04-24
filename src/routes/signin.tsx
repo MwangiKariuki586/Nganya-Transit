@@ -99,7 +99,7 @@ function SignInScreen() {
           <form onSubmit={handleSignIn} className="space-y-6">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-2">
+                <label htmlFor="signin-email" className="block text-sm font-semibold text-(--color-text-primary) mb-2">
                   Email Address
                 </label>
                 <div className="relative">
@@ -107,6 +107,7 @@ function SignInScreen() {
                     <Mail className="w-4 h-4" />
                   </span>
                   <input
+                    id="signin-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -118,7 +119,7 @@ function SignInScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-2">
+                <label htmlFor="signin-password" className="block text-sm font-semibold text-(--color-text-primary) mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -126,6 +127,7 @@ function SignInScreen() {
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
+                    id="signin-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

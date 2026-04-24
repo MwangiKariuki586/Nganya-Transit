@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import DiscoverScreen from '@/modules/fan/screens/DiscoverScreen'
 import { loadDiscoverRouteData } from '@/modules/fan/services/route-data'
+import type { FanSharedData } from '@/modules/fan/services/route-data'
+import { DiscoverSkeleton } from '@/components/ui/loading'
 
 export const Route = createFileRoute('/(fan)/discover')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -13,12 +15,14 @@ export const Route = createFileRoute('/(fan)/discover')({
     corridor: search.corridor ?? null,
     vibe: search.vibe ?? null,
   }),
-  loader: async ({ deps }) =>
-    loadDiscoverRouteData({
-      search: deps.q,
-      corridorId: deps.corridor,
-      vibe: deps.vibe,
-    }),
+  loader: async ({ deps, context }) => {
+    const shared = (context as { fanShared: FanSharedData }).fanShared
+    return loadDiscoverRouteData(
+      { search: deps.q, corridorId: deps.corridor, vibe: deps.vibe },
+      shared,
+    )
+  },
+  pendingComponent: DiscoverSkeleton,
   component: DiscoverRouteComponent,
 })
 

@@ -113,6 +113,9 @@ export default function ImageUpload({
     <div className="space-y-3">
       {/* Upload Area */}
       <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={label || "Upload image"}
         className={`relative ${aspectClass} rounded-[var(--radius-lg)] border-2 border-dashed overflow-hidden transition-all ${
           isDragging
             ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5"
@@ -124,6 +127,7 @@ export default function ImageUpload({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
       >
         {/* Hidden file input */}
         <input
@@ -207,7 +211,7 @@ export default function ImageUpload({
 
       {/* Error Message */}
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-soft)] border border-[rgba(255,82,82,0.2)]">
+        <div role="alert" className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-soft)] border border-[rgba(255,82,82,0.2)]">
           <X className="w-4 h-4 text-[var(--color-error)] mt-0.5 shrink-0" />
           <p className="text-xs text-[var(--color-error)]">{error}</p>
         </div>

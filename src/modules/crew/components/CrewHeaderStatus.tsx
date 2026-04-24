@@ -1,4 +1,4 @@
-import { formatRelativeTime } from '@/lib/formatters'
+import { formatDirectionLabel, formatRelativeTime } from '@/lib/formatters'
 
 interface CrewHeaderStatusProps {
   isLive: boolean
@@ -30,7 +30,7 @@ export function CrewHeaderStatus({
       <div className="mt-3">
         <h1 className="text-h2 text-[var(--color-text-primary)]">{nganyaName}</h1>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {corridorName} · {direction === 'TO_TOWN' ? 'To Town' : 'From Town'}
+          {corridorName} &middot; {formatDirectionLabel(direction, corridorName) ?? direction}
         </p>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

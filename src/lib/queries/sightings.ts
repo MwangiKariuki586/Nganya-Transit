@@ -31,8 +31,7 @@ async function attachSightingConfidence<T extends { id: string }>(
   }));
 }
 
-export async function getCorridorSightings(corridorId: string) {
-  // Join on public.v_public_profiles to only expose allowed viewer data instead of raw full profiles table.
+export async function getCorridorSightings(corridorId: string, limit = 50) {
   const { data, error } = await supabase
     .from("sightings")
     .select(
@@ -44,13 +43,14 @@ export async function getCorridorSightings(corridorId: string) {
     `,
     )
     .eq("corridor_id", corridorId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw error;
   return attachSightingConfidence(data);
 }
 
-export async function getMySightings() {
+export async function getMySightings(limit = 50) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -66,7 +66,8 @@ export async function getMySightings() {
     `,
     )
     .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw error;
   return attachSightingConfidence(data);

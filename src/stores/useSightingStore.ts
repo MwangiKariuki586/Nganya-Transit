@@ -1,17 +1,23 @@
 import { create } from 'zustand'
 import { getMySightings, getCorridorSightings, postSighting as postSightingApi } from '@/lib/queries/sightings'
+import { retryWithBackoff } from '@/lib/utils/retry'
 
 const USER_SIGHTINGS_TTL = 60_000 // 60 seconds
 const RECENT_SIGHTINGS_TTL = 30_000 // 30 seconds
 
+interface CacheEntry<T> {
+  data: T
+  fetchedAt: number
+}
+
 interface SightingStoreState {
   // Data
   userSightings: any[]
-  recentSightings: any[]
+  recentSightingsCache: Map<string, CacheEntry<any[]>>
+  currentCorridorKey: string
 
   // Metadata
   userSightingsLastFetchedAt: number | null
-  recentSightingsLastFetchedAt: number | null
 
   isLoadingUserSightings: boolean
   isLoadingRecentSightings: boolean
@@ -21,6 +27,7 @@ interface SightingStoreState {
   // Actions
   fetchUserSightings: () => Promise<any[]>
   fetchRecentSightings: (corridorId: string) => Promise<any[]>
+  getRecentSightings: () => any[]
   postSighting: (sighting: {
     nganya_id: string
     corridor_id: string
@@ -40,11 +47,11 @@ interface SightingStoreState {
 export const useSightingStore = create<SightingStoreState>((set, get) => ({
   // Data
   userSightings: [],
-  recentSightings: [],
+  recentSightingsCache: new Map(),
+  currentCorridorKey: '',
 
   // Metadata
   userSightingsLastFetchedAt: null,
-  recentSightingsLastFetchedAt: null,
 
   isLoadingUserSightings: false,
   isLoadingRecentSightings: false,
@@ -59,14 +66,19 @@ export const useSightingStore = create<SightingStoreState>((set, get) => ({
   },
 
   isRecentSightingsStale: () => {
-    const lastFetchedAt = get().recentSightingsLastFetchedAt
-    if (!lastFetchedAt) return true
-    return Date.now() - lastFetchedAt > RECENT_SIGHTINGS_TTL
+    const key = get().currentCorridorKey
+    const entry = get().recentSightingsCache.get(key)
+    if (!entry) return true
+    return Date.now() - entry.fetchedAt > RECENT_SIGHTINGS_TTL
+  },
+
+  getRecentSightings: () => {
+    const key = get().currentCorridorKey
+    return get().recentSightingsCache.get(key)?.data ?? []
   },
 
   // Actions
   fetchUserSightings: async () => {
-    // Check cache first (stale-while-revalidate)
     const cached = get().userSightings
     const isStale = get().isUserSightingsStale()
 
@@ -74,25 +86,22 @@ export const useSightingStore = create<SightingStoreState>((set, get) => ({
       return cached
     }
 
-    // Return stale data immediately, fetch in background
     if (cached && isStale) {
-      const promise = getMySightings()
-
-      promise
+      retryWithBackoff(() => getMySightings(), { maxAttempts: 2, initialDelay: 1000 })
         .then((data) => {
           set({
             userSightings: data,
             userSightingsLastFetchedAt: Date.now(),
+            error: null,
           })
         })
-        .catch(() => {
-          // Keep stale data on error
+        .catch((error) => {
+          set({ error: error as Error })
         })
 
       return cached
     }
 
-    // No cache, fetch fresh
     set({ isLoadingUserSightings: true, error: null })
 
     try {
@@ -113,40 +122,37 @@ export const useSightingStore = create<SightingStoreState>((set, get) => ({
   },
 
   fetchRecentSightings: async (corridorId: string) => {
-    // Check cache first (stale-while-revalidate)
-    const cached = get().recentSightings
-    const isStale = get().isRecentSightingsStale()
+    set({ currentCorridorKey: corridorId })
+
+    const cached = get().recentSightingsCache.get(corridorId)
+    const isStale = !cached || (Date.now() - cached.fetchedAt > RECENT_SIGHTINGS_TTL)
 
     if (cached && !isStale) {
-      return cached
+      return cached.data
     }
 
-    // Return stale data immediately, fetch in background
     if (cached && isStale) {
-      const promise = getCorridorSightings(corridorId)
-
-      promise
+      retryWithBackoff(() => getCorridorSightings(corridorId), { maxAttempts: 2, initialDelay: 1000 })
         .then((data) => {
-          set({
-            recentSightings: data,
-            recentSightingsLastFetchedAt: Date.now(),
-          })
+          const updatedCache = new Map(get().recentSightingsCache)
+          updatedCache.set(corridorId, { data, fetchedAt: Date.now() })
+          set({ recentSightingsCache: updatedCache, error: null })
         })
-        .catch(() => {
-          // Keep stale data on error
+        .catch((error) => {
+          set({ error: error as Error })
         })
 
-      return cached
+      return cached.data
     }
 
-    // No cache, fetch fresh
     set({ isLoadingRecentSightings: true, error: null })
 
     try {
       const data = await getCorridorSightings(corridorId)
+      const updatedCache = new Map(get().recentSightingsCache)
+      updatedCache.set(corridorId, { data, fetchedAt: Date.now() })
       set({
-        recentSightings: data,
-        recentSightingsLastFetchedAt: Date.now(),
+        recentSightingsCache: updatedCache,
         isLoadingRecentSightings: false,
       })
       return data
@@ -163,7 +169,6 @@ export const useSightingStore = create<SightingStoreState>((set, get) => ({
     try {
       await postSightingApi(sighting)
 
-      // Invalidate both user and recent sightings to trigger refresh
       get().invalidateUserSightings()
       get().invalidateRecentSightings()
     } catch (error) {
@@ -177,6 +182,6 @@ export const useSightingStore = create<SightingStoreState>((set, get) => ({
   },
 
   invalidateRecentSightings: () => {
-    set({ recentSightingsLastFetchedAt: null })
+    set({ recentSightingsCache: new Map() })
   },
 }))

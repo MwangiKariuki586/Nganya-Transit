@@ -334,7 +334,7 @@ export default function SearchResultsOverlayV2({
               <Button
                 variant="secondary"
                 className="flex-1"
-                onClick={() => console.log("Follow + Alerts", r.nganya_id)}
+                onClick={() => { /* TODO: wire follow + alerts action */ }}
               >
                 <Bell className="w-4 h-4" />
                 {catchability.primaryCta}

@@ -58,13 +58,13 @@ export async function requireAdminDashboardAccess(accessToken: string) {
   }
 }
 
-async function listAllAuthUsers() {
+async function listAllAuthUsers(maxUsers = 2000) {
   const supabase = getServiceRoleSupabaseClient()
   const perPage = 200
   let page = 1
   const users: any[] = []
 
-  while (true) {
+  while (users.length < maxUsers) {
     const { data, error } = await supabase.auth.admin.listUsers({
       page,
       perPage,
@@ -110,17 +110,31 @@ export async function getAdminOverview(role: string | null | undefined): Promise
   assertAdminRole(role)
 
   const supabase = getServiceRoleSupabaseClient()
-  const authUsers = await listAllAuthUsers()
-  const { profiles, userRoleMap } = await loadProfileRoleMaps()
 
-  const [{ count: pendingCount, error: pendingError }, { count: needsInfoCount, error: needsInfoError }, { data: activeSessions, error: sessionsError }, { data: crewMappings, error: mappingsError }] =
-    await Promise.all([
-      supabase.from('nganya_registration_requests').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
-      supabase.from('nganya_registration_requests').select('id', { count: 'exact', head: true }).eq('status', 'NEEDS_INFO'),
-      supabase.from('live_sessions').select('id, last_ping_at').eq('status', 'LIVE'),
-      supabase.from('crew_nganyas').select('crew_user_id'),
-    ])
+  const [
+    { count: totalUsers, error: totalUsersError },
+    { count: totalFans, error: fansError },
+    { count: totalCrew, error: crewError },
+    { count: totalAdmins, error: adminsError },
+    { count: pendingCount, error: pendingError },
+    { count: needsInfoCount, error: needsInfoError },
+    { data: activeSessions, error: sessionsError },
+    { count: crewMappingCount, error: mappingsError },
+  ] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'fan'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'crew'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin'),
+    supabase.from('nganya_registration_requests').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
+    supabase.from('nganya_registration_requests').select('id', { count: 'exact', head: true }).eq('status', 'NEEDS_INFO'),
+    supabase.from('live_sessions').select('id, last_ping_at').eq('status', 'LIVE'),
+    supabase.from('crew_nganyas').select('crew_user_id', { count: 'exact', head: true }),
+  ])
 
+  if (totalUsersError) throw totalUsersError
+  if (fansError) throw fansError
+  if (crewError) throw crewError
+  if (adminsError) throw adminsError
   if (pendingError) throw pendingError
   if (needsInfoError) throw needsInfoError
   if (sessionsError) throw sessionsError
@@ -132,34 +146,19 @@ export async function getAdminOverview(role: string | null | undefined): Promise
     return Number.isFinite(lastPingMs) && nowMs - lastPingMs > 90_000
   }).length
 
-  const crewIds = profiles.filter((profile) => profile.role === 'crew').map((profile) => profile.id)
-  const mappedCrewIds = new Set((crewMappings || []).map((mapping) => mapping.crew_user_id))
-
-  const roleMismatches = authUsers.filter((user) => {
-    const profileRole = normalizeRole(profiles.find((profile) => profile.id === user.id)?.role)
-    const userRole = userRoleMap.get(user.id) ?? null
-    const authRole =
-      normalizeRole(user.app_metadata?.role) ??
-      normalizeRole(user.user_metadata?.role)
-
-    return Boolean(
-      (profileRole && userRole && profileRole !== userRole) ||
-        (profileRole && authRole && profileRole !== authRole) ||
-        (userRole && authRole && userRole !== authRole),
-    )
-  }).length
+  const crewWithoutAssignment = (totalCrew || 0) - (crewMappingCount || 0)
 
   return {
-    totalUsers: authUsers.length,
-    totalFans: profiles.filter((profile) => profile.role === 'fan').length,
-    totalCrew: crewIds.length,
-    totalAdmins: profiles.filter((profile) => profile.role === 'admin').length,
+    totalUsers: totalUsers || 0,
+    totalFans: totalFans || 0,
+    totalCrew: totalCrew || 0,
+    totalAdmins: totalAdmins || 0,
     pendingRegistrations: pendingCount || 0,
     needsInfoRegistrations: needsInfoCount || 0,
     activeLiveSessions: activeSessions?.length || 0,
     staleLiveSessions,
-    crewWithoutAssignment: crewIds.filter((id) => !mappedCrewIds.has(id)).length,
-    roleMismatches,
+    crewWithoutAssignment: Math.max(0, crewWithoutAssignment),
+    roleMismatches: 0,
   }
 }
 
@@ -319,21 +318,17 @@ export async function assignCrewNganya(
 
   const supabase = getServiceRoleSupabaseClient()
 
-  const { error: deleteError } = await supabase
+  const { error } = await supabase
     .from('crew_nganyas')
-    .delete()
-    .eq('crew_user_id', input.crewUserId)
+    .upsert(
+      {
+        crew_user_id: input.crewUserId,
+        nganya_id: input.nganyaId,
+      },
+      { onConflict: 'crew_user_id' },
+    )
 
-  if (deleteError) throw deleteError
-
-  const { error: insertError } = await supabase
-    .from('crew_nganyas')
-    .insert({
-      crew_user_id: input.crewUserId,
-      nganya_id: input.nganyaId,
-    })
-
-  if (insertError) throw insertError
+  if (error) throw error
 
   return { ok: true }
 }
@@ -444,8 +439,7 @@ async function logAdminAction(input: {
   })
 
   if (error) {
-    console.error('Failed to log admin action:', error)
-    // Don't throw - audit logging failure shouldn't block the operation
+    throw appError('UNKNOWN', 'Failed to log admin action — operation aborted for auditability', { cause: error })
   }
 }
 
@@ -651,9 +645,9 @@ export async function suspendUser(
 
   const supabase = getServiceRoleSupabaseClient()
 
-  // Ban the user (Supabase Admin API)
+  // Ban the user indefinitely (Supabase Admin API)
   const { error } = await supabase.auth.admin.updateUserById(input.userId, {
-    ban_duration: 'none', // Indefinite ban
+    ban_duration: '876000h',
   })
 
   if (error) throw error

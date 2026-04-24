@@ -1,21 +1,26 @@
 import { create } from 'zustand'
 import { searchNganyas, getCorridors } from '@/lib/queries/discover'
 import { getLiveNow } from '@/lib/queries/live'
+import { retryWithBackoff } from '@/lib/utils/retry'
 
 const NGANYAS_TTL = 60_000 // 60 seconds
 const CORRIDORS_TTL = 120_000 // 120 seconds
 const LIVE_NGANYAS_TTL = 30_000 // 30 seconds
 
-interface NganyaStoreState {
-  // Data
-  nganyas: any[] | null
-  corridors: any[] | null
-  liveNganyas: any[] | null
+interface CacheEntry<T> {
+  data: T
+  fetchedAt: number
+}
 
-  // Metadata
-  nganyasLastFetchedAt: number | null
-  corridorsLastFetchedAt: number | null
-  liveNganyasLastFetchedAt: number | null
+interface NganyaStoreState {
+  // Keyed caches: Map<requestKey, CacheEntry>
+  nganyasCache: Map<string, CacheEntry<any[]>>
+  corridorsCache: CacheEntry<any[]> | null
+  liveNganyasCache: Map<string, CacheEntry<any[]>>
+
+  // Current request key tracking (so consumers know which data to read)
+  currentNganyaKey: string
+  currentLiveKey: string
 
   isLoadingNganyas: boolean
   isLoadingCorridors: boolean
@@ -30,6 +35,11 @@ interface NganyaStoreState {
   pendingCorridorRequests: Map<string, Promise<any[]>>
   pendingLiveNganyaRequests: Map<string, Promise<any[]>>
 
+  // Selectors
+  getNganyas: () => any[] | null
+  getCorridors: () => any[] | null
+  getLiveNganyas: () => any[] | null
+
   // Actions
   fetchNganyas: (searchTerm?: string, corridorId?: string) => Promise<any[]>
   fetchCorridors: () => Promise<any[]>
@@ -40,22 +50,31 @@ interface NganyaStoreState {
   invalidateLiveNganyas: () => void
   invalidateAll: () => void
 
-  // Selectors
   isNganyasStale: () => boolean
   isCorridorsStale: () => boolean
   isLiveNganyasStale: () => boolean
 }
 
-export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
-  // Data
-  nganyas: null,
-  corridors: null,
-  liveNganyas: null,
+function buildNganyaKey(searchTerm = '', corridorId?: string) {
+  return `nganyas:${searchTerm}:${corridorId || ''}`
+}
 
-  // Metadata
-  nganyasLastFetchedAt: null,
-  corridorsLastFetchedAt: null,
-  liveNganyasLastFetchedAt: null,
+function buildLiveKey(corridorId?: string) {
+  return `liveNganyas:${corridorId || ''}`
+}
+
+function isCacheStale<T>(entry: CacheEntry<T> | undefined | null, ttl: number): boolean {
+  if (!entry) return true
+  return Date.now() - entry.fetchedAt > ttl
+}
+
+export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
+  nganyasCache: new Map(),
+  corridorsCache: null,
+  liveNganyasCache: new Map(),
+
+  currentNganyaKey: buildNganyaKey(),
+  currentLiveKey: buildLiveKey(),
 
   isLoadingNganyas: false,
   isLoadingCorridors: false,
@@ -65,74 +84,76 @@ export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
   corridorsError: null,
   liveNganyasError: null,
 
-  // In-flight request tracking
   pendingNganyaRequests: new Map(),
   pendingCorridorRequests: new Map(),
   pendingLiveNganyaRequests: new Map(),
 
-  // Selectors
+  getNganyas: () => {
+    const key = get().currentNganyaKey
+    return get().nganyasCache.get(key)?.data ?? null
+  },
+
+  getCorridors: () => {
+    return get().corridorsCache?.data ?? null
+  },
+
+  getLiveNganyas: () => {
+    const key = get().currentLiveKey
+    return get().liveNganyasCache.get(key)?.data ?? null
+  },
+
   isNganyasStale: () => {
-    const lastFetchedAt = get().nganyasLastFetchedAt
-    if (!lastFetchedAt) return true
-    return Date.now() - lastFetchedAt > NGANYAS_TTL
+    const key = get().currentNganyaKey
+    return isCacheStale(get().nganyasCache.get(key), NGANYAS_TTL)
   },
 
   isCorridorsStale: () => {
-    const lastFetchedAt = get().corridorsLastFetchedAt
-    if (!lastFetchedAt) return true
-    return Date.now() - lastFetchedAt > CORRIDORS_TTL
+    return isCacheStale(get().corridorsCache, CORRIDORS_TTL)
   },
 
   isLiveNganyasStale: () => {
-    const lastFetchedAt = get().liveNganyasLastFetchedAt
-    if (!lastFetchedAt) return true
-    return Date.now() - lastFetchedAt > LIVE_NGANYAS_TTL
+    const key = get().currentLiveKey
+    return isCacheStale(get().liveNganyasCache.get(key), LIVE_NGANYAS_TTL)
   },
 
-  // Actions
   fetchNganyas: async (searchTerm = '', corridorId?: string) => {
-    const requestKey = `nganyas:${searchTerm}:${corridorId || ''}`
+    const requestKey = buildNganyaKey(searchTerm, corridorId)
 
-    // Check if request is already in-flight
+    set({ currentNganyaKey: requestKey })
+
     const pending = get().pendingNganyaRequests.get(requestKey)
     if (pending) return pending
 
-    // Check cache first (stale-while-revalidate)
-    const cached = get().nganyas
-    const isStale = get().isNganyasStale()
-    const hasCachedData = cached !== null && cached.length > 0
+    const cached = get().nganyasCache.get(requestKey)
+    const isStale = isCacheStale(cached, NGANYAS_TTL)
 
-    if (hasCachedData && !isStale) {
-      return cached
+    if (cached && !isStale) {
+      return cached.data
     }
 
-    // Return stale data immediately, fetch in background
-    if (hasCachedData && isStale) {
-      const promise = searchNganyas(searchTerm, corridorId)
+    if (cached && isStale) {
+      const promise = retryWithBackoff(() => searchNganyas(searchTerm, corridorId), { maxAttempts: 2, initialDelay: 1000 })
       const newPendingRequests = new Map(get().pendingNganyaRequests)
       newPendingRequests.set(requestKey, promise)
       set({ pendingNganyaRequests: newPendingRequests })
 
       promise
         .then((data) => {
-          const updatedPendingRequests = new Map(get().pendingNganyaRequests)
-          updatedPendingRequests.delete(requestKey)
-          set({
-            nganyas: data,
-            nganyasLastFetchedAt: Date.now(),
-            pendingNganyaRequests: updatedPendingRequests,
-          })
+          const updatedPending = new Map(get().pendingNganyaRequests)
+          updatedPending.delete(requestKey)
+          const updatedCache = new Map(get().nganyasCache)
+          updatedCache.set(requestKey, { data, fetchedAt: Date.now() })
+          set({ nganyasCache: updatedCache, nganyasError: null, pendingNganyaRequests: updatedPending })
         })
-        .catch(() => {
-          const updatedPendingRequests = new Map(get().pendingNganyaRequests)
-          updatedPendingRequests.delete(requestKey)
-          set({ pendingNganyaRequests: updatedPendingRequests })
+        .catch((error) => {
+          const updatedPending = new Map(get().pendingNganyaRequests)
+          updatedPending.delete(requestKey)
+          set({ nganyasError: error as Error, pendingNganyaRequests: updatedPending })
         })
 
-      return cached
+      return cached.data
     }
 
-    // No cache, fetch fresh
     set({ isLoadingNganyas: true, nganyasError: null })
     const promise = searchNganyas(searchTerm, corridorId)
     const newPendingRequests = new Map(get().pendingNganyaRequests)
@@ -141,22 +162,23 @@ export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
 
     try {
       const data = await promise
-      const updatedPendingRequests = new Map(get().pendingNganyaRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingNganyaRequests)
+      updatedPending.delete(requestKey)
+      const updatedCache = new Map(get().nganyasCache)
+      updatedCache.set(requestKey, { data, fetchedAt: Date.now() })
       set({
-        nganyas: data,
-        nganyasLastFetchedAt: Date.now(),
+        nganyasCache: updatedCache,
         isLoadingNganyas: false,
-        pendingNganyaRequests: updatedPendingRequests,
+        pendingNganyaRequests: updatedPending,
       })
       return data
     } catch (error) {
-      const updatedPendingRequests = new Map(get().pendingNganyaRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingNganyaRequests)
+      updatedPending.delete(requestKey)
       set({
         nganyasError: error as Error,
         isLoadingNganyas: false,
-        pendingNganyaRequests: updatedPendingRequests,
+        pendingNganyaRequests: updatedPending,
       })
       throw error
     }
@@ -165,46 +187,41 @@ export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
   fetchCorridors: async () => {
     const requestKey = 'corridors'
 
-    // Check if request is already in-flight
     const pending = get().pendingCorridorRequests.get(requestKey)
     if (pending) return pending
 
-    // Check cache first (stale-while-revalidate)
-    const cached = get().corridors
-    const isStale = get().isCorridorsStale()
-    const hasCachedData = cached !== null && cached.length > 0
+    const cached = get().corridorsCache
+    const isStale = isCacheStale(cached, CORRIDORS_TTL)
 
-    if (hasCachedData && !isStale) {
-      return cached
+    if (cached && !isStale) {
+      return cached.data
     }
 
-    // Return stale data immediately, fetch in background
-    if (hasCachedData && isStale) {
-      const promise = getCorridors()
+    if (cached && isStale) {
+      const promise = retryWithBackoff(() => getCorridors(), { maxAttempts: 2, initialDelay: 1000 })
       const newPendingRequests = new Map(get().pendingCorridorRequests)
       newPendingRequests.set(requestKey, promise)
       set({ pendingCorridorRequests: newPendingRequests })
 
       promise
         .then((data) => {
-          const updatedPendingRequests = new Map(get().pendingCorridorRequests)
-          updatedPendingRequests.delete(requestKey)
+          const updatedPending = new Map(get().pendingCorridorRequests)
+          updatedPending.delete(requestKey)
           set({
-            corridors: data,
-            corridorsLastFetchedAt: Date.now(),
-            pendingCorridorRequests: updatedPendingRequests,
+            corridorsCache: { data, fetchedAt: Date.now() },
+            corridorsError: null,
+            pendingCorridorRequests: updatedPending,
           })
         })
-        .catch(() => {
-          const updatedPendingRequests = new Map(get().pendingCorridorRequests)
-          updatedPendingRequests.delete(requestKey)
-          set({ pendingCorridorRequests: updatedPendingRequests })
+        .catch((error) => {
+          const updatedPending = new Map(get().pendingCorridorRequests)
+          updatedPending.delete(requestKey)
+          set({ corridorsError: error as Error, pendingCorridorRequests: updatedPending })
         })
 
-      return cached
+      return cached.data
     }
 
-    // No cache, fetch fresh
     set({ isLoadingCorridors: true, corridorsError: null })
     const promise = getCorridors()
     const newPendingRequests = new Map(get().pendingCorridorRequests)
@@ -213,70 +230,64 @@ export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
 
     try {
       const data = await promise
-      const updatedPendingRequests = new Map(get().pendingCorridorRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingCorridorRequests)
+      updatedPending.delete(requestKey)
       set({
-        corridors: data,
-        corridorsLastFetchedAt: Date.now(),
+        corridorsCache: { data, fetchedAt: Date.now() },
         isLoadingCorridors: false,
-        pendingCorridorRequests: updatedPendingRequests,
+        pendingCorridorRequests: updatedPending,
       })
       return data
     } catch (error) {
-      const updatedPendingRequests = new Map(get().pendingCorridorRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingCorridorRequests)
+      updatedPending.delete(requestKey)
       set({
         corridorsError: error as Error,
         isLoadingCorridors: false,
-        pendingCorridorRequests: updatedPendingRequests,
+        pendingCorridorRequests: updatedPending,
       })
       throw error
     }
   },
 
   fetchLiveNganyas: async (corridorId?: string) => {
-    const requestKey = `liveNganyas:${corridorId || ''}`
+    const requestKey = buildLiveKey(corridorId)
 
-    // Check if request is already in-flight
+    set({ currentLiveKey: requestKey })
+
     const pending = get().pendingLiveNganyaRequests.get(requestKey)
     if (pending) return pending
 
-    // Check cache first (stale-while-revalidate)
-    const cached = get().liveNganyas
-    const isStale = get().isLiveNganyasStale()
-    const hasCachedData = cached !== null && cached.length > 0
+    const cached = get().liveNganyasCache.get(requestKey)
+    const isStale = isCacheStale(cached, LIVE_NGANYAS_TTL)
 
-    if (hasCachedData && !isStale) {
-      return cached
+    if (cached && !isStale) {
+      return cached.data
     }
 
-    // Return stale data immediately, fetch in background
-    if (hasCachedData && isStale) {
-      const promise = getLiveNow(corridorId)
+    if (cached && isStale) {
+      const promise = retryWithBackoff(() => getLiveNow(corridorId), { maxAttempts: 2, initialDelay: 1000 })
       const newPendingRequests = new Map(get().pendingLiveNganyaRequests)
       newPendingRequests.set(requestKey, promise)
       set({ pendingLiveNganyaRequests: newPendingRequests })
 
       promise
         .then((data) => {
-          const updatedPendingRequests = new Map(get().pendingLiveNganyaRequests)
-          updatedPendingRequests.delete(requestKey)
-          set({
-            liveNganyas: data,
-            liveNganyasLastFetchedAt: Date.now(),
-            pendingLiveNganyaRequests: updatedPendingRequests,
-          })
+          const updatedPending = new Map(get().pendingLiveNganyaRequests)
+          updatedPending.delete(requestKey)
+          const updatedCache = new Map(get().liveNganyasCache)
+          updatedCache.set(requestKey, { data, fetchedAt: Date.now() })
+          set({ liveNganyasCache: updatedCache, liveNganyasError: null, pendingLiveNganyaRequests: updatedPending })
         })
-        .catch(() => {
-          const updatedPendingRequests = new Map(get().pendingLiveNganyaRequests)
-          updatedPendingRequests.delete(requestKey)
-          set({ pendingLiveNganyaRequests: updatedPendingRequests })
+        .catch((error) => {
+          const updatedPending = new Map(get().pendingLiveNganyaRequests)
+          updatedPending.delete(requestKey)
+          set({ liveNganyasError: error as Error, pendingLiveNganyaRequests: updatedPending })
         })
 
-      return cached
+      return cached.data
     }
 
-    // No cache, fetch fresh
     set({ isLoadingLiveNganyas: true, liveNganyasError: null })
     const promise = getLiveNow(corridorId)
     const newPendingRequests = new Map(get().pendingLiveNganyaRequests)
@@ -285,47 +296,45 @@ export const useNganyaStore = create<NganyaStoreState>((set, get) => ({
 
     try {
       const data = await promise
-      const updatedPendingRequests = new Map(get().pendingLiveNganyaRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingLiveNganyaRequests)
+      updatedPending.delete(requestKey)
+      const updatedCache = new Map(get().liveNganyasCache)
+      updatedCache.set(requestKey, { data, fetchedAt: Date.now() })
       set({
-        liveNganyas: data,
-        liveNganyasLastFetchedAt: Date.now(),
+        liveNganyasCache: updatedCache,
         isLoadingLiveNganyas: false,
-        pendingLiveNganyaRequests: updatedPendingRequests,
+        pendingLiveNganyaRequests: updatedPending,
       })
       return data
     } catch (error) {
-      const updatedPendingRequests = new Map(get().pendingLiveNganyaRequests)
-      updatedPendingRequests.delete(requestKey)
+      const updatedPending = new Map(get().pendingLiveNganyaRequests)
+      updatedPending.delete(requestKey)
       set({
         liveNganyasError: error as Error,
         isLoadingLiveNganyas: false,
-        pendingLiveNganyaRequests: updatedPendingRequests,
+        pendingLiveNganyaRequests: updatedPending,
       })
       throw error
     }
   },
 
   invalidateNganyas: () => {
-    set({ nganyasLastFetchedAt: null, nganyas: null })
+    set({ nganyasCache: new Map() })
   },
 
   invalidateCorridors: () => {
-    set({ corridorsLastFetchedAt: null, corridors: null })
+    set({ corridorsCache: null })
   },
 
   invalidateLiveNganyas: () => {
-    set({ liveNganyasLastFetchedAt: null, liveNganyas: null })
+    set({ liveNganyasCache: new Map() })
   },
 
   invalidateAll: () => {
     set({
-      nganyasLastFetchedAt: null,
-      nganyas: null,
-      corridorsLastFetchedAt: null,
-      corridors: null,
-      liveNganyasLastFetchedAt: null,
-      liveNganyas: null,
+      nganyasCache: new Map(),
+      corridorsCache: null,
+      liveNganyasCache: new Map(),
     })
   },
 }))

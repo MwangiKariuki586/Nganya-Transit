@@ -3,7 +3,7 @@
  * Centered card with backdrop blur and scale-in animation.
  */
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -22,15 +22,17 @@ const sizes = {
 }
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
-    // Lock body scroll when open
+    const titleId = useId()
+    const dialogRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden'
+            dialogRef.current?.focus()
             return () => { document.body.style.overflow = '' }
         }
     }, [isOpen])
 
-    // Close on Escape
     useEffect(() => {
         if (!isOpen) return
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -42,7 +44,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     if (typeof document === 'undefined') return null
 
     return createPortal(
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -51,11 +53,10 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
             />
 
             {/* Modal card */}
-            <div className={`relative w-full ${sizes[size]} max-h-[80vh] rounded-[var(--radius-xl)] bg-[var(--color-bg-surface)] border border-[var(--glass-border)] shadow-[var(--shadow-xl)] animate-scale-in overflow-hidden flex flex-col`}>
-                {/* Header */}
+            <div ref={dialogRef} tabIndex={-1} className={`relative w-full ${sizes[size]} max-h-[80vh] rounded-[var(--radius-xl)] bg-[var(--color-bg-surface)] border border-[var(--glass-border)] shadow-[var(--shadow-xl)] animate-scale-in overflow-hidden flex flex-col outline-none`}>
                 {title && (
                     <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--color-line)]">
-                        <h3 className="text-h3 text-[var(--color-text-primary)]">{title}</h3>
+                        <h3 id={titleId} className="text-h3 text-[var(--color-text-primary)]">{title}</h3>
                         <button
                             onClick={onClose}
                             className="p-2 -mr-2 rounded-full text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)] transition-colors cursor-pointer"

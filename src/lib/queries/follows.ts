@@ -1,13 +1,14 @@
 import { supabase } from "../supabase";
 import { authRequired } from "@/shared/errors/app-error";
 
-export async function getMyFollows() {
+export async function getMyFollows(limit = 100) {
   const { data, error } = await supabase
     .from("follows")
     .select(
       "*, nganyas(*, corridors(name), nganya_media(media_url, media_type), crew_nganyas(profiles(avatar_url)))",
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
   if (error) throw error;
   return data;
 }

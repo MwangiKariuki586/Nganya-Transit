@@ -4,7 +4,7 @@
  * Used for edit profile, spot confirmation, and other mobile interactions.
  */
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -16,15 +16,17 @@ interface BottomSheetProps {
 }
 
 export default function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
-    // Lock body scroll when open
+    const titleId = useId()
+    const sheetRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden'
+            sheetRef.current?.focus()
             return () => { document.body.style.overflow = '' }
         }
     }, [isOpen])
 
-    // Close on Escape
     useEffect(() => {
         if (!isOpen) return
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -36,7 +38,7 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
     if (typeof document === 'undefined') return null
 
     return createPortal(
-        <div className="fixed inset-0 z-[var(--z-modal)]" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -45,7 +47,7 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
             />
 
             {/* Sheet */}
-            <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-[var(--radius-xl)] bg-[var(--color-bg-surface)] border-t border-[var(--glass-border)] animate-slide-up-sheet overflow-hidden flex flex-col">
+            <div ref={sheetRef} tabIndex={-1} className="absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-[var(--radius-xl)] bg-[var(--color-bg-surface)] border-t border-[var(--glass-border)] animate-slide-up-sheet overflow-hidden flex flex-col outline-none">
                 {/* Drag handle */}
                 <div className="flex justify-center py-3">
                     <div className="w-10 h-1 rounded-full bg-[var(--color-line-strong)]" />
@@ -54,7 +56,7 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
                 {/* Header */}
                 {title && (
                     <div className="flex items-center justify-between px-5 pb-4">
-                        <h3 className="text-h3 text-[var(--color-text-primary)]">{title}</h3>
+                        <h3 id={titleId} className="text-h3 text-[var(--color-text-primary)]">{title}</h3>
                         <button
                             onClick={onClose}
                             className="p-2 -mr-2 rounded-full text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)] transition-colors cursor-pointer"

@@ -84,6 +84,7 @@ export function FlexibleSeatSelector({
         <div className="flex-1 text-center">
           <input
             type="number"
+            aria-label="Seats remaining"
             value={inputValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}

@@ -1,16 +1,14 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import ProfileScreen from "@/modules/fan/screens/ProfileScreen";
 import { loadProfileRouteData } from "@/modules/fan/services/route-data";
+import type { FanSharedData } from "@/modules/fan/services/route-data";
+import { ProfileSkeleton } from "@/components/ui/loading";
 
 export const Route = createFileRoute("/(fan)/profile")({
-  beforeLoad: async () => {
-    // This will be called before the loader
-    // If we need to check auth, we can do it here
-  },
-  loader: async () => {
-    const data = await loadProfileRouteData();
+  loader: async ({ context }) => {
+    const shared = (context as { fanShared: FanSharedData }).fanShared;
+    const data = await loadProfileRouteData(shared);
 
-    // If no auth user after stable session check, redirect to signin
     if (!data.authUser) {
       throw redirect({
         to: "/signin",
@@ -22,6 +20,7 @@ export const Route = createFileRoute("/(fan)/profile")({
 
     return data;
   },
+  pendingComponent: ProfileSkeleton,
   component: ProfileRouteComponent,
 });
 

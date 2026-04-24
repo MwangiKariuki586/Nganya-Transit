@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import Chip from "@/components/ui/Chip";
 import LiveBadge from "@/components/ui/LiveBadge";
 import Skeleton from "@/components/ui/Skeleton";
-import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
+import { formatDirectionLabel, formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { Clock, TrendingUp, ChevronRight } from "lucide-react";
 import WhereToCard, {
@@ -60,17 +60,7 @@ interface BrowseCardActionItem {
   isLive: boolean;
 }
 
-function getDirectionLabel(
-  direction: string | null | undefined,
-  corridorName: string,
-) {
-  if (!direction) return null;
-
-  const normalized = direction.toUpperCase();
-  if (normalized.includes("TOWN")) return "→ Town";
-  if (normalized.includes("TERMINAL")) return `→ ${corridorName}`;
-  return direction;
-}
+const getDirectionLabel = formatDirectionLabel;
 
 function getMinutesSince(isoDate: string) {
   return Math.max(

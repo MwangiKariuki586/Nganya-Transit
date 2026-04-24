@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { InlineErrorState } from '@/components/error/InlineErrorState'
 import { crewLiveService } from '@/features/crew-live/services/crew-live-service'
-import { formatRelativeTime } from '@/lib/formatters'
+import { formatDirectionLabel, formatRelativeTime } from '@/lib/formatters'
 
 export default function CrewSessionHistoryScreen() {
   const [sessions, setSessions] = useState<any[]>([])
@@ -52,7 +52,7 @@ export default function CrewSessionHistoryScreen() {
                 <div>
                   <div className="text-sm font-semibold text-[var(--color-text-primary)]">{session.nganyas?.name || 'Mapped nganya'}</div>
                   <div className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-                    {session.nganyas?.corridors?.name || 'Unknown corridor'} · {session.direction === 'TO_TOWN' ? 'To Town' : 'From Town'}
+                    {session.nganyas?.corridors?.name || 'Unknown corridor'} · {formatDirectionLabel(session.direction, session.nganyas?.corridors?.name) ?? session.direction}
                   </div>
                 </div>
                 <div className={`rounded-full px-3 py-1 text-[11px] font-semibold ${session.status === 'LIVE' ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]' : 'bg-[var(--glass-bg-strong)] text-[var(--color-text-secondary)]'}`}>

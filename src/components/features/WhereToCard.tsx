@@ -175,7 +175,8 @@ export default function WhereToCard({
       preference,
       preferredNganya,
     };
-    console.log("Analytics: ride_search_started", {
+    // TODO: wire analytics event for ride_search_started
+    void ({
       from: fromStage.id,
       to: toPlace.id,
       preference,

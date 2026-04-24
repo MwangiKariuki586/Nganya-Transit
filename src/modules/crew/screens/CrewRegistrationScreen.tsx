@@ -465,6 +465,8 @@ export default function CrewRegistrationScreen({
             1. Route terminal
           </div>
           <select
+            id="reg-corridor"
+            aria-label="Route terminal"
             value={corridorId}
             onChange={(event) => setCorridorId(event.target.value)}
             disabled={isLoadingCorridors}
@@ -485,10 +487,11 @@ export default function CrewRegistrationScreen({
           </div>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <div>
-              <label className="text-body-sm text-[var(--color-text-secondary)]">
+              <label htmlFor="reg-name" className="text-body-sm text-[var(--color-text-secondary)]">
                 Nganya name
               </label>
               <input
+                id="reg-name"
                 value={proposedName}
                 onChange={(event) => setProposedName(event.target.value)}
                 placeholder="e.g. Street Saint"
@@ -496,10 +499,11 @@ export default function CrewRegistrationScreen({
               />
             </div>
             <div>
-              <label className="text-body-sm text-[var(--color-text-secondary)]">
+              <label htmlFor="reg-plate" className="text-body-sm text-[var(--color-text-secondary)]">
                 Plate info
               </label>
               <input
+                id="reg-plate"
                 value={plateInput}
                 onChange={(event) => setPlateInput(event.target.value)}
                 placeholder="KDM 421X"
@@ -510,10 +514,11 @@ export default function CrewRegistrationScreen({
               </div>
             </div>
             <div className="md:col-span-2">
-              <label className="text-body-sm text-[var(--color-text-secondary)]">
+              <label htmlFor="reg-sacco" className="text-body-sm text-[var(--color-text-secondary)]">
                 SACCO (optional)
               </label>
               <input
+                id="reg-sacco"
                 value={sacco}
                 onChange={(event) => setSacco(event.target.value)}
                 placeholder="e.g. Super Metro"

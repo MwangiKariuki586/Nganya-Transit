@@ -117,6 +117,9 @@ export default function MediaUpload({
       )}
 
       <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={label || "Upload media"}
         className={`
           relative w-full ${aspectRatioClass} rounded-[var(--radius-lg)] overflow-hidden
           border-2 transition-all duration-200
@@ -131,6 +134,7 @@ export default function MediaUpload({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
       >
         <input
           ref={fileInputRef}
@@ -221,7 +225,7 @@ export default function MediaUpload({
       </div>
 
       {error && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-error)]">
+        <div role="alert" className="mt-2 flex items-center gap-2 text-xs text-[var(--color-error)]">
           <X className="w-4 h-4" />
           <span>{error}</span>
         </div>

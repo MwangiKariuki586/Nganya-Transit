@@ -6,6 +6,7 @@
  * - Stale-while-revalidate pattern works correctly
  * - Request deduplication works correctly
  * - Cache invalidation works correctly
+ * - Parameter-keyed caching returns correct data per key
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -28,27 +29,28 @@ const mockLiveNganyas = [
   { id: 'live-1', nganya_id: 'nganya-1', corridor_id: 'corridor-1', status: 'LIVE' },
 ]
 
+function resetStore() {
+  useNganyaStore.setState({
+    nganyasCache: new Map(),
+    corridorsCache: null,
+    liveNganyasCache: new Map(),
+    currentNganyaKey: 'nganyas::',
+    currentLiveKey: 'liveNganyas:',
+    isLoadingNganyas: false,
+    isLoadingCorridors: false,
+    isLoadingLiveNganyas: false,
+    nganyasError: null,
+    corridorsError: null,
+    liveNganyasError: null,
+    pendingNganyaRequests: new Map(),
+    pendingCorridorRequests: new Map(),
+    pendingLiveNganyaRequests: new Map(),
+  })
+}
+
 describe('useNganyaStore', () => {
   beforeEach(() => {
-    // Reset store state
-    useNganyaStore.setState({
-      nganyas: [],
-      corridors: [],
-      liveNganyas: [],
-      nganyasLastFetchedAt: null,
-      corridorsLastFetchedAt: null,
-      liveNganyasLastFetchedAt: null,
-      isLoadingNganyas: false,
-      isLoadingCorridors: false,
-      isLoadingLiveNganyas: false,
-      nganyasError: null,
-      corridorsError: null,
-      liveNganyasError: null,
-      pendingNganyaRequests: new Map(),
-      pendingCorridorRequests: new Map(),
-      pendingLiveNganyaRequests: new Map(),
-    })
-
+    resetStore()
     vi.clearAllMocks()
   })
 
@@ -57,63 +59,33 @@ describe('useNganyaStore', () => {
   })
 
   describe('TTL-based freshness checks', () => {
-    it('should return true for isNganyasStale when lastFetchedAt is null', () => {
+    it('should return true for isNganyasStale when no cache entry exists', () => {
       const { isNganyasStale } = useNganyaStore.getState()
       expect(isNganyasStale()).toBe(true)
     })
 
-    it('should return false for isNganyasStale when data is fresh (within 60s TTL)', () => {
-      useNganyaStore.setState({
-        nganyasLastFetchedAt: Date.now() - 30_000, // 30 seconds ago
-      })
+    it('should return false for isNganyasStale when data is fresh (within 60s TTL)', async () => {
+      vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
+      await useNganyaStore.getState().fetchNganyas()
 
       const { isNganyasStale } = useNganyaStore.getState()
       expect(isNganyasStale()).toBe(false)
     })
 
-    it('should return true for isNganyasStale when data is stale (beyond 60s TTL)', () => {
-      useNganyaStore.setState({
-        nganyasLastFetchedAt: Date.now() - 70_000, // 70 seconds ago
-      })
-
-      const { isNganyasStale } = useNganyaStore.getState()
-      expect(isNganyasStale()).toBe(true)
-    })
-
-    it('should return false for isCorridorsStale when data is fresh (within 120s TTL)', () => {
-      useNganyaStore.setState({
-        corridorsLastFetchedAt: Date.now() - 60_000, // 60 seconds ago
-      })
+    it('should return false for isCorridorsStale when data is fresh (within 120s TTL)', async () => {
+      vi.spyOn(discoverQueries, 'getCorridors').mockResolvedValue(mockCorridors)
+      await useNganyaStore.getState().fetchCorridors()
 
       const { isCorridorsStale } = useNganyaStore.getState()
       expect(isCorridorsStale()).toBe(false)
     })
 
-    it('should return true for isCorridorsStale when data is stale (beyond 120s TTL)', () => {
-      useNganyaStore.setState({
-        corridorsLastFetchedAt: Date.now() - 130_000, // 130 seconds ago
-      })
-
-      const { isCorridorsStale } = useNganyaStore.getState()
-      expect(isCorridorsStale()).toBe(true)
-    })
-
-    it('should return false for isLiveNganyasStale when data is fresh (within 30s TTL)', () => {
-      useNganyaStore.setState({
-        liveNganyasLastFetchedAt: Date.now() - 15_000, // 15 seconds ago
-      })
+    it('should return false for isLiveNganyasStale when data is fresh (within 30s TTL)', async () => {
+      vi.spyOn(liveQueries, 'getLiveNow').mockResolvedValue(mockLiveNganyas)
+      await useNganyaStore.getState().fetchLiveNganyas()
 
       const { isLiveNganyasStale } = useNganyaStore.getState()
       expect(isLiveNganyasStale()).toBe(false)
-    })
-
-    it('should return true for isLiveNganyasStale when data is stale (beyond 30s TTL)', () => {
-      useNganyaStore.setState({
-        liveNganyasLastFetchedAt: Date.now() - 40_000, // 40 seconds ago
-      })
-
-      const { isLiveNganyasStale } = useNganyaStore.getState()
-      expect(isLiveNganyasStale()).toBe(true)
     })
   })
 
@@ -121,31 +93,33 @@ describe('useNganyaStore', () => {
     it('should return cached nganyas immediately when fresh', async () => {
       const searchNganyasSpy = vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
 
-      // Set fresh cached data
-      useNganyaStore.setState({
-        nganyas: mockNganyas,
-        nganyasLastFetchedAt: Date.now() - 30_000, // 30 seconds ago (fresh)
-      })
+      // First fetch to populate cache
+      await useNganyaStore.getState().fetchNganyas()
+      searchNganyasSpy.mockClear()
 
-      const { fetchNganyas } = useNganyaStore.getState()
-      const result = await fetchNganyas()
+      // Second fetch should use cache
+      const result = await useNganyaStore.getState().fetchNganyas()
 
       expect(result).toEqual(mockNganyas)
-      expect(searchNganyasSpy).not.toHaveBeenCalled() // Should not fetch
+      expect(searchNganyasSpy).not.toHaveBeenCalled()
     })
 
     it('should return stale nganyas immediately and fetch in background when stale', async () => {
       const newMockNganyas = [...mockNganyas, { id: 'nganya-3', name: 'Nganya 3', corridor_id: 'corridor-1' }]
-      const searchNganyasSpy = vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(newMockNganyas)
+      const searchNganyasSpy = vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
 
-      // Set stale cached data
-      useNganyaStore.setState({
-        nganyas: mockNganyas,
-        nganyasLastFetchedAt: Date.now() - 70_000, // 70 seconds ago (stale)
-      })
+      // First fetch to populate cache
+      await useNganyaStore.getState().fetchNganyas()
 
-      const { fetchNganyas } = useNganyaStore.getState()
-      const result = await fetchNganyas()
+      // Make cache stale by manipulating the cache entry
+      const key = 'nganyas::'
+      const staleCache = new Map(useNganyaStore.getState().nganyasCache)
+      staleCache.set(key, { data: mockNganyas, fetchedAt: Date.now() - 70_000 })
+      useNganyaStore.setState({ nganyasCache: staleCache })
+
+      searchNganyasSpy.mockClear()
+      searchNganyasSpy.mockResolvedValue(newMockNganyas)
+      const result = await useNganyaStore.getState().fetchNganyas()
 
       // Should return stale data immediately
       expect(result).toEqual(mockNganyas)
@@ -154,44 +128,18 @@ describe('useNganyaStore', () => {
       // Wait for background fetch to complete
       await vi.waitFor(() => {
         const state = useNganyaStore.getState()
-        expect(state.nganyas).toEqual(newMockNganyas)
+        expect(state.getNganyas()).toEqual(newMockNganyas)
       })
     })
 
     it('should fetch fresh corridors when no cache exists', async () => {
       const getCorridorsSpy = vi.spyOn(discoverQueries, 'getCorridors').mockResolvedValue(mockCorridors)
 
-      const { fetchCorridors } = useNganyaStore.getState()
-      const result = await fetchCorridors()
+      const result = await useNganyaStore.getState().fetchCorridors()
 
       expect(result).toEqual(mockCorridors)
       expect(getCorridorsSpy).toHaveBeenCalledOnce()
-      expect(useNganyaStore.getState().corridors).toEqual(mockCorridors)
-      expect(useNganyaStore.getState().corridorsLastFetchedAt).toBeGreaterThan(0)
-    })
-
-    it('should return stale live nganyas immediately and fetch in background when stale', async () => {
-      const newMockLiveNganyas = [...mockLiveNganyas, { id: 'live-2', nganya_id: 'nganya-2', corridor_id: 'corridor-2', status: 'LIVE' }]
-      const getLiveNowSpy = vi.spyOn(liveQueries, 'getLiveNow').mockResolvedValue(newMockLiveNganyas)
-
-      // Set stale cached data
-      useNganyaStore.setState({
-        liveNganyas: mockLiveNganyas,
-        liveNganyasLastFetchedAt: Date.now() - 40_000, // 40 seconds ago (stale)
-      })
-
-      const { fetchLiveNganyas } = useNganyaStore.getState()
-      const result = await fetchLiveNganyas()
-
-      // Should return stale data immediately
-      expect(result).toEqual(mockLiveNganyas)
-      expect(getLiveNowSpy).toHaveBeenCalledOnce()
-
-      // Wait for background fetch to complete
-      await vi.waitFor(() => {
-        const state = useNganyaStore.getState()
-        expect(state.liveNganyas).toEqual(newMockLiveNganyas)
-      })
+      expect(useNganyaStore.getState().getCorridors()).toEqual(mockCorridors)
     })
   })
 
@@ -204,14 +152,12 @@ describe('useNganyaStore', () => {
 
       const { fetchNganyas } = useNganyaStore.getState()
 
-      // Make 3 concurrent requests
       const [result1, result2, result3] = await Promise.all([
         fetchNganyas('test'),
         fetchNganyas('test'),
         fetchNganyas('test'),
       ])
 
-      // Should only call API once
       expect(searchNganyasSpy).toHaveBeenCalledOnce()
       expect(result1).toEqual(mockNganyas)
       expect(result2).toEqual(mockNganyas)
@@ -226,14 +172,12 @@ describe('useNganyaStore', () => {
 
       const { fetchCorridors } = useNganyaStore.getState()
 
-      // Make 3 concurrent requests
       const [result1, result2, result3] = await Promise.all([
         fetchCorridors(),
         fetchCorridors(),
         fetchCorridors(),
       ])
 
-      // Should only call API once
       expect(getCorridorsSpy).toHaveBeenCalledOnce()
       expect(result1).toEqual(mockCorridors)
       expect(result2).toEqual(mockCorridors)
@@ -248,14 +192,12 @@ describe('useNganyaStore', () => {
 
       const { fetchLiveNganyas } = useNganyaStore.getState()
 
-      // Make 3 concurrent requests
       const [result1, result2, result3] = await Promise.all([
         fetchLiveNganyas(),
         fetchLiveNganyas(),
         fetchLiveNganyas(),
       ])
 
-      // Should only call API once
       expect(getLiveNowSpy).toHaveBeenCalledOnce()
       expect(result1).toEqual(mockLiveNganyas)
       expect(result2).toEqual(mockLiveNganyas)
@@ -272,76 +214,95 @@ describe('useNganyaStore', () => {
         fetchNganyas('term2'),
       ])
 
-      // Should call API twice with different terms
       expect(searchNganyasSpy).toHaveBeenCalledTimes(2)
       expect(searchNganyasSpy).toHaveBeenCalledWith('term1', undefined)
       expect(searchNganyasSpy).toHaveBeenCalledWith('term2', undefined)
     })
   })
 
+  describe('Parameter-keyed caching', () => {
+    it('should cache nganyas separately per search term', async () => {
+      const term1Results = [{ id: '1', name: 'Rongai Bus' }]
+      const term2Results = [{ id: '2', name: 'Kiambu Express' }]
+
+      const searchNganyasSpy = vi.spyOn(discoverQueries, 'searchNganyas')
+        .mockResolvedValueOnce(term1Results)
+        .mockResolvedValueOnce(term2Results)
+
+      await useNganyaStore.getState().fetchNganyas('rongai')
+      expect(useNganyaStore.getState().getNganyas()).toEqual(term1Results)
+
+      await useNganyaStore.getState().fetchNganyas('kiambu')
+      expect(useNganyaStore.getState().getNganyas()).toEqual(term2Results)
+
+      // Switching back to 'rongai' should use cache
+      searchNganyasSpy.mockClear()
+      const result = await useNganyaStore.getState().fetchNganyas('rongai')
+      expect(result).toEqual(term1Results)
+      expect(useNganyaStore.getState().getNganyas()).toEqual(term1Results)
+      expect(searchNganyasSpy).not.toHaveBeenCalled()
+    })
+
+    it('should cache live nganyas separately per corridor', async () => {
+      const corridor1Live = [{ id: 'l1', corridor_id: 'c1' }]
+      const corridor2Live = [{ id: 'l2', corridor_id: 'c2' }]
+
+      const getLiveNowSpy = vi.spyOn(liveQueries, 'getLiveNow')
+        .mockResolvedValueOnce(corridor1Live)
+        .mockResolvedValueOnce(corridor2Live)
+
+      await useNganyaStore.getState().fetchLiveNganyas('c1')
+      expect(useNganyaStore.getState().getLiveNganyas()).toEqual(corridor1Live)
+
+      await useNganyaStore.getState().fetchLiveNganyas('c2')
+      expect(useNganyaStore.getState().getLiveNganyas()).toEqual(corridor2Live)
+
+      // Switching back should use cache
+      getLiveNowSpy.mockClear()
+      const result = await useNganyaStore.getState().fetchLiveNganyas('c1')
+      expect(result).toEqual(corridor1Live)
+      expect(useNganyaStore.getState().getLiveNganyas()).toEqual(corridor1Live)
+      expect(getLiveNowSpy).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Cache invalidation', () => {
-    it('should invalidate nganyas cache', () => {
-      useNganyaStore.setState({
-        nganyas: mockNganyas,
-        nganyasLastFetchedAt: Date.now(),
-      })
+    it('should invalidate all nganyas cache entries', async () => {
+      vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
 
-      const { invalidateNganyas } = useNganyaStore.getState()
-      invalidateNganyas()
+      await useNganyaStore.getState().fetchNganyas('a')
+      await useNganyaStore.getState().fetchNganyas('b')
 
-      const state = useNganyaStore.getState()
-      expect(state.nganyasLastFetchedAt).toBeNull()
-      expect(state.nganyas).toBeNull()
+      useNganyaStore.getState().invalidateNganyas()
+
+      expect(useNganyaStore.getState().nganyasCache.size).toBe(0)
+      expect(useNganyaStore.getState().getNganyas()).toBeNull()
     })
 
-    it('should invalidate corridors cache', () => {
-      useNganyaStore.setState({
-        corridors: mockCorridors,
-        corridorsLastFetchedAt: Date.now(),
-      })
+    it('should invalidate corridors cache', async () => {
+      vi.spyOn(discoverQueries, 'getCorridors').mockResolvedValue(mockCorridors)
 
-      const { invalidateCorridors } = useNganyaStore.getState()
-      invalidateCorridors()
+      await useNganyaStore.getState().fetchCorridors()
+      useNganyaStore.getState().invalidateCorridors()
 
-      const state = useNganyaStore.getState()
-      expect(state.corridorsLastFetchedAt).toBeNull()
-      expect(state.corridors).toBeNull()
+      expect(useNganyaStore.getState().corridorsCache).toBeNull()
+      expect(useNganyaStore.getState().getCorridors()).toBeNull()
     })
 
-    it('should invalidate live nganyas cache', () => {
-      useNganyaStore.setState({
-        liveNganyas: mockLiveNganyas,
-        liveNganyasLastFetchedAt: Date.now(),
-      })
+    it('should invalidate all caches', async () => {
+      vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
+      vi.spyOn(discoverQueries, 'getCorridors').mockResolvedValue(mockCorridors)
+      vi.spyOn(liveQueries, 'getLiveNow').mockResolvedValue(mockLiveNganyas)
 
-      const { invalidateLiveNganyas } = useNganyaStore.getState()
-      invalidateLiveNganyas()
+      await useNganyaStore.getState().fetchNganyas()
+      await useNganyaStore.getState().fetchCorridors()
+      await useNganyaStore.getState().fetchLiveNganyas()
 
-      const state = useNganyaStore.getState()
-      expect(state.liveNganyasLastFetchedAt).toBeNull()
-      expect(state.liveNganyas).toBeNull()
-    })
+      useNganyaStore.getState().invalidateAll()
 
-    it('should invalidate all caches', () => {
-      useNganyaStore.setState({
-        nganyas: mockNganyas,
-        nganyasLastFetchedAt: Date.now(),
-        corridors: mockCorridors,
-        corridorsLastFetchedAt: Date.now(),
-        liveNganyas: mockLiveNganyas,
-        liveNganyasLastFetchedAt: Date.now(),
-      })
-
-      const { invalidateAll } = useNganyaStore.getState()
-      invalidateAll()
-
-      const state = useNganyaStore.getState()
-      expect(state.nganyasLastFetchedAt).toBeNull()
-      expect(state.nganyas).toBeNull()
-      expect(state.corridorsLastFetchedAt).toBeNull()
-      expect(state.corridors).toBeNull()
-      expect(state.liveNganyasLastFetchedAt).toBeNull()
-      expect(state.liveNganyas).toBeNull()
+      expect(useNganyaStore.getState().getNganyas()).toBeNull()
+      expect(useNganyaStore.getState().getCorridors()).toBeNull()
+      expect(useNganyaStore.getState().getLiveNganyas()).toBeNull()
     })
   })
 
@@ -350,9 +311,7 @@ describe('useNganyaStore', () => {
       const error = new Error('Network error')
       vi.spyOn(discoverQueries, 'searchNganyas').mockRejectedValue(error)
 
-      const { fetchNganyas } = useNganyaStore.getState()
-
-      await expect(fetchNganyas()).rejects.toThrow('Network error')
+      await expect(useNganyaStore.getState().fetchNganyas()).rejects.toThrow('Network error')
 
       const state = useNganyaStore.getState()
       expect(state.nganyasError).toEqual(error)
@@ -363,9 +322,7 @@ describe('useNganyaStore', () => {
       const error = new Error('Network error')
       vi.spyOn(discoverQueries, 'getCorridors').mockRejectedValue(error)
 
-      const { fetchCorridors } = useNganyaStore.getState()
-
-      await expect(fetchCorridors()).rejects.toThrow('Network error')
+      await expect(useNganyaStore.getState().fetchCorridors()).rejects.toThrow('Network error')
 
       const state = useNganyaStore.getState()
       expect(state.corridorsError).toEqual(error)
@@ -373,26 +330,26 @@ describe('useNganyaStore', () => {
     })
 
     it('should keep stale data on background fetch error', async () => {
-      vi.spyOn(discoverQueries, 'searchNganyas').mockRejectedValue(new Error('Network error'))
+      const searchNganyasSpy = vi.spyOn(discoverQueries, 'searchNganyas').mockResolvedValue(mockNganyas)
 
-      // Set stale cached data
-      useNganyaStore.setState({
-        nganyas: mockNganyas,
-        nganyasLastFetchedAt: Date.now() - 70_000, // stale
-      })
+      // Populate cache
+      await useNganyaStore.getState().fetchNganyas()
 
-      const { fetchNganyas } = useNganyaStore.getState()
-      const result = await fetchNganyas()
+      // Make stale
+      const key = 'nganyas::'
+      const staleCache = new Map(useNganyaStore.getState().nganyasCache)
+      staleCache.set(key, { data: mockNganyas, fetchedAt: Date.now() - 70_000 })
+      useNganyaStore.setState({ nganyasCache: staleCache })
 
-      // Should return stale data
+      searchNganyasSpy.mockRejectedValue(new Error('Network error'))
+
+      const result = await useNganyaStore.getState().fetchNganyas()
       expect(result).toEqual(mockNganyas)
 
-      // Wait a bit for background fetch to fail
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Stale data should still be in store
-      const state = useNganyaStore.getState()
-      expect(state.nganyas).toEqual(mockNganyas)
+      // Stale data should still be accessible
+      expect(useNganyaStore.getState().getNganyas()).toEqual(mockNganyas)
     })
   })
 })

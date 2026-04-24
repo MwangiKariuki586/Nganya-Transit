@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Route } from "@/routes/(crew)/crew/profile";
 import { updateCrewProfileServerFn } from "@/shared/server-fns/crew-profile";
-import { replaceAvatar, replaceCoverMedia } from "@/lib/storage/profile-media";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useToast } from "@/components/ui/ToastContainer";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
-import { compressImage, formatFileSize } from "@/lib/utils/image-compress";
 import { browserSupabase } from "@/shared/supabase/browser-client";
+import { useProfileMediaUpload } from "@/hooks/useProfileMediaUpload";
+import InlineSpinner from "@/components/ui/InlineSpinner";
 import AvatarRing, { computeCompleteness } from "@/components/ui/AvatarRing";
 import MediaLightbox from "@/components/ui/MediaLightbox";
 import { ProfileGallery } from "@/modules/crew/components/ProfileGallery";
@@ -39,8 +39,6 @@ export function CrewProfileScreen() {
   // ── Profile details editor state ──────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
 
   const [formData, setFormData] = useState({
     full_name: initialProfile.full_name || "",
@@ -50,24 +48,24 @@ export function CrewProfileScreen() {
   const [originalData, setOriginalData] = useState(formData);
   const [displayData, setDisplayData] = useState(formData);
 
-  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(
-    initialProfile.avatar_url || null,
-  );
-  const [pendingAvatarPreviewUrl, setPendingAvatarPreviewUrl] = useState<
-    string | null
-  >(null);
+  const persistAvatar = useCallback(async (url: string) => {
+    await retryWithBackoff(() => updateCrewProfileServerFn({ data: { accessToken: session?.access_token ?? "", avatar_url: url } }), { maxAttempts: 3 });
+  }, [session?.access_token]);
 
-  // ── Cover photo editor state ──────────────────────────────────────────────
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [coverUploadProgress, setCoverUploadProgress] = useState(0);
-  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(
-    initialProfile.cover_media_url || null,
-  );
-  const [coverPreviewType, setCoverPreviewType] = useState<
-    "image" | "video" | null
-  >(initialProfile.cover_media_type || null);
+  const persistCover = useCallback(async (url: string, type: "image" | "video") => {
+    await retryWithBackoff(() => updateCrewProfileServerFn({ data: { accessToken: session?.access_token ?? "", cover_media_url: url, cover_media_type: type } }), { maxAttempts: 3 });
+  }, [session?.access_token]);
+
+  const media = useProfileMediaUpload({
+    userId: session?.user?.id,
+    existingAvatarUrl: initialProfile.avatar_url || null,
+    existingCoverUrl: initialProfile.cover_media_url || null,
+    existingCoverType: initialProfile.cover_media_type || null,
+    toast,
+    persistAvatar,
+    persistCover,
+    onSuccess: () => router.invalidate(),
+  });
 
   // ── Shared UI state ───────────────────────────────────────────────────────
   const [lightbox, setLightbox] = useState<{
@@ -76,216 +74,13 @@ export function CrewProfileScreen() {
   } | null>(null);
   const heroFrameRef = useRef<HTMLDivElement | null>(null);
 
-  const currentCoverSrc =
-    coverPreviewUrl || initialProfile.cover_media_url || "";
-  const currentCoverType = coverPreviewType || initialProfile.cover_media_type;
+  const currentCoverType = media.cover.previewType || initialProfile.cover_media_type;
 
   const hasChanges =
     formData.full_name !== originalData.full_name ||
     formData.handle !== originalData.handle ||
     formData.bio !== originalData.bio;
 
-  // ── Avatar handlers ───────────────────────────────────────────────────────
-  const handleAvatarSelect = (file: File) => {
-    if (pendingAvatarPreviewUrl) {
-      URL.revokeObjectURL(pendingAvatarPreviewUrl);
-    }
-
-    setPendingAvatarFile(file);
-    setPendingAvatarPreviewUrl(URL.createObjectURL(file));
-  };
-
-  const handleAvatarConfirm = async () => {
-    if (!pendingAvatarFile || !pendingAvatarPreviewUrl || !session?.user?.id) {
-      return;
-    }
-
-    const avatarFile = pendingAvatarFile;
-    const previewUrl = pendingAvatarPreviewUrl;
-    const previousAvatarUrl = avatarPreviewUrl;
-
-    setAvatarPreviewUrl(previewUrl);
-    setPendingAvatarFile(null);
-    setPendingAvatarPreviewUrl(null);
-    setIsUploadingAvatar(true);
-    setAvatarUploadProgress(0);
-
-    const progressInterval = setInterval(() => {
-      setAvatarUploadProgress((prev) => (prev >= 85 ? prev : prev + 2));
-    }, 100);
-
-    try {
-      const fileToUpload = await compressImage(avatarFile, {
-        maxWidthOrHeight: 400,
-        quality: 0.88,
-        maxSizeMB: 1,
-      });
-
-      if (fileToUpload.size < avatarFile.size) {
-        toast.info(
-          "Avatar compressed",
-          `${formatFileSize(avatarFile.size)} → ${formatFileSize(fileToUpload.size)}`,
-        );
-      }
-
-      const result = await retryWithBackoff(
-        () =>
-          replaceAvatar(
-            fileToUpload,
-            session.user.id,
-            initialProfile.avatar_url || undefined,
-          ),
-        {
-          maxAttempts: 3,
-          onRetry: (attempt, error) => {
-            toast.info(
-              `Retrying avatar upload...`,
-              `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue detected." : ""}`,
-            );
-          },
-        },
-      );
-
-      await retryWithBackoff(
-        () =>
-          updateCrewProfileServerFn({
-            data: {
-              accessToken: session.access_token ?? "",
-              avatar_url: result.url,
-            },
-          }),
-        { maxAttempts: 3 },
-      );
-
-      clearInterval(progressInterval);
-      setAvatarUploadProgress(100);
-      setAvatarPreviewUrl(result.url);
-      toast.success("Avatar updated!", "Your profile image has been saved.");
-      router.invalidate();
-    } catch (err: any) {
-      clearInterval(progressInterval);
-      setAvatarUploadProgress(0);
-      setAvatarPreviewUrl(previousAvatarUrl);
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      toast.error(
-        "Avatar upload failed",
-        isNetworkError(err)
-          ? "Network error. Please check your connection and try again."
-          : err.message || "An unexpected error occurred.",
-      );
-    } finally {
-      setIsUploadingAvatar(false);
-      setAvatarUploadProgress(0);
-    }
-  };
-
-  const handleAvatarDiscard = () => {
-    if (pendingAvatarPreviewUrl) {
-      URL.revokeObjectURL(pendingAvatarPreviewUrl);
-    }
-
-    setPendingAvatarFile(null);
-    setPendingAvatarPreviewUrl(null);
-  };
-
-  // ── Cover upload (staged: pick → preview → confirm) ──────────────────────
-  const handleCoverSelect = (file: File) => {
-    setSelectedCoverFile(file);
-    setCoverPreviewUrl(URL.createObjectURL(file));
-    setCoverPreviewType("image");
-  };
-
-  const handleCoverConfirm = async () => {
-    if (!selectedCoverFile || !session?.user?.id) return;
-
-    setIsUploadingCover(true);
-    setCoverUploadProgress(0);
-
-    const progressInterval = setInterval(() => {
-      setCoverUploadProgress((prev) => (prev >= 85 ? prev : prev + 2));
-    }, 100);
-
-    try {
-      const coverToUpload = await compressImage(selectedCoverFile, {
-        maxWidthOrHeight: 1920,
-        quality: 0.85,
-        maxSizeMB: 3,
-      });
-
-      if (coverToUpload.size < selectedCoverFile.size) {
-        toast.info(
-          "Cover compressed",
-          `${formatFileSize(selectedCoverFile.size)} → ${formatFileSize(coverToUpload.size)}`,
-        );
-      }
-
-      const result = await retryWithBackoff(
-        () =>
-          replaceCoverMedia(
-            coverToUpload,
-            session.user.id,
-            initialProfile.cover_media_url || undefined,
-          ),
-        {
-          maxAttempts: 3,
-          onRetry: (attempt, error) => {
-            toast.info(
-              `Retrying cover upload...`,
-              `Attempt ${attempt} of 3. ${isNetworkError(error) ? "Network issue detected." : ""}`,
-            );
-          },
-        },
-      );
-
-      clearInterval(progressInterval);
-      setCoverUploadProgress(100);
-      setCoverPreviewUrl(result.url);
-      setCoverPreviewType(result.type);
-
-      await retryWithBackoff(
-        () =>
-          updateCrewProfileServerFn({
-            data: {
-              accessToken: session.access_token ?? "",
-              cover_media_url: result.url,
-              cover_media_type: result.type,
-            },
-          }),
-        { maxAttempts: 3 },
-      );
-
-      toast.success("Cover updated!", "Your cover photo has been saved.");
-      setSelectedCoverFile(null);
-      setCoverUploadProgress(0);
-      // Refresh route data (updates nav avatar etc.) without a full page reload
-      router.invalidate();
-    } catch (err: any) {
-      clearInterval(progressInterval);
-      setCoverUploadProgress(0);
-      // revert preview
-      setCoverPreviewUrl(initialProfile.cover_media_url || null);
-      setCoverPreviewType(initialProfile.cover_media_type || null);
-      setSelectedCoverFile(null);
-
-      toast.error(
-        "Cover upload failed",
-        isNetworkError(err)
-          ? "Network error. Please check your connection and try again."
-          : err.message || "An unexpected error occurred.",
-      );
-    } finally {
-      setIsUploadingCover(false);
-    }
-  };
-
-  const handleCoverDiscard = () => {
-    setSelectedCoverFile(null);
-    setCoverPreviewUrl(initialProfile.cover_media_url || null);
-    setCoverPreviewType(initialProfile.cover_media_type || null);
-  };
 
   // ── Profile details save ──────────────────────────────────────────────────
   const handleSave = async () => {
@@ -374,32 +169,15 @@ export function CrewProfileScreen() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isEditing, isSaving]);
 
-  useEffect(() => {
-    return () => {
-      if (pendingAvatarPreviewUrl) {
-        URL.revokeObjectURL(pendingAvatarPreviewUrl);
-      }
-    };
-  }, [pendingAvatarPreviewUrl]);
-
-  const displayedAvatarSrc = pendingAvatarPreviewUrl || avatarPreviewUrl;
+  const displayedAvatarSrc = media.avatar.displayedSrc;
 
   return (
     <div className="pb-10 md:pb-16">
-      {isUploadingAvatar && (
+      {media.isUploading && (
         <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
           <div
             className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
-            style={{ width: `${avatarUploadProgress}%` }}
-          />
-        </div>
-      )}
-      {/* Cover upload progress bar — fixed below top nav (desktop) */}
-      {isUploadingCover && (
-        <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
-          <div
-            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
-            style={{ width: `${coverUploadProgress}%` }}
+            style={{ width: `${media.uploadProgress}%` }}
           />
         </div>
       )}
@@ -410,10 +188,10 @@ export function CrewProfileScreen() {
         className="relative w-full overflow-hidden"
         style={{ height: "clamp(180px, 30vw, 320px)" }}
       >
-        {currentCoverSrc ? (
+        {media.cover.currentSrc ? (
           currentCoverType === "video" ? (
             <video
-              src={currentCoverSrc}
+              src={media.cover.currentSrc}
               className="absolute inset-0 h-full w-full object-cover"
               autoPlay
               muted
@@ -422,7 +200,7 @@ export function CrewProfileScreen() {
             />
           ) : (
             <img
-              src={currentCoverSrc}
+              src={media.cover.currentSrc}
               alt="Cover"
               className="absolute inset-0 h-full w-full object-cover"
             />
@@ -446,27 +224,26 @@ export function CrewProfileScreen() {
         />
 
         {/* Lightbox trigger on non-editing view */}
-        {!selectedCoverFile &&
-          currentCoverSrc &&
+        {!media.cover.selectedFile &&
+          media.cover.currentSrc &&
           currentCoverType !== "video" && (
             <button
               className="absolute inset-0 h-full w-full"
               aria-label="View cover full size"
               onClick={() =>
-                setLightbox({ src: currentCoverSrc, type: "image" })
+                setLightbox({ src: media.cover.currentSrc, type: "image" })
               }
             />
           )}
 
         {/* Cover controls — top-right */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-          {selectedCoverFile && !isUploadingCover ? (
-            /* Staged: discard (X) + confirm (tick) */
+          {media.cover.selectedFile && !media.cover.isUploading ? (
             <>
               <button
                 type="button"
                 aria-label="Discard cover change"
-                onClick={handleCoverDiscard}
+                onClick={media.cover.discard}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg transition-colors hover:bg-black/85"
               >
                 <svg
@@ -484,7 +261,7 @@ export function CrewProfileScreen() {
               <button
                 type="button"
                 aria-label="Save cover photo"
-                onClick={handleCoverConfirm}
+                onClick={media.cover.confirm}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
               >
                 <Check className="h-4 w-4" />
@@ -501,7 +278,7 @@ export function CrewProfileScreen() {
                 className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleCoverSelect(file);
+                  if (file) media.cover.select(file);
                   e.target.value = "";
                 }}
               />
@@ -524,7 +301,7 @@ export function CrewProfileScreen() {
                 handle: displayData.handle,
                 bio: displayData.bio,
                 avatarUrl: displayedAvatarSrc || "",
-                coverMediaUrl: coverPreviewUrl || "",
+                coverMediaUrl: media.cover.previewUrl || "",
               });
               return (
                 <AvatarRing
@@ -557,7 +334,7 @@ export function CrewProfileScreen() {
                     {
                       <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/45" />
                     }
-                    {!pendingAvatarFile && (
+                    {!media.avatar.pendingFile && (
                       <label
                         htmlFor="avatar-upload-input"
                         className="absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/25 bg-black/75 text-white opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:bg-black"
@@ -572,20 +349,20 @@ export function CrewProfileScreen() {
                           className="sr-only"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handleAvatarSelect(file);
+                            if (file) media.avatar.select(file);
                             e.target.value = "";
                           }}
                         />
                       </label>
                     )}
-                    {pendingAvatarFile && (
+                    {media.avatar.pendingFile && (
                       <>
                         <button
                           type="button"
                           aria-label="Discard avatar change"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAvatarDiscard();
+                            media.avatar.discard();
                           }}
                           className="absolute left-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white shadow-lg transition-colors hover:bg-black"
                         >
@@ -596,7 +373,7 @@ export function CrewProfileScreen() {
                           aria-label="Confirm avatar change"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void handleAvatarConfirm();
+                            void media.avatar.confirm();
                           }}
                           className="absolute right-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
                         >
@@ -706,7 +483,7 @@ export function CrewProfileScreen() {
                   }`}
                 >
                   {isSaving ? (
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                    <InlineSpinner />
                   ) : (
                     <Check className="h-3.5 w-3.5" />
                   )}
@@ -717,11 +494,12 @@ export function CrewProfileScreen() {
 
           <div className="space-y-6">
           <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+            <label htmlFor="crew-fullname" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
               Display Name
             </label>
             {isEditing ? (
               <input
+                id="crew-fullname"
                 type="text"
                 value={formData.full_name}
                 onChange={(e) =>
@@ -747,11 +525,12 @@ export function CrewProfileScreen() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+            <label htmlFor="crew-handle" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
               Handle
             </label>
             {isEditing ? (
               <input
+                id="crew-handle"
                 type="text"
                 value={formData.handle}
                 onChange={(e) =>
@@ -771,12 +550,13 @@ export function CrewProfileScreen() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+            <label htmlFor="crew-bio" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
               Bio
             </label>
             {isEditing ? (
               <>
                 <textarea
+                  id="crew-bio"
                   value={formData.bio}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, bio: e.target.value }))

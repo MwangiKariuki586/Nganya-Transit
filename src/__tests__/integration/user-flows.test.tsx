@@ -131,14 +131,14 @@ describe("Integration Tests - User Flows", () => {
         await nganyaStore.fetchLiveNganyas();
 
         // Verify data is in store
-        expect(nganyaStore.nganyas).toHaveLength(2);
-        expect(nganyaStore.corridors).toHaveLength(2);
-        expect(nganyaStore.liveNganyas).toHaveLength(1);
+        expect(nganyaStore.getNganyas()).toHaveLength(2);
+        expect(nganyaStore.getCorridors()).toHaveLength(2);
+        expect(nganyaStore.getLiveNganyas()).toHaveLength(1);
 
         // Step 2: Verify data is cached (second fetch should use cache)
-        const corridorsBefore = nganyaStore.corridors;
+        const corridorsBefore = nganyaStore.getCorridors();
         await nganyaStore.fetchCorridors();
-        const corridorsAfter = nganyaStore.corridors;
+        const corridorsAfter = nganyaStore.getCorridors();
 
         // Same reference means data was served from cache
         expect(corridorsBefore).toBe(corridorsAfter);
@@ -179,7 +179,7 @@ describe("Integration Tests - User Flows", () => {
         // First fetch
         await nganyaStore.fetchCorridors();
         expect(getCorridorsCalls.length).toBe(1);
-        expect(nganyaStore.corridors).toHaveLength(2);
+        expect(nganyaStore.getCorridors()).toHaveLength(2);
 
         // Second fetch (should use cache)
         await nganyaStore.fetchCorridors();
@@ -353,19 +353,19 @@ describe("Integration Tests - User Flows", () => {
         // Step 1: Initial fetch
         await nganyaStore.fetchCorridors();
         expect(fetchCount).toBe(1);
-        expect(nganyaStore.corridors).toHaveLength(2);
+        expect(nganyaStore.getCorridors()).toHaveLength(2);
 
         // Step 2: Wait for data to become stale (simulate TTL expiration)
-        // Manually set lastFetchedAt to past
+        // Manually set corridors cache entry to stale
         useNganyaStore.setState({
-          corridorsLastFetchedAt: Date.now() - 130_000, // 130 seconds ago (TTL is 120s)
+          corridorsCache: { data: nganyaStore.getCorridors()!, fetchedAt: Date.now() - 130_000 },
         });
 
         // Step 3: Fetch again (should return stale data immediately)
         const corridorsPromise = nganyaStore.fetchCorridors();
 
         // Verify stale data is returned immediately
-        const staleCorridors = nganyaStore.corridors;
+        const staleCorridors = nganyaStore.getCorridors();
         expect(staleCorridors).not.toBeNull();
         if (staleCorridors) {
           expect(staleCorridors).toHaveLength(2);
@@ -376,7 +376,7 @@ describe("Integration Tests - User Flows", () => {
 
         // Verify fresh data was fetched in background
         expect(fetchCount).toBe(2);
-        expect(nganyaStore.corridors).toHaveLength(2);
+        expect(nganyaStore.getCorridors()).toHaveLength(2);
       } catch (error) {
         // If store has null check issues, document it
         console.log("Store null check issue:", error);

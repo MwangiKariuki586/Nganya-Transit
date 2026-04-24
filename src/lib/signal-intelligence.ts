@@ -20,15 +20,6 @@ export function getSignalStrength(createdAt: string | Date): SignalStrength {
 /**
  * Get human-readable signal label
  */
-export function getSignalLabel(strength: SignalStrength): string {
-  const labels = {
-    fresh: 'Fresh',
-    aging: 'Aging',
-    expired: 'Expired',
-  };
-  return labels[strength];
-}
-
 /**
  * Get signal strength styling
  */

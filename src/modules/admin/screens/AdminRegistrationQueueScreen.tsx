@@ -684,7 +684,7 @@ export default function AdminRegistrationQueueScreen() {
               {(selectedRequest.status === "PENDING" ||
                 selectedRequest.status === "NEEDS_INFO") && (
                 <div>
-                  <label className="text-caption text-[var(--color-text-tertiary)]">
+                  <label htmlFor="review-notes" className="text-caption text-[var(--color-text-tertiary)]">
                     Review notes
                     <span className="ml-2 text-amber-200">
                       (Required for Request changes / Reject)
@@ -707,6 +707,7 @@ export default function AdminRegistrationQueueScreen() {
                   </div>
 
                   <textarea
+                    id="review-notes"
                     value={reviewNotes}
                     onChange={(event) => setReviewNotes(event.target.value)}
                     rows={4}

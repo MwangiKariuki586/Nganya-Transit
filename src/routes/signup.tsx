@@ -149,7 +149,7 @@ function SignUpScreen() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
+                <label htmlFor="signup-fullname" className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
                   Full Name
                 </label>
                 <div className="relative">
@@ -157,6 +157,7 @@ function SignUpScreen() {
                     <User className="w-4 h-4" />
                   </span>
                   <input
+                    id="signup-fullname"
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -168,7 +169,7 @@ function SignUpScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
+                <label htmlFor="signup-handle" className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
                   Handle (Username)
                 </label>
                 <div className="relative">
@@ -176,6 +177,7 @@ function SignUpScreen() {
                     <AtSign className="w-4 h-4" />
                   </span>
                   <input
+                    id="signup-handle"
                     type="text"
                     value={handle}
                     onChange={(e) => setHandle(e.target.value)}
@@ -187,7 +189,7 @@ function SignUpScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
+                <label htmlFor="signup-email" className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
                   Email
                 </label>
                 <div className="relative">
@@ -195,6 +197,7 @@ function SignUpScreen() {
                     <Mail className="w-4 h-4" />
                   </span>
                   <input
+                    id="signup-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -206,7 +209,7 @@ function SignUpScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
+                <label htmlFor="signup-password" className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -214,6 +217,7 @@ function SignUpScreen() {
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
+                    id="signup-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -225,7 +229,7 @@ function SignUpScreen() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
+                <label htmlFor="signup-confirm-password" className="block text-sm font-semibold text-(--color-text-primary) mb-1.5">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -233,6 +237,7 @@ function SignUpScreen() {
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
+                    id="signup-confirm-password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}

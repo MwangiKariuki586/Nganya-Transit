@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import HomeScreen, { HomeScreenSkeleton } from '@/modules/fan/screens/HomeScreen'
 import { loadFanHomeRouteData } from '@/modules/fan/services/route-data'
+import type { FanSharedData } from '@/modules/fan/services/route-data'
 
 export const Route = createFileRoute('/(fan)/')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -8,7 +9,10 @@ export const Route = createFileRoute('/(fan)/')({
     recent: search.recent === 'all' ? 'all' : undefined,
   }),
   loaderDeps: ({ search }) => ({ corridor: search.corridor ?? null }),
-  loader: async ({ deps }) => loadFanHomeRouteData({ corridorId: deps.corridor }),
+  loader: async ({ deps, context }) => {
+    const shared = (context as { fanShared: FanSharedData }).fanShared
+    return loadFanHomeRouteData({ corridorId: deps.corridor }, shared)
+  },
   component: FanHomeRoute,
   pendingComponent: FanHomePendingRoute,
 })

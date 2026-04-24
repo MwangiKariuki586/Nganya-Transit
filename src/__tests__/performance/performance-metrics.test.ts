@@ -392,8 +392,11 @@ describe('Performance Testing - State Management Migration', () => {
       expect(fetchCount).toBe(1)
 
       // Make data stale
+      const currentCorridors = nganyaStore.getCorridors()
       useNganyaStore.setState({
-        corridorsLastFetchedAt: Date.now() - 130_000, // 130 seconds ago (TTL is 120s)
+        corridorsCache: currentCorridors
+          ? { data: currentCorridors, fetchedAt: Date.now() - 130_000 }
+          : null,
       })
 
       // Fetch with stale data (should return immediately)

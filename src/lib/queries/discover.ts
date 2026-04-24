@@ -45,7 +45,7 @@ export async function getCorridors() {
     return data
 }
 
-export async function searchNganyas(queryText: string, corridorId?: string) {
+export async function searchNganyas(queryText: string, corridorId?: string, limit = 100) {
     let query = supabase.from('nganyas').select(NGANYA_IMAGE_SELECT)
 
     if (corridorId) {
@@ -53,11 +53,13 @@ export async function searchNganyas(queryText: string, corridorId?: string) {
     }
 
     if (queryText) {
-        // Basic ilike search on name or tags for MVP
-        query = query.or(`name.ilike.%${queryText}%,tags.cs.{${queryText}}`)
+        const sanitized = queryText.replace(/[%_\\(),.*+?{}|[\]^$]/g, '')
+        if (sanitized) {
+            query = query.or(`name.ilike.%${sanitized}%,tags.cs.{${sanitized}}`)
+        }
     }
 
-    const { data, error } = await query
+    const { data, error } = await query.limit(limit)
     if (error) throw error
     return dedupeNganyas(data)
 }
@@ -74,10 +76,16 @@ export async function getNganya(id: string) {
 }
 
 export async function getNganyaBySlug(slug: string) {
+    // Derive an approximate name pattern from the slug to filter server-side
+    // instead of loading the entire table and matching in JS.
+    const nameHint = slug.replace(/-/g, '%')
+
     const { data, error } = await supabase
         .from('nganyas')
         .select('*, corridors(*), nganya_media(*), crew_nganyas(profiles(avatar_url))')
+        .ilike('name', `%${nameHint}%`)
         .order('created_at', { ascending: false })
+        .limit(20)
 
     if (error) throw error
 

@@ -3,9 +3,13 @@ import FollowingScreen, {
   FollowingScreenSkeleton,
 } from "@/modules/fan/screens/FollowingScreen";
 import { loadFollowingRouteData } from "@/modules/fan/services/route-data";
+import type { FanSharedData } from "@/modules/fan/services/route-data";
 
 export const Route = createFileRoute("/(fan)/following")({
-  loader: loadFollowingRouteData,
+  loader: async ({ context }) => {
+    const shared = (context as { fanShared: FanSharedData }).fanShared;
+    return loadFollowingRouteData(shared);
+  },
   component: FollowingRouteComponent,
   pendingComponent: FollowingRoutePendingComponent,
 });

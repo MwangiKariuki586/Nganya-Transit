@@ -183,11 +183,7 @@ export default function TrackDrawer({
       // In real app: save to user_journeys table
       await new Promise((resolve) => setTimeout(resolve, 500)); // Mock delay
 
-      console.log(`Analytics: ${action.toLowerCase()}_confirmed`, {
-        nganya_id: nganya.nganya_id,
-        predicted_eta: nganya.eta_minutes,
-        actual_eta: latestEta,
-      });
+      // TODO: wire analytics event for ${action} confirmation
 
       if (action === "BOARDED") {
         // Success state - could show a success toast
