@@ -95,7 +95,12 @@ export const startCrewSessionServerFn = createServerFn({ method: 'POST' })
       throw error
     }
 
-    return access.getCrewSessionById(context, session.id)
+    const sessionId = typeof session === 'string' ? session : session?.id
+    if (!sessionId) {
+      throw new Error('RPC create_live_session returned no session id')
+    }
+
+    return access.getCrewSessionById(context, sessionId)
   })
 
 export const pingCrewSessionServerFn = createServerFn({ method: 'POST' })

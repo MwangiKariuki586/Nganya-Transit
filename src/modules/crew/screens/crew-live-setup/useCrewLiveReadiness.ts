@@ -57,55 +57,63 @@ export function useCrewLiveReadiness(
       throw new Error("This browser does not support geolocation.");
     }
 
-    // Bypass navigator.permissions.query — some mobile browsers falsely
-    // report "denied" or suppress the native prompt.
-    return new Promise<Coords>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        setPermissionStatus("prompt");
-        reject(new Error("Location request timed out. Please ensure location is enabled and try again."));
-      }, 15000);
+    const applyFix = (position: GeolocationPosition): Coords => {
+      const nextCoords: Coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
+      };
+      setCoords(nextCoords);
+      setPermissionStatus("granted");
+      setLastFixAt(new Date().toISOString());
+      return nextCoords;
+    };
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          clearTimeout(timeoutId);
-          const nextCoords: Coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
-          };
-          setCoords(nextCoords);
-          setPermissionStatus("granted");
-          setLastFixAt(new Date().toISOString());
-          resolve(nextCoords);
-        },
-        (error) => {
-          clearTimeout(timeoutId);
-          let errorMessage = "Location permission is required to go Live.";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              setPermissionStatus("denied");
-              errorMessage =
-                typeof window !== "undefined" && window.isSecureContext === false
-                  ? "Location requires a secure connection. Please use HTTPS or localhost."
-                  : "Location permission denied. Please enable location in your browser settings or app settings.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location information is unavailable. Please check your device's location services.";
-              break;
-            case error.TIMEOUT:
-              setPermissionStatus("prompt");
-              errorMessage = "Location request timed out. Please ensure location is enabled and try again.";
-              break;
-            default:
-              setPermissionStatus("prompt");
-              errorMessage = "An unknown error occurred while getting location.";
-              break;
-          }
-          reject(new Error(errorMessage));
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 3000 },
-      );
-    });
+    const toError = (error: GeolocationPositionError): Error => {
+      let errorMessage = "Location permission is required to go Live.";
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          setPermissionStatus("denied");
+          errorMessage =
+            typeof window !== "undefined" && window.isSecureContext === false
+              ? "Location requires a secure connection. Please use HTTPS or localhost."
+              : "Location permission denied. Please enable location in your browser settings or app settings.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = "Location information is unavailable. Please check your device's location services.";
+          break;
+        case error.TIMEOUT:
+          setPermissionStatus("prompt");
+          errorMessage = "Location request timed out. Please ensure location is enabled and try again.";
+          break;
+        default:
+          setPermissionStatus("prompt");
+          errorMessage = "An unknown error occurred while getting location.";
+          break;
+      }
+      return new Error(errorMessage);
+    };
+
+    const getPosition = (opts: PositionOptions) =>
+      new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+      });
+
+    // Stage 1: fast network/cached fix
+    try {
+      const pos = await getPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+      return applyFix(pos);
+    } catch (fastErr: any) {
+      if (fastErr?.code === 1) throw toError(fastErr); // PERMISSION_DENIED — don't retry
+    }
+
+    // Stage 2: high-accuracy GPS fallback
+    try {
+      const pos = await getPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+      return applyFix(pos);
+    } catch (err: any) {
+      throw toError(err);
+    }
   }, []);
 
   // Load registration request + history

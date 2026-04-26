@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { crewLiveService } from '@/features/crew-live/services/crew-live-service'
 import { useGeolocation } from './useGeolocation'
 import { useNetworkStatus } from './useNetworkStatus'
@@ -146,6 +146,43 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
       }
     }
   }, [session?.status, permissionStatus, isTracking, startTracking, stopTracking])
+
+  // Wake Lock: prevent screen sleep during active LIVE session
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+
+  useEffect(() => {
+    if (session?.status !== 'LIVE' || !('wakeLock' in navigator)) return
+
+    let released = false
+
+    const requestLock = async () => {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen')
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null
+        })
+      } catch {
+        // Wake Lock can fail silently (e.g. low battery, unsupported context)
+      }
+    }
+
+    // Re-acquire lock when tab becomes visible (browser releases it on hide)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !released && !wakeLockRef.current) {
+        void requestLock()
+      }
+    }
+
+    void requestLock()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      released = true
+      document.removeEventListener('visibilitychange', handleVisibility)
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+  }, [session?.status])
 
   const updateSeats = useCallback(
     async (seatsLeft: number) => {

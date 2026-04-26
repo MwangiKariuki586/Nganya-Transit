@@ -5,7 +5,10 @@ import SpecificNganyaPicker from "./SpecificNganyaPicker";
 import SearchResultsOverlayV2 from "./SearchResultsOverlayV2";
 import Chip from "../ui/Chip";
 import Button from "../ui/Button";
-import { MapPin, Navigation, BusFront, ChevronDown } from "lucide-react";
+import { MapPin, Navigation, BusFront, ChevronDown, Clock, X } from "lucide-react";
+import { useIsMobile } from "../../hooks/useIsMobile";
+import { useRecentSearches } from "../../hooks/useRecentSearches";
+import { trackEvent } from "../../lib/analytics";
 
 export interface RideSearchPayload {
   fromStage: { id: string; name: string };
@@ -28,7 +31,7 @@ export default function WhereToCard({
   onSearch,
   onClear,
 }: WhereToCardProps) {
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [isCompact, setIsCompact] = useState(false);
 
   // Pickers state
@@ -86,6 +89,8 @@ export default function WhereToCard({
     }
   });
 
+  const { recents, addRecent, clearRecents } = useRecentSearches();
+
   // Persist to localStorage whenever state changes
   useEffect(() => {
     if (toPlace) {
@@ -123,13 +128,7 @@ export default function WhereToCard({
     if (toPlace?.corridor_id) {
       onCorridorChange?.(toPlace.corridor_id, toPlace.name);
     }
-  }, []);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -156,7 +155,6 @@ export default function WhereToCard({
     setIsCompact(false);
     setResultsOpen(false);
 
-    // Clear localStorage
     localStorage.removeItem("whereto_toPlace");
     localStorage.removeItem("whereto_fromStage");
     localStorage.removeItem("whereto_preference");
@@ -175,12 +173,18 @@ export default function WhereToCard({
       preference,
       preferredNganya,
     };
-    // TODO: wire analytics event for ride_search_started
-    void ({
-      from: fromStage.id,
-      to: toPlace.id,
-      preference,
+
+    trackEvent({
+      event: "ride_search_started",
+      properties: {
+        from_stage_id: fromStage.id,
+        to_corridor_id: toPlace.corridor_id || toPlace.id,
+        preference,
+        has_preferred_nganya: !!preferredNganya,
+      },
     });
+
+    addRecent(payload);
 
     if (onSearch) {
       onSearch(payload);
@@ -193,6 +197,37 @@ export default function WhereToCard({
     setResultsOpen(true);
   };
 
+  /** Replay a recent search without re-opening pickers. */
+  const handleReplayRecent = (payload: RideSearchPayload) => {
+    setToPlace(payload.toPlace);
+    setFromStage(payload.fromStage);
+    setPreference(payload.preference);
+    setPreferredNganya(payload.preferredNganya);
+    onCorridorChange?.(
+      payload.toPlace.corridor_id || payload.toPlace.id,
+      payload.toPlace.name,
+    );
+
+    trackEvent({
+      event: "ride_search_started",
+      properties: {
+        from_stage_id: payload.fromStage.id,
+        to_corridor_id: payload.toPlace.corridor_id || payload.toPlace.id,
+        preference: payload.preference,
+        source: "recent_repeat",
+      },
+    });
+
+    addRecent(payload);
+
+    if (onSearch) {
+      onSearch(payload);
+      if (isMobile) setIsCompact(true);
+      return;
+    }
+    setResultsOpen(true);
+  };
+
   const canSearch = fromStage !== null && toPlace !== null;
   const summaryText = `${toPlace?.name || "Route"} • ${fromStage?.name || "Stage"} • ${
     preference === "SPECIFIC"
@@ -202,6 +237,7 @@ export default function WhereToCard({
         : "Any"
   }`;
 
+  // Compact summary (mobile, after search has been triggered)
   if (isMobile && isCompact && toPlace && fromStage) {
     return (
       <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6 shadow-sm">
@@ -256,6 +292,50 @@ export default function WhereToCard({
           </button>
         )}
       </div>
+
+      {/* Recent searches strip */}
+      {recents.length > 0 && !toPlace && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-[var(--color-text-tertiary)] uppercase tracking-wider font-semibold flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Recent
+            </p>
+            <button
+              type="button"
+              onClick={clearRecents}
+              className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-0.5"
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {recents.map((recent, idx) => (
+              <button
+                key={`${recent.fromStage.id}-${recent.toPlace.id}-${idx}`}
+                type="button"
+                onClick={() => handleReplayRecent(recent)}
+                className="w-full flex items-center justify-between p-2.5 rounded-[var(--radius-md)] bg-[var(--color-bg-body)] border border-[var(--color-line)] hover:border-[var(--color-accent-soft)] transition-colors text-left group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock className="w-3.5 h-3.5 shrink-0 text-[var(--color-text-tertiary)]" />
+                  <span className="text-sm text-[var(--color-text-primary)] truncate">
+                    {recent.toPlace.name}
+                  </span>
+                  <span className="text-[var(--color-text-tertiary)] text-xs shrink-0">
+                    from
+                  </span>
+                  <span className="text-sm text-[var(--color-text-secondary)] truncate">
+                    {recent.fromStage.name}
+                  </span>
+                </div>
+                <span className="text-xs text-[var(--color-accent)] shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Repeat
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="flex flex-col gap-3">

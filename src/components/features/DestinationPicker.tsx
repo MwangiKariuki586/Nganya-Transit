@@ -4,6 +4,7 @@ import BottomSheet from '../ui/BottomSheet'
 import SearchInput from '../ui/SearchInput'
 import { getCorridors } from '../../lib/queries/discover'
 import { MapPin, Route } from 'lucide-react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 interface DestinationPickerProps {
     isOpen: boolean
@@ -12,17 +13,10 @@ interface DestinationPickerProps {
 }
 
 export default function DestinationPicker({ isOpen, onClose, onSelect }: DestinationPickerProps) {
-    const [isMobile, setIsMobile] = useState(false)
+    const isMobile = useIsMobile()
     const [corridors, setCorridors] = useState<any[]>([])
     const [search, setSearch] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-        checkMobile()
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
 
     useEffect(() => {
         if (isOpen && corridors.length === 0) {

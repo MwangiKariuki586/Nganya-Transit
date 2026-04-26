@@ -13,7 +13,6 @@ import {
   clearCrewActiveSessionId,
   writeCrewActiveSessionId,
 } from "@/modules/crew/lib/storage";
-import { CrewAssignmentCard } from "./crew-live-setup/CrewAssignmentCard";
 import { CrewLiveSettingsCard } from "./crew-live-setup/CrewLiveSettingsCard";
 import { CrewMobileStickyBar } from "./crew-live-setup/CrewMobileStickyBar";
 import { clampSeats, getDirectionLabels, getLocationPoint } from "./crew-live-setup/crew-live-domain";
@@ -33,14 +32,13 @@ export default function CrewLiveSetupScreen() {
 
   const readiness = useCrewLiveReadiness(assignment, snapshot.bootstrap.request, addToast);
 
-  const [isMobileReadinessExpanded, setIsMobileReadinessExpanded] = useState(false);
   const [isStagePickerOpen, setIsStagePickerOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isEndingActive, setIsEndingActive] = useState(false);
 
   const directionSectionRef = useRef<HTMLDivElement>(null);
   const seatsSectionRef = useRef<HTMLDivElement>(null);
-  const startLiveButtonRef = useRef<HTMLButtonElement>(null);
+  const startLiveButtonRef = useRef<HTMLDivElement>(null);
 
   const scrollToSection = useCallback(
     (target: "direction" | "seats" | "start") => {
@@ -72,7 +70,6 @@ export default function CrewLiveSetupScreen() {
   const directionIsActive = readiness.nextRequired === "direction";
   const seatsIsActive = readiness.nextRequired === "seats";
   const settingsNeedAttention = directionIsActive || seatsIsActive;
-  const mobileReadinessCollapsed = [readiness.assignmentReady, readiness.locationGranted, readiness.directionSelected, readiness.seatsSet].filter(Boolean).length > 1 && !isMobileReadinessExpanded;
 
   const stickyHelperText = !assignment
     ? "Complete crew setup before going Live."
@@ -83,12 +80,6 @@ export default function CrewLiveSetupScreen() {
         : !readiness.seatsSet
           ? "Confirm seats to continue."
           : `${assignment.nganya_name} | ${readiness.direction === "TO_TOWN" ? directionLabels.toTown : directionLabels.fromTown} | ${readiness.seatsLeft === 0 ? "Full" : `${readiness.seatsLeft} seats left`}`;
-
-  const ghostCtaLabel =
-    readiness.nextRequired === "location" ? "Enable location to start"
-    : readiness.nextRequired === "direction" ? "Set direction to start"
-    : readiness.nextRequired === "seats" ? "Set seats to start"
-    : "Start Live";
 
   const readinessItems = [
     {
@@ -116,10 +107,6 @@ export default function CrewLiveSetupScreen() {
         : "Direction and seats are required before you go live.",
     },
   ] as const;
-
-  const assignmentThumb = assignment?.media_thumb_url || readiness.registrationRequest?.nganya_registration_request_media?.[0]?.media_url || null;
-  const assignmentPlateLast4 = readiness.registrationRequest?.plate_last4 || null;
-  const assignmentSacco = readiness.registrationRequest?.sacco || null;
 
   const handleDirectionChange = (value: CrewDirectionValue) => readiness.setDirection(value);
   const handleSeatsChange = (value: number) => { readiness.setHasConfirmedSeats(true); readiness.setSeatsLeft(value); };
@@ -189,50 +176,21 @@ export default function CrewLiveSetupScreen() {
       ) : (
         <>
           <div className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] xl:items-start xl:gap-6">
-            <div className="space-y-4 xl:order-2">
-              <CrewAssignmentCard
-                assignment={assignment} corridorName={corridorName} assignmentThumb={assignmentThumb}
-                assignmentPlateLast4={assignmentPlateLast4} assignmentSacco={assignmentSacco} lastLiveAt={readiness.lastLiveAt}
-                isAssignmentExpanded={readiness.isAssignmentExpanded} onToggleExpanded={() => readiness.setIsAssignmentExpanded((c) => !c)}
-                showAssignmentHelp={readiness.showAssignmentHelp} onToggleHelp={() => readiness.setShowAssignmentHelp((c) => !c)}
-              />
-            </div>
-
-            <aside className="mt-4 space-y-4 xl:order-1 xl:sticky xl:top-[calc(var(--top-nav-height)+24px)] xl:mt-0">
-              <div className="xl:hidden">
-                <CrewReadinessCard items={readinessItems as any} permissionStatus={readiness.permissionStatus} lastFixAt={readiness.lastFixAt}
-                  gpsQuality={readiness.gpsQuality} networkStatus={readiness.networkStatus} networkMessage={readiness.networkMessage}
-                  readinessCount={[readiness.assignmentReady, readiness.locationGranted, readiness.directionSelected, readiness.seatsSet].filter(Boolean).length}
-                  readinessTotal={4} compact collapsed={mobileReadinessCollapsed} nextRequired={readiness.nextRequired}
-                  onSetDirection={() => scrollToSection("direction")} onSetSeats={() => scrollToSection("seats")}
-                  onToggle={() => setIsMobileReadinessExpanded((c) => !c)} onEnableLocation={readiness.handleLocationAction}
-                />
-              </div>
-
-              <div className="hidden xl:block" ref={startLiveButtonRef}>
-                <CrewReadinessCard items={readinessItems as any} permissionStatus={readiness.permissionStatus} lastFixAt={readiness.lastFixAt}
-                  gpsQuality={readiness.gpsQuality} networkStatus={readiness.networkStatus} networkMessage={readiness.networkMessage}
-                  readinessCount={[readiness.assignmentReady, readiness.locationGranted, readiness.directionSelected, readiness.seatsSet].filter(Boolean).length}
-                  readinessTotal={4} nextRequired={readiness.nextRequired}
-                  onSetDirection={() => scrollToSection("direction")} onSetSeats={() => scrollToSection("seats")}
-                  onEnableLocation={readiness.handleLocationAction}
-                />
-              </div>
-
-              <div className="xl:hidden">
-                <Button variant="ghost"
-                  className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${startIsActive ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.10)] text-[var(--color-accent)] shadow-[0_12px_32px_rgba(255,45,120,0.10)]" : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-secondary)]"} disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none`}
-                  disabled={!readiness.isReadyToStart} onClick={handleStart}>
-                  <Radio className="h-4 w-4" />{ghostCtaLabel}
-                </Button>
-              </div>
-
+            <div className="space-y-4">
               <CrewLiveSettingsCard direction={readiness.direction} onDirectionChange={handleDirectionChange}
                 seatsLeft={readiness.seatsLeft} onSeatsChange={handleSeatsChange} onSeatStep={handleSeatStep}
                 hasConfirmedSeats={readiness.hasConfirmedSeats} hasAssignment={Boolean(assignment)}
                 directionIsActive={directionIsActive} seatsIsActive={seatsIsActive} settingsNeedAttention={settingsNeedAttention}
                 directionLabels={directionLabels} directionSectionRef={directionSectionRef} seatsSectionRef={seatsSectionRef}
               />
+
+              <div className="xl:hidden">
+                <Button variant="ghost"
+                  className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${startIsActive ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.10)] text-[var(--color-accent)] shadow-[0_12px_32px_rgba(255,45,120,0.10)]" : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-secondary)]"} disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none`}
+                  disabled={!readiness.isReadyToStart} onClick={handleStart}>
+                  <Radio className="h-4 w-4" />Start Live
+                </Button>
+              </div>
 
               <div className="hidden xl:block">
                 <Button variant="primary"
@@ -241,6 +199,16 @@ export default function CrewLiveSetupScreen() {
                   <Radio className="h-4 w-4" />Start Live
                 </Button>
               </div>
+            </div>
+
+            <aside className="mt-4 space-y-4 xl:sticky xl:top-[calc(var(--top-nav-height)+24px)] xl:mt-0" ref={startLiveButtonRef}>
+              <CrewReadinessCard items={readinessItems as any} permissionStatus={readiness.permissionStatus} lastFixAt={readiness.lastFixAt}
+                gpsQuality={readiness.gpsQuality} networkStatus={readiness.networkStatus} networkMessage={readiness.networkMessage}
+                readinessCount={[readiness.assignmentReady, readiness.locationGranted, readiness.directionSelected, readiness.seatsSet].filter(Boolean).length}
+                readinessTotal={4} nextRequired={readiness.nextRequired}
+                onSetDirection={() => scrollToSection("direction")} onSetSeats={() => scrollToSection("seats")}
+                onEnableLocation={readiness.handleLocationAction}
+              />
             </aside>
           </div>
 

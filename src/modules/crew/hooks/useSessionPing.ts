@@ -195,6 +195,28 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
     }
   }, [sessionId, isActive, pingInterval, ping])
 
+  // Catch-up ping when tab becomes visible after being backgrounded
+  useEffect(() => {
+    if (!sessionId || !isActive) return
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void ping()
+
+        // Reset the interval so the next tick is a full pingInterval away
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+        }
+        intervalRef.current = setInterval(() => {
+          void ping()
+        }, pingInterval)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [sessionId, isActive, ping, pingInterval])
+
   // Handle online/offline events
   useEffect(() => {
     const handleOnline = () => {

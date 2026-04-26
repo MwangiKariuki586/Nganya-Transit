@@ -51,6 +51,8 @@ interface CardProps {
   primaryAction?: CardAction | null;
   secondaryAction?: CardAction | null;
   footerContent?: ReactNode;
+  /** When provided, intercepts the card body click and calls this instead of navigating to the nganya profile. */
+  onCardClick?: () => void;
 }
 
 export default function Card({
@@ -66,6 +68,7 @@ export default function Card({
   primaryAction,
   secondaryAction,
   footerContent,
+  onCardClick,
 }: CardProps) {
   if (variant === "compact")
     return (
@@ -98,6 +101,7 @@ export default function Card({
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}
         footerContent={footerContent}
+        onCardClick={onCardClick}
       />
     );
 }
@@ -115,6 +119,7 @@ function StandardCard({
   primaryAction,
   secondaryAction,
   footerContent,
+  onCardClick,
 }: CardProps) {
   const handleActionClick =
     (handler?: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
@@ -128,6 +133,7 @@ function StandardCard({
       to="/nganya/$slug"
       params={{ slug: nganya.slug }}
       className={`group block rounded-[var(--radius-lg)] overflow-hidden bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all duration-200 hover:-translate-y-0.5 no-underline ${className}`}
+      onClick={onCardClick ? (e) => { e.preventDefault(); onCardClick(); } : undefined}
     >
       {/* Image area */}
       <div className="relative h-44 overflow-hidden">

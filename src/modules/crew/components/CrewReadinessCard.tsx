@@ -272,33 +272,31 @@ export function CrewReadinessCard({
           </div>
 
           <div className="mt-3 rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-                  <LocateFixed className="h-4 w-4 text-[var(--color-accent)]" />
-                  <span>Location</span>
-                </div>
-                <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {locationCopy}
-                </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                <LocateFixed className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+                <span>Location</span>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="rounded-[var(--radius-full)] border border-[var(--glass-border)] bg-[var(--glass-bg)] px-2.5 py-1 text-caption text-[var(--color-text-tertiary)]">
-                  Shared only while Live
-                </div>
-                {nextRequired === "location" && showLocationAction ? (
-                  <Button
-                    variant="secondary"
-                    className="min-h-[32px] rounded-[12px] px-2 py-1 text-xs font-semibold"
-                    onClick={onEnableLocation}
-                  >
-                    {permissionStatus === "denied"
-                      ? "Retry location"
-                      : "Enable location"}
-                  </Button>
-                ) : null}
-              </div>
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--color-text-tertiary)]">
+                Shared only while Live
+              </span>
             </div>
+            <div className="mt-1.5 pl-6 text-sm text-[var(--color-text-secondary)]">
+              {locationCopy}
+            </div>
+            {nextRequired === "location" && showLocationAction ? (
+              <div className="mt-2.5 pl-6">
+                <Button
+                  variant="secondary"
+                  className="min-h-[36px] w-full rounded-[12px] px-3 text-sm font-semibold"
+                  onClick={onEnableLocation}
+                >
+                  {permissionStatus === "denied"
+                    ? "Retry location"
+                    : "Enable location"}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 rounded-[16px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] px-3 py-3">

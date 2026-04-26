@@ -14,7 +14,7 @@ interface CrewMobileStickyBarProps {
   onLocationAction: () => void;
   onScrollToDirection: () => void;
   onScrollToSeats: () => void;
-  startLiveButtonRef: RefObject<HTMLButtonElement | null>;
+  startLiveButtonRef: RefObject<HTMLDivElement | null>;
 }
 
 export function CrewMobileStickyBar({

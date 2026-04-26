@@ -30,3 +30,7 @@ migrations
 
 # Always track Cursor skills (new skills added later must not be blocked by *.md above)
 !.cursor/skills/**
+
+# Local HTTPS dev certs
+rootCA.pem
+*.pem

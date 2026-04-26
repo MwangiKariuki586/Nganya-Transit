@@ -601,6 +601,7 @@ export default function HomeScreen({
                     variant="standard"
                     isFollowing={followedIds.has(cardData.id)}
                     onFollow={toggleFollow}
+                    onCardClick={() => handleBrowseCardAction(cardData)}
                     primaryAction={{
                       label:
                         cardData.isLive &&
@@ -910,6 +911,7 @@ export default function HomeScreen({
                   variant="standard"
                   isFollowing={followedIds.has(cardData.id)}
                   onFollow={toggleFollow}
+                  onCardClick={() => handleBrowseCardAction(cardData)}
                   primaryAction={{
                     label:
                       cardData.isLive &&

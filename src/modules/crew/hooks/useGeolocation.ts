@@ -31,8 +31,8 @@ export interface UseGeolocationReturn {
 
 const DEFAULT_OPTIONS: GeolocationOptions = {
   enableHighAccuracy: true,
-  timeout: 12000,
-  maximumAge: 3000,
+  timeout: 20000,
+  maximumAge: 30000,
   watchPosition: false,
 }
 
@@ -93,34 +93,43 @@ export function useGeolocation(options: GeolocationOptions = {}): UseGeolocation
       throw new Error('This browser does not support geolocation.')
     }
 
-    return new Promise<Coords>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        setPermissionStatus('prompt')
-        reject(new Error('Location request timed out. Please ensure location is enabled and try again.'))
-      }, opts.timeout! + 3000)
+    const tryGet = (highAccuracy: boolean, timeout: number, maximumAge: number) =>
+      new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: highAccuracy,
+          timeout,
+          maximumAge,
+        })
+      })
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          clearTimeout(timeoutId)
-          const nextCoords = parsePosition(position)
-          setCoords(nextCoords)
-          setPermissionStatus('granted')
-          setError(null)
-          resolve(nextCoords)
-        },
-        (err) => {
-          clearTimeout(timeoutId)
-          const errorMessage = handleError(err)
-          reject(new Error(errorMessage))
-        },
-        {
-          enableHighAccuracy: opts.enableHighAccuracy,
-          timeout: opts.timeout,
-          maximumAge: opts.maximumAge,
-        },
-      )
-    })
-  }, [opts.enableHighAccuracy, opts.timeout, opts.maximumAge, parsePosition, handleError])
+    try {
+      // Fast path: accept any network/wifi/cached position (almost instant)
+      const position = await tryGet(false, 5000, 60000)
+      const nextCoords = parsePosition(position)
+      setCoords(nextCoords)
+      setPermissionStatus('granted')
+      setError(null)
+      return nextCoords
+    } catch (fastErr: any) {
+      // Permission denied — no point retrying with high accuracy
+      if (fastErr?.code === 1) {
+        const errorMessage = handleError(fastErr)
+        throw new Error(errorMessage)
+      }
+      // TIMEOUT or POSITION_UNAVAILABLE — fall back to high-accuracy GPS
+      try {
+        const position = await tryGet(true, opts.timeout!, opts.maximumAge!)
+        const nextCoords = parsePosition(position)
+        setCoords(nextCoords)
+        setPermissionStatus('granted')
+        setError(null)
+        return nextCoords
+      } catch (slowErr: any) {
+        const errorMessage = handleError(slowErr)
+        throw new Error(errorMessage)
+      }
+    }
+  }, [opts.timeout, opts.maximumAge, parsePosition, handleError])
 
   const requestPermission = useCallback(async (): Promise<Coords> => {
     try {

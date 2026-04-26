@@ -7,6 +7,7 @@ import { useToast } from "../ui/ToastContainer";
 import { getStages } from "../../lib/queries/discover";
 import { supabase } from "../../lib/supabase";
 import { MapPin, Navigation, AlertCircle } from "lucide-react";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 interface StagePickerProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export default function StagePicker({
   onSelect,
 }: StagePickerProps) {
   const { addToast } = useToast();
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [stages, setStages] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,13 +31,6 @@ export default function StagePicker({
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
