@@ -72,19 +72,19 @@ export function SessionInsights({
       icon: TrendingUp,
       label: "Updates sent",
       value: insights.totalPings.toString(),
-      color: "text-emerald-400",
+      color: "text-[var(--color-success)]",
     },
     {
       icon: Users,
       label: "Avg seats",
       value: insights.avgSeatsLeft.toString(),
-      color: "text-purple-400",
+      color: "text-[var(--color-cyan)]",
     },
     {
       icon: MapPin,
       label: "Distance",
       value: insights.distanceCovered,
-      color: "text-amber-400",
+      color: "text-[var(--color-text-secondary)]",
     },
   ];
 

@@ -327,11 +327,11 @@ export function UserDetailDrawer({ userId, onClose }: UserDetailDrawerProps) {
                   </div>
 
                   {userDetail.roleMismatch && (
-                    <div className="rounded-[20px] border border-amber-500/30 bg-amber-500/10 p-5">
-                      <div className="text-caption font-semibold text-amber-200">
-                        ⚠️ Fix role mismatch
+                    <div className="rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
+                      <div className="text-caption font-semibold text-[var(--color-warning)]">
+                        Fix role mismatch
                       </div>
-                      <p className="mt-2 text-sm text-amber-200/80">
+                      <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
                         Align all role sources to a single target role. This
                         will update Profile, UserRoles, and Auth metadata.
                       </p>
@@ -344,7 +344,7 @@ export function UserDetailDrawer({ userId, onClose }: UserDetailDrawerProps) {
                             className={`rounded-[14px] border px-4 py-2 text-sm font-semibold transition-all ${
                               selectedFixRole === role
                                 ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
-                                : "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:border-amber-500/50"
+                                : "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)] hover:border-[var(--color-warning)]/50"
                             }`}
                           >
                             {role.toUpperCase()}
@@ -514,13 +514,13 @@ export function UserDetailDrawer({ userId, onClose }: UserDetailDrawerProps) {
                     <button
                       type="button"
                       onClick={() => setShowSuspendConfirm(true)}
-                      className="w-full rounded-[14px] border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-orange-400 transition-all hover:border-orange-500/50 hover:bg-orange-500/20"
+                      className="w-full rounded-[14px] border border-[var(--glass-border)] bg-transparent px-4 py-3 text-sm font-semibold text-[var(--color-error)] transition-all hover:border-[var(--color-error)]/50 hover:bg-[var(--color-error)]/10"
                     >
                       Suspend account
                     </button>
                   ) : (
-                    <div className="space-y-3 rounded-[14px] border border-orange-500/30 bg-orange-500/10 p-4">
-                      <p className="text-sm text-orange-400">
+                    <div className="space-y-3 rounded-[14px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
+                      <p className="text-sm text-[var(--color-error)]">
                         This will ban the user indefinitely. They will not be
                         able to sign in.
                       </p>
@@ -529,7 +529,7 @@ export function UserDetailDrawer({ userId, onClose }: UserDetailDrawerProps) {
                         onChange={(e) => setSuspendReason(e.target.value)}
                         placeholder="Suspension reason (required, min 10 characters)"
                         rows={3}
-                        className="w-full rounded-[14px] border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm text-white placeholder:text-orange-400/50 focus:border-orange-500/50 focus:outline-none"
+                        className="w-full rounded-[14px] border border-[var(--glass-border)] bg-[var(--color-bg-base)] px-4 py-2 text-sm text-white placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-error)]/50 focus:outline-none"
                       />
                       <div className="flex gap-2">
                         <LoadingButton
@@ -538,7 +538,7 @@ export function UserDetailDrawer({ userId, onClose }: UserDetailDrawerProps) {
                           isLoading={isSuspending}
                           loadingLabel="Suspending..."
                           onClick={handleSuspend}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600"
+                          className="flex-1 bg-[var(--color-error)] hover:bg-[var(--color-error)]/80"
                         >
                           Confirm suspend
                         </LoadingButton>

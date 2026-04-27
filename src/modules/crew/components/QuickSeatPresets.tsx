@@ -37,10 +37,10 @@ export function QuickSeatPresets({
         const colorClasses = {
           red: "border-red-500/30 bg-red-500/10 text-red-200 hover:bg-red-500/20",
           amber:
-            "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20",
+            "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)] hover:bg-[var(--glass-bg-strong)]",
           blue: "border-blue-500/30 bg-blue-500/10 text-blue-200 hover:bg-blue-500/20",
           green:
-            "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
+            "border-[var(--glass-border)] bg-transparent text-[var(--color-success)] hover:bg-[var(--glass-bg-strong)]",
         };
 
         return (

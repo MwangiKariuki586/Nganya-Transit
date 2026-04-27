@@ -27,9 +27,9 @@ export function PermissionBanner({ status, onRequest }: PermissionBannerProps) {
   }[status]
 
   return (
-    <div className="rounded-[24px] border border-amber-500/35 bg-[linear-gradient(135deg,rgba(255,184,0,0.16),rgba(255,184,0,0.08))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
-      <div className="text-sm font-semibold text-amber-300">{copy.title}</div>
-      <div className="mt-1 max-w-3xl text-sm text-amber-50/85">{copy.body}</div>
+    <div className="rounded-[24px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
+      <div className="text-sm font-semibold text-[var(--color-warning)]">{copy.title}</div>
+      <div className="mt-1 max-w-3xl text-sm text-[var(--color-text-primary)]/85">{copy.body}</div>
       {copy.action && onRequest ? (
         <Button
           variant="secondary"

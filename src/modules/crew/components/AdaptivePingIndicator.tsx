@@ -19,8 +19,8 @@ export function AdaptivePingIndicator({
   const config = {
     fast: {
       icon: Zap,
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-500/20",
+      color: "text-[var(--color-success)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Fast",
       description: "High-frequency updates",
     },
@@ -33,8 +33,8 @@ export function AdaptivePingIndicator({
     },
     slow: {
       icon: Turtle,
-      color: "text-amber-400",
-      bgColor: "bg-amber-500/20",
+      color: "text-[var(--color-warning)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Slow",
       description: "Reduced frequency",
     },
@@ -64,7 +64,7 @@ export function AdaptivePingIndicator({
       </div>
 
       {batteryLevel !== null && batteryLevel < 20 && (
-        <div className="flex items-center gap-1 text-xs text-amber-400">
+        <div className="flex items-center gap-1 text-xs text-[var(--color-warning)]">
           <Battery className="h-3 w-3" />
           <span>{batteryLevel.toFixed(0)}%</span>
         </div>

@@ -15,14 +15,14 @@ export function NetworkQualityIndicator({
   const config = {
     healthy: {
       icon: Wifi,
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-500/20",
+      color: "text-[var(--color-success)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Online",
     },
     poor: {
       icon: Wifi,
-      color: "text-amber-400",
-      bgColor: "bg-amber-500/20",
+      color: "text-[var(--color-warning)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Slow",
     },
     offline: {

@@ -16,7 +16,7 @@ interface WorkQueuePanelProps {
 
 const severityStyles = {
   info: "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-[var(--color-accent)]",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+  warning: "border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-warning)]",
   critical: "border-red-500/30 bg-red-500/10 text-red-200",
 } as const;
 
@@ -45,12 +45,12 @@ export function WorkQueuePanel({ items, isLoading }: WorkQueuePanelProps) {
       </div>
 
       {items.length === 0 ? (
-        <div className="mt-4 rounded-[18px] border border-emerald-500/20 bg-emerald-500/5 p-6 text-center">
-          <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-300" />
-          <div className="mt-2 text-sm font-semibold text-emerald-200">
+        <div className="mt-4 rounded-[18px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-6 text-center">
+          <CheckCircle2 className="mx-auto h-8 w-8 text-[var(--color-success)]" />
+          <div className="mt-2 text-sm font-semibold text-[var(--color-text-primary)]">
             All clear
           </div>
-          <div className="mt-1 text-caption text-emerald-300/70">
+          <div className="mt-1 text-caption text-[var(--color-text-tertiary)]">
             No urgent items need attention
           </div>
         </div>

@@ -190,10 +190,10 @@ export default function AdminHomeScreen() {
           <span
             className={`inline-block h-2 w-2 rounded-full ${
               health === "green"
-                ? "bg-emerald-400"
+                ? "bg-[var(--color-success)]"
                 : health === "amber"
-                  ? "bg-amber-400"
-                  : "bg-red-400"
+                  ? "bg-[var(--color-warning)]"
+                  : "bg-[var(--color-error)]"
             }`}
           />
         );
@@ -227,11 +227,11 @@ export default function AdminHomeScreen() {
         <span
           className={`inline-block rounded-[999px] border px-2 py-0.5 text-caption ${
             reg.status === "APPROVED"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+              ? "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]"
               : reg.status === "REJECTED"
-                ? "border-red-500/30 bg-red-500/10 text-red-200"
+                ? "border-[var(--glass-border)] bg-transparent text-[var(--color-error)]"
                 : reg.status === "NEEDS_INFO"
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                  ? "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]"
                   : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
           }`}
         >
@@ -274,7 +274,7 @@ export default function AdminHomeScreen() {
             <span key="user" className="font-medium text-white">
               {user.handle || user.email || formatShortId(user.id)}
             </span>,
-            <span key="issue" className="text-amber-200">
+            <span key="issue" className="text-[var(--color-warning)]">
               {issueType}
             </span>,
             user.lastSignInAt ? (
@@ -459,7 +459,7 @@ export default function AdminHomeScreen() {
                     Manage crew
                   </div>
                   {(overview?.crewWithoutAssignment || 0) > 0 && (
-                    <span className="rounded-[999px] border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-caption text-amber-200">
+                    <span className="rounded-[999px] border border-[var(--glass-border)] bg-transparent px-2 py-0.5 text-caption text-[var(--color-warning)]">
                       {overview?.crewWithoutAssignment} unassigned
                     </span>
                   )}
@@ -479,7 +479,7 @@ export default function AdminHomeScreen() {
                     Manage users
                   </div>
                   {(overview?.roleMismatches || 0) > 0 && (
-                    <span className="rounded-[999px] border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-caption text-amber-200">
+                    <span className="rounded-[999px] border border-[var(--glass-border)] bg-transparent px-2 py-0.5 text-caption text-[var(--color-warning)]">
                       {overview?.roleMismatches} mismatched
                     </span>
                   )}

@@ -15,8 +15,6 @@ interface CrewLiveSettingsCardProps {
   onSeatStep: (delta: number) => void;
   hasConfirmedSeats: boolean;
   hasAssignment: boolean;
-  directionIsActive: boolean;
-  seatsIsActive: boolean;
   settingsNeedAttention: boolean;
   directionLabels: { toTown: string; fromTown: string };
   directionSectionRef: RefObject<HTMLDivElement | null>;
@@ -31,8 +29,6 @@ export function CrewLiveSettingsCard({
   onSeatStep,
   hasConfirmedSeats,
   hasAssignment,
-  directionIsActive,
-  seatsIsActive,
   settingsNeedAttention,
   directionLabels,
   directionSectionRef,
@@ -52,21 +48,10 @@ export function CrewLiveSettingsCard({
 
       <div
         ref={directionSectionRef}
-        className={`mt-4 rounded-[22px] border px-4 py-4 transition-all ${
-          directionIsActive
-            ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)] shadow-[0_10px_28px_rgba(255,45,120,0.08)]"
-            : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)]"
-        }`}
+        className="mt-4 rounded-[22px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)] px-4 py-4"
       >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Direction
-          </div>
-          {directionIsActive ? (
-            <div className="rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--color-accent)]">
-              REQUIRED
-            </div>
-          ) : null}
+        <div className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+          Direction
         </div>
         <DirectionToggle
           value={direction}
@@ -82,21 +67,10 @@ export function CrewLiveSettingsCard({
 
       <div
         ref={seatsSectionRef}
-        className={`mt-4 rounded-[22px] border px-4 py-4 transition-all ${
-          seatsIsActive
-            ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)] shadow-[0_10px_28px_rgba(255,45,120,0.08)]"
-            : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)]"
-        }`}
+        className="mt-4 rounded-[22px] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.28)] px-4 py-4"
       >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Seats
-          </div>
-          {seatsIsActive ? (
-            <div className="rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--color-accent)]">
-              REQUIRED
-            </div>
-          ) : null}
+        <div className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+          Seats
         </div>
         <SeatsQuickButtons
           value={seatsLeft}

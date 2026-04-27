@@ -12,17 +12,17 @@ interface AlertCardProps {
 }
 
 const severityStyles = {
-  ok: "border-emerald-500/30 bg-emerald-500/10",
-  info: "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10",
-  warning: "border-amber-500/30 bg-amber-500/10",
-  critical: "border-red-500/30 bg-red-500/10",
+  ok: "border-[var(--glass-border)] bg-[var(--glass-bg)]",
+  info: "border-[var(--glass-border)] bg-[var(--glass-bg)]",
+  warning: "border-[var(--glass-border)] bg-[var(--glass-bg)]",
+  critical: "border-[var(--glass-border)] bg-[var(--glass-bg)]",
 } as const;
 
 const iconStyles = {
-  ok: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
-  info: "text-[var(--color-accent)] bg-[var(--color-accent)]/10 border-[var(--color-accent)]/20",
-  warning: "text-amber-300 bg-amber-500/10 border-amber-500/20",
-  critical: "text-red-300 bg-red-500/10 border-red-500/20",
+  ok: "text-[var(--color-success)] bg-transparent border-[var(--glass-border)]",
+  info: "text-[var(--color-accent)] bg-transparent border-[var(--glass-border)]",
+  warning: "text-[var(--color-warning)] bg-transparent border-[var(--glass-border)]",
+  critical: "text-[var(--color-error)] bg-transparent border-[var(--glass-border)]",
 } as const;
 
 export function AlertCard({

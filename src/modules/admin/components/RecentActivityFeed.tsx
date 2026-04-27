@@ -15,7 +15,7 @@ interface RecentActivityFeedProps {
 
 const typeStyles = {
   registration: "text-[var(--color-accent)]",
-  crew_assignment: "text-emerald-300",
+  crew_assignment: "text-[var(--color-success)]",
   role_update: "text-cyan-300",
 } as const;
 

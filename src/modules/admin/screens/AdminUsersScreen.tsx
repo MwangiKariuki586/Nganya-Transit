@@ -317,7 +317,7 @@ export default function AdminUsersScreen() {
                         <button
                           type="button"
                           onClick={() => setDrawerUserId(user.id)}
-                          className="rounded-[14px] border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-all hover:border-amber-500/50 hover:bg-amber-500/20"
+                          className="rounded-[14px] border border-[var(--glass-border)] bg-transparent px-3 py-1.5 text-xs font-semibold text-[var(--color-warning)] transition-all hover:border-[var(--color-warning)]/50"
                         >
                           Fix mismatch
                         </button>

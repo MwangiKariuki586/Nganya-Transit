@@ -46,7 +46,7 @@ export function CrewHeaderStatus({
             {lastPingAt ? formatRelativeTime(lastPingAt) : 'Waiting'}
           </div>
           {isStale ? (
-            <div className="mt-1 text-caption text-amber-300">Update is stale</div>
+            <div className="mt-1 text-caption text-[var(--color-warning)]">Update is stale</div>
           ) : null}
         </div>
       </div>

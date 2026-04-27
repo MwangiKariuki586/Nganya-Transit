@@ -88,7 +88,7 @@ export function RouteProgress({
                   key={item.stage.id}
                   className="flex items-center gap-2 p-2 rounded-[var(--radius-md)] bg-[var(--color-bg-body)] border border-[var(--color-line)]"
                 >
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <CheckCircle className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-[var(--color-text-primary)] truncate">
                       {item.stage.name}

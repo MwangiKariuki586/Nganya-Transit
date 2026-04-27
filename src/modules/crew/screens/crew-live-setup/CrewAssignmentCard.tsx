@@ -61,8 +61,8 @@ export function CrewAssignmentCard({
             <div
               className={`rounded-[999px] border px-3 py-1 text-caption ${
                 assignment?.is_verified
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                  ? "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]"
+                  : "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]"
               }`}
             >
               {assignment?.is_verified ? "Verified" : "Pending"}
@@ -164,9 +164,9 @@ export function CrewAssignmentCard({
               ) : null}
             </>
           ) : (
-            <div className="mt-4 rounded-[20px] border border-amber-500/25 bg-amber-500/8 p-4">
+            <div className="mt-4 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
               <div className="flex items-start gap-3">
-                <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-300" />
+                <ShieldAlert className="mt-0.5 h-5 w-5 text-[var(--color-warning)]" />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-white">
                     No assigned nganya yet

@@ -25,20 +25,20 @@ export function GpsQualityIndicator({
 
   const config = {
     excellent: {
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-500/20",
+      color: "text-[var(--color-success)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Excellent",
       bars: 4,
     },
     good: {
-      color: "text-green-400",
-      bgColor: "bg-green-500/20",
+      color: "text-[var(--color-success)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Good",
       bars: 3,
     },
     fair: {
-      color: "text-amber-400",
-      bgColor: "bg-amber-500/20",
+      color: "text-[var(--color-warning)]",
+      bgColor: "bg-[var(--glass-bg)]",
       label: "Fair",
       bars: 2,
     },

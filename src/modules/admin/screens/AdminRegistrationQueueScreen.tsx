@@ -16,11 +16,11 @@ import { formatTimeAgo, formatShortId } from "@/lib/admin-utils";
 function statusClasses(status: NganyaRegistrationRequestStatus) {
   switch (status) {
     case "APPROVED":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]";
     case "REJECTED":
-      return "border-red-500/30 bg-red-500/10 text-red-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-error)]";
     case "NEEDS_INFO":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]";
     case "PENDING":
     default:
       return "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-[var(--color-accent)]";
@@ -570,7 +570,7 @@ export default function AdminRegistrationQueueScreen() {
                   <div className="mt-3 space-y-3 text-sm">
                     {duplicateWarnings.matchingPlateHints.length > 0 && (
                       <div>
-                        <div className="flex items-center gap-2 font-semibold text-amber-200">
+                        <div className="flex items-center gap-2 font-semibold text-[var(--color-warning)]">
                           <svg
                             className="h-4 w-4"
                             fill="none"
@@ -591,7 +591,7 @@ export default function AdminRegistrationQueueScreen() {
                             (item: any) => (
                               <div
                                 key={item.id}
-                                className="rounded-[14px] border border-amber-500/20 bg-amber-500/5 p-3"
+                                className="rounded-[14px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-3"
                               >
                                 <div className="font-medium text-white">
                                   {item.proposed_name}
@@ -686,7 +686,7 @@ export default function AdminRegistrationQueueScreen() {
                 <div>
                   <label htmlFor="review-notes" className="text-caption text-[var(--color-text-tertiary)]">
                     Review notes
-                    <span className="ml-2 text-amber-200">
+                    <span className="ml-2 text-[var(--color-warning)]/80">
                       (Required for Request changes / Reject)
                     </span>
                   </label>
@@ -807,7 +807,7 @@ export default function AdminRegistrationQueueScreen() {
               notified.
             </p>
             {!reviewNotes.trim() && (
-              <p className="mt-2 text-sm text-amber-200">
+              <p className="mt-2 text-sm text-[var(--color-warning)]">
                 Please add notes explaining the rejection reason.
               </p>
             )}

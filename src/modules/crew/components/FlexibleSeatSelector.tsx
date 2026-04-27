@@ -54,9 +54,9 @@ export function FlexibleSeatSelector({
 
   const getStatusColor = () => {
     if (value === 0) return "text-red-400";
-    if (value <= 5) return "text-amber-400";
-    if (value <= 15) return "text-blue-400";
-    return "text-emerald-400";
+    if (value <= 5) return "text-[var(--color-warning)]";
+    if (value <= 15) return "text-[var(--color-cyan)]";
+    return "text-[var(--color-success)]";
   };
 
   const getStatusText = () => {

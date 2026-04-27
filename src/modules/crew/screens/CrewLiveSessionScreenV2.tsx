@@ -263,7 +263,7 @@ export default function CrewLiveSessionScreenV2({
       )}
 
       {/* Quick seat presets */}
-      <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
+      {/* <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
         <div className="mb-4">
           <div className="text-caption text-[var(--color-text-tertiary)]">
             Quick updates
@@ -280,7 +280,7 @@ export default function CrewLiveSessionScreenV2({
           disabled={isPinging}
           maxSeats={33}
         />
-      </section>
+      </section> */}
 
       {/* Seats update */}
       <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">

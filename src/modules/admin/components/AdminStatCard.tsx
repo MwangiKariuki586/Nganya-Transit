@@ -10,9 +10,9 @@ interface AdminStatCardProps {
 
 const accentStyles = {
   accent: 'text-[var(--color-accent)] bg-[var(--color-accent)]/10 border-[var(--color-accent)]/20',
-  green: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
-  amber: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
-  cyan: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20',
+  green: 'text-[var(--color-success)] bg-transparent border-[var(--glass-border)]',
+  amber: 'text-[var(--color-warning)] bg-transparent border-[var(--glass-border)]',
+  cyan: 'text-[var(--color-cyan)] bg-transparent border-[var(--glass-border)]',
 } as const
 
 export function AdminStatCard({

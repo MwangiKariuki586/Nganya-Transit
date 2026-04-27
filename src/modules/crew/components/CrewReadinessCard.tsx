@@ -56,7 +56,7 @@ function getStatusIcon(status: ItemStatus) {
   }
 
   if (status === "warning") {
-    return <AlertTriangle className="h-4 w-4 text-amber-300" />;
+    return <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" />;
   }
 
   if (status === "error") {
@@ -211,13 +211,13 @@ export function CrewReadinessCard({
 
               return (
                 <div
-              key={item.id}
-              className={`rounded-[16px] border px-3 py-2.5 ${
-                item.id === nextRequired
-                  ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)]"
-                  : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)]"
-              }`}
-            >
+                  key={item.id}
+                  className={`rounded-[16px] border px-3 py-2.5 ${
+                    item.id === nextRequired
+                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)]"
+                      : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)]"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5 text-sm">
                       {getStatusIcon(item.status)}
@@ -225,47 +225,42 @@ export function CrewReadinessCard({
                         {item.label}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-caption text-[var(--color-text-tertiary)]">
-                        {getStatusLabel(item.status)}
-                      </span>
-                      {showAction && (
-                        <Button
-                          variant="secondary"
-                          className="min-h-[32px] rounded-[12px] px-2 py-1 text-xs font-semibold"
-                          onClick={() => {
-                            if (
-                              item.id === "controls" &&
-                              nextRequired === "direction" &&
-                              onSetDirection
-                            ) {
-                              onSetDirection();
-                            } else if (
-                              item.id === "controls" &&
-                              nextRequired === "seats" &&
-                              onSetSeats
-                            ) {
-                              onSetSeats();
-                            }
-                          }}
-                        >
-                          {nextRequired === "direction"
-                            ? "Set direction"
-                            : "Set seats"}
-                        </Button>
-                      )}
-                    </div>
+                    <span className="text-caption text-[var(--color-text-tertiary)]">
+                      {getStatusLabel(item.status)}
+                    </span>
                   </div>
                   {item.detail ? (
-                    <div className="mt-1.5 pl-6 text-caption text-[var(--color-text-secondary)]">
+                    <div className="mt-1.5 pl-6 text-xs text-[var(--color-text-secondary)]">
                       {item.detail}
-                      {item.id === "controls" && isMissing && (
-                        <div className="mt-1 text-[var(--color-accent)]">
-                          Direction and seats are required before you go live.
-                        </div>
-                      )}
                     </div>
                   ) : null}
+                  {showAction && (
+                    <div className="mt-2.5 pl-6">
+                      <Button
+                        variant="secondary"
+                        className="min-h-[36px] w-full rounded-[12px] px-3 text-sm font-semibold"
+                        onClick={() => {
+                          if (
+                            item.id === "controls" &&
+                            nextRequired === "direction" &&
+                            onSetDirection
+                          ) {
+                            onSetDirection();
+                          } else if (
+                            item.id === "controls" &&
+                            nextRequired === "seats" &&
+                            onSetSeats
+                          ) {
+                            onSetSeats();
+                          }
+                        }}
+                      >
+                        {nextRequired === "direction"
+                          ? "Set direction"
+                          : "Set seats"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -304,10 +299,10 @@ export function CrewReadinessCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
                   {networkStatus === "offline" ? (
-                    <WifiOff className="h-4 w-4 text-red-300" />
+                    <WifiOff className="h-4 w-4 text-[var(--color-error)]" />
                   ) : (
                     <Wifi
-                      className={`h-4 w-4 ${networkStatus === "poor" ? "text-amber-300" : "text-[var(--color-green)]"}`}
+                      className={`h-4 w-4 ${networkStatus === "poor" ? "text-[var(--color-warning)]" : "text-[var(--color-green)]"}`}
                     />
                   )}
                   <span>Network</span>
@@ -321,8 +316,8 @@ export function CrewReadinessCard({
                   networkStatus === "offline"
                     ? "border-red-500/30 bg-red-500/10 text-red-200"
                     : networkStatus === "poor"
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                      ? "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]"
+                      : "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]"
                 }`}
               >
                 {networkStatus === "offline"

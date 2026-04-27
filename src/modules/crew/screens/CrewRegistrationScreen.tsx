@@ -76,11 +76,11 @@ interface CrewRegistrationScreenProps {
 function getStatusClasses(status: NganyaRegistrationRequestStatus) {
   switch (status) {
     case "APPROVED":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]";
     case "REJECTED":
-      return "border-red-500/30 bg-red-500/10 text-red-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-error)]";
     case "NEEDS_INFO":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+      return "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]";
     case "PENDING":
     default:
       return "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-[var(--color-accent)]";
@@ -405,7 +405,7 @@ export default function CrewRegistrationScreen({
           </div>
 
           {activeRequest.review_notes ? (
-            <div className="mt-5 rounded-[20px] border border-amber-500/20 bg-amber-500/8 p-4 text-sm text-[var(--color-text-secondary)]">
+            <div className="mt-5 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 text-sm text-[var(--color-text-secondary)]">
               <div className="font-semibold text-[var(--color-text-primary)]">
                 Review note
               </div>

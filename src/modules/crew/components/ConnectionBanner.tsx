@@ -12,7 +12,7 @@ export function ConnectionBanner({ status, message, onRetry }: ConnectionBannerP
   const palette = status === 'offline'
     ? 'border-red-500/30 bg-red-500/10 text-red-200'
     : status === 'poor'
-      ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+      ? 'border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-warning)]'
       : 'border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-[var(--color-text-primary)]'
 
   return (

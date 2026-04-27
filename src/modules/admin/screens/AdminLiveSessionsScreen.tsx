@@ -301,10 +301,10 @@ export default function AdminLiveSessionsScreen() {
                         : "Stale";
                   const healthColor =
                     health === "green"
-                      ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
+                      ? "text-[var(--color-success)] bg-transparent border-[var(--glass-border)]"
                       : health === "amber"
-                        ? "text-amber-300 bg-amber-500/10 border-amber-500/20"
-                        : "text-red-300 bg-red-500/10 border-red-500/20";
+                        ? "text-[var(--color-warning)] bg-transparent border-[var(--glass-border)]"
+                        : "text-[var(--color-error)] bg-transparent border-[var(--glass-border)]";
 
                   return (
                     <tr
@@ -318,10 +318,10 @@ export default function AdminLiveSessionsScreen() {
                           <span
                             className={`h-2 w-2 rounded-full ${
                               health === "green"
-                                ? "bg-emerald-400"
+                                ? "bg-[var(--color-success)]"
                                 : health === "amber"
-                                  ? "bg-amber-400"
-                                  : "bg-red-400"
+                                  ? "bg-[var(--color-warning)]"
+                                  : "bg-[var(--color-error)]"
                             }`}
                           />
                           {healthLabel}
@@ -344,7 +344,7 @@ export default function AdminLiveSessionsScreen() {
                           )}
                         </div>
                         {crew.assignmentVerified && (
-                          <div className="mt-1 text-caption text-emerald-300">
+                          <div className="mt-1 text-caption text-[var(--color-success)]">
                             ✓ Verified
                           </div>
                         )}
@@ -413,11 +413,11 @@ export default function AdminLiveSessionsScreen() {
         {!isLoading && filteredSessions.length > 0 && (
           <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-[var(--glass-border)] pt-4 text-caption text-[var(--color-text-tertiary)]">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
               Healthy (&lt;30s)
             </div>
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              <span className="h-2 w-2 rounded-full bg-[var(--color-warning)]" />
               Warning (30-90s)
             </div>
             <div className="flex items-center gap-2">
@@ -430,28 +430,28 @@ export default function AdminLiveSessionsScreen() {
 
       {/* Stats summary */}
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-[24px] border border-emerald-500/30 bg-emerald-500/10 p-5">
+        <div className="rounded-[24px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
           <div className="flex items-center gap-3">
-            <RadioTower className="h-6 w-6 text-emerald-300" />
+            <RadioTower className="h-6 w-6 text-[var(--color-success)]" />
             <div>
-              <div className="text-caption text-emerald-300/70">
+              <div className="text-caption text-[var(--color-text-tertiary)]">
                 Healthy sessions
               </div>
-              <div className="mt-1 text-h3 text-emerald-200">
+              <div className="mt-1 text-h3 text-[var(--color-success)]">
                 {healthCounts.healthy}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-amber-500/30 bg-amber-500/10 p-5">
+        <div className="rounded-[24px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
           <div className="flex items-center gap-3">
-            <RadioTower className="h-6 w-6 text-amber-300" />
+            <RadioTower className="h-6 w-6 text-[var(--color-warning)]" />
             <div>
-              <div className="text-caption text-amber-300/70">
+              <div className="text-caption text-[var(--color-text-tertiary)]">
                 Warning sessions
               </div>
-              <div className="mt-1 text-h3 text-amber-200">
+              <div className="mt-1 text-h3 text-[var(--color-warning)]">
                 {healthCounts.warning}
               </div>
             </div>
@@ -541,11 +541,11 @@ export default function AdminLiveSessionsScreen() {
                         getLiveHealthTone(
                           viewingSession.activeSessionLastPingAt,
                         ) === "green"
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                          ? "border-[var(--glass-border)] bg-transparent text-[var(--color-success)]"
                           : getLiveHealthTone(
                                 viewingSession.activeSessionLastPingAt,
                               ) === "amber"
-                            ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                            ? "border-[var(--glass-border)] bg-transparent text-[var(--color-warning)]"
                             : "border-red-500/30 bg-red-500/10 text-red-200"
                       }`}
                     >
@@ -554,11 +554,11 @@ export default function AdminLiveSessionsScreen() {
                           getLiveHealthTone(
                             viewingSession.activeSessionLastPingAt,
                           ) === "green"
-                            ? "bg-emerald-400"
+                            ? "bg-[var(--color-success)]"
                             : getLiveHealthTone(
                                   viewingSession.activeSessionLastPingAt,
                                 ) === "amber"
-                              ? "bg-amber-400"
+                              ? "bg-[var(--color-warning)]"
                               : "bg-red-400"
                         }`}
                       />

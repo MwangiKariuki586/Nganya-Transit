@@ -177,12 +177,12 @@ export default function CrewLiveSetupScreen() {
         <>
           <div className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] xl:items-start xl:gap-6">
             <div className="space-y-4">
-              <CrewLiveSettingsCard direction={readiness.direction} onDirectionChange={handleDirectionChange}
-                seatsLeft={readiness.seatsLeft} onSeatsChange={handleSeatsChange} onSeatStep={handleSeatStep}
-                hasConfirmedSeats={readiness.hasConfirmedSeats} hasAssignment={Boolean(assignment)}
-                directionIsActive={directionIsActive} seatsIsActive={seatsIsActive} settingsNeedAttention={settingsNeedAttention}
-                directionLabels={directionLabels} directionSectionRef={directionSectionRef} seatsSectionRef={seatsSectionRef}
-              />
+            <CrewLiveSettingsCard direction={readiness.direction} onDirectionChange={handleDirectionChange}
+              seatsLeft={readiness.seatsLeft} onSeatsChange={handleSeatsChange} onSeatStep={handleSeatStep}
+              hasConfirmedSeats={readiness.hasConfirmedSeats} hasAssignment={Boolean(assignment)}
+              settingsNeedAttention={settingsNeedAttention}
+              directionLabels={directionLabels} directionSectionRef={directionSectionRef} seatsSectionRef={seatsSectionRef}
+            />
 
               <div className="xl:hidden">
                 <Button variant="ghost"

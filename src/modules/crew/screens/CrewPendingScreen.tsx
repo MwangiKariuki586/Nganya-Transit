@@ -110,7 +110,7 @@ export default function CrewPendingScreen() {
         </div>
 
         {request?.review_notes ? (
-          <div className="mt-5 rounded-[20px] border border-amber-500/20 bg-amber-500/8 p-4 text-sm text-[var(--color-text-secondary)]">
+          <div className="mt-5 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 text-sm text-[var(--color-text-secondary)]">
             <div className="font-semibold text-[var(--color-text-primary)]">
               Admin note
             </div>
