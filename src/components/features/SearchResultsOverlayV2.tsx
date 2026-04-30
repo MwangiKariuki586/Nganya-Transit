@@ -196,6 +196,22 @@ export default function SearchResultsOverlayV2({
     return "Any";
   }, [preference, preferredNganya?.name]);
 
+  const visibleNganyaIds = useMemo((): string[] | null => {
+    if (preference === "SPECIFIC") {
+      return preferredNganya?.id ? [preferredNganya.id] : null;
+    }
+
+    if (preference === "NEWEST") {
+      if (!results.length) return null;
+      const ids = results
+        .map((r) => r.nganya_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      return ids.length ? ids : null;
+    }
+
+    return null;
+  }, [preference, preferredNganya?.id, results]);
+
   const content = (
     <div
       className={`flex flex-col relative ${inline ? "" : "h-full max-h-[90vh]"}`}
@@ -208,6 +224,7 @@ export default function SearchResultsOverlayV2({
         corridorName={toPlace.name}
         pickupStage={fromStage}
         journeyResults={results}
+        visibleNganyaIds={visibleNganyaIds}
         highlightNganyaId={
           trackingNganya?.nganya_id ??
           (preference === "SPECIFIC" ? preferredNganya?.id ?? null : null)

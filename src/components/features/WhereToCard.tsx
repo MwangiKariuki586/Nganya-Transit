@@ -17,18 +17,24 @@ export interface RideSearchPayload {
   preferredNganya: { id: string; name: string } | null;
 }
 
+export interface PlannerFiltersValue {
+  toPlace: RideSearchPayload["toPlace"] | null;
+  fromStage: RideSearchPayload["fromStage"] | null;
+  preference: RideSearchPayload["preference"];
+  preferredNganya: RideSearchPayload["preferredNganya"];
+}
+
 interface WhereToCardProps {
-  onCorridorChange?: (
-    corridorId: string | null,
-    corridorName?: string | null,
-  ) => void;
+  value: PlannerFiltersValue;
+  onChange: (next: PlannerFiltersValue) => void;
   onSearch?: (payload: RideSearchPayload) => void;
   onClear?: () => void;
   className?: string;
 }
 
 export default function WhereToCard({
-  onCorridorChange,
+  value,
+  onChange,
   onSearch,
   onClear,
   className,
@@ -42,96 +48,9 @@ export default function WhereToCard({
   const [isSpecificPickerOpen, setSpecificPickerOpen] = useState(false);
   const [isResultsOpen, setResultsOpen] = useState(false);
 
-  // Form state - initialize from localStorage
-  const [toPlace, setToPlace] = useState<{
-    id: string;
-    name: string;
-    corridor_id?: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem("whereto_toPlace");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [fromStage, setFromStage] = useState<{
-    id: string;
-    name: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem("whereto_fromStage");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [preference, setPreference] = useState<"ANY" | "NEWEST" | "SPECIFIC">(
-    () => {
-      try {
-        const saved = localStorage.getItem("whereto_preference");
-        return (saved as "ANY" | "NEWEST" | "SPECIFIC") || "ANY";
-      } catch {
-        return "ANY";
-      }
-    },
-  );
-
-  const [preferredNganya, setPreferredNganya] = useState<{
-    id: string;
-    name: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem("whereto_preferredNganya");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
   const { recents, addRecent, clearRecents } = useRecentSearches();
 
-  // Persist to localStorage whenever state changes
-  useEffect(() => {
-    if (toPlace) {
-      localStorage.setItem("whereto_toPlace", JSON.stringify(toPlace));
-    } else {
-      localStorage.removeItem("whereto_toPlace");
-    }
-  }, [toPlace]);
-
-  useEffect(() => {
-    if (fromStage) {
-      localStorage.setItem("whereto_fromStage", JSON.stringify(fromStage));
-    } else {
-      localStorage.removeItem("whereto_fromStage");
-    }
-  }, [fromStage]);
-
-  useEffect(() => {
-    localStorage.setItem("whereto_preference", preference);
-  }, [preference]);
-
-  useEffect(() => {
-    if (preferredNganya) {
-      localStorage.setItem(
-        "whereto_preferredNganya",
-        JSON.stringify(preferredNganya),
-      );
-    } else {
-      localStorage.removeItem("whereto_preferredNganya");
-    }
-  }, [preferredNganya]);
-
-  // Notify parent of initial corridor on mount
-  useEffect(() => {
-    if (toPlace?.corridor_id) {
-      onCorridorChange?.(toPlace.corridor_id, toPlace.name);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { toPlace, fromStage, preference, preferredNganya } = value;
 
   useEffect(() => {
     if (isMobile && toPlace && fromStage) {
@@ -140,29 +59,24 @@ export default function WhereToCard({
   }, [isMobile, toPlace?.id, fromStage?.id]);
 
   const handlePreferenceSelect = (val: "ANY" | "NEWEST" | "SPECIFIC") => {
-    setPreference(val);
-    if (val !== "SPECIFIC") {
-      setPreferredNganya(null);
-    }
-    if (val === "SPECIFIC" && toPlace && fromStage) {
-      setSpecificPickerOpen(true);
-    }
+    onChange({
+      ...value,
+      preference: val,
+      preferredNganya: val === "SPECIFIC" ? value.preferredNganya : null,
+    });
+
+    if (val === "SPECIFIC" && toPlace && fromStage) setSpecificPickerOpen(true);
   };
 
   const handleClear = () => {
-    setToPlace(null);
-    setFromStage(null);
-    setPreferredNganya(null);
-    setPreference("ANY");
+    onChange({
+      toPlace: null,
+      fromStage: null,
+      preferredNganya: null,
+      preference: "ANY",
+    });
     setIsCompact(false);
     setResultsOpen(false);
-
-    localStorage.removeItem("whereto_toPlace");
-    localStorage.removeItem("whereto_fromStage");
-    localStorage.removeItem("whereto_preference");
-    localStorage.removeItem("whereto_preferredNganya");
-
-    onCorridorChange?.(null, null);
     onClear?.();
   };
 
@@ -201,14 +115,12 @@ export default function WhereToCard({
 
   /** Replay a recent search without re-opening pickers. */
   const handleReplayRecent = (payload: RideSearchPayload) => {
-    setToPlace(payload.toPlace);
-    setFromStage(payload.fromStage);
-    setPreference(payload.preference);
-    setPreferredNganya(payload.preferredNganya);
-    onCorridorChange?.(
-      payload.toPlace.corridor_id || payload.toPlace.id,
-      payload.toPlace.name,
-    );
+    onChange({
+      toPlace: payload.toPlace,
+      fromStage: payload.fromStage,
+      preference: payload.preference,
+      preferredNganya: payload.preferredNganya,
+    });
 
     trackEvent({
       event: "ride_search_started",
@@ -458,13 +370,10 @@ export default function WhereToCard({
         isOpen={isDestPickerOpen}
         onClose={() => setDestPickerOpen(false)}
         onSelect={(id, name, corridor_id) => {
-          if (toPlace?.id !== id) {
-            setFromStage(null);
-            setPreferredNganya(null);
-            setPreference("ANY");
-          }
-          setToPlace({ id, name, corridor_id });
-          onCorridorChange?.(corridor_id || id, name);
+          onChange({
+            ...value,
+            toPlace: { id, name, corridor_id },
+          });
           setDestPickerOpen(false);
         }}
       />
@@ -474,7 +383,10 @@ export default function WhereToCard({
         onClose={() => setStagePickerOpen(false)}
         corridorId={toPlace?.corridor_id}
         onSelect={(id, name) => {
-          setFromStage({ id, name });
+          onChange({
+            ...value,
+            fromStage: { id, name },
+          });
           setStagePickerOpen(false);
           if (preference === "SPECIFIC") {
             setSpecificPickerOpen(true);
@@ -487,8 +399,11 @@ export default function WhereToCard({
         onClose={() => setSpecificPickerOpen(false)}
         corridorId={toPlace?.corridor_id}
         onSelect={(id, name) => {
-          setPreferredNganya({ id, name });
-          setPreference("SPECIFIC");
+          onChange({
+            ...value,
+            preference: "SPECIFIC",
+            preferredNganya: { id, name },
+          });
           setSpecificPickerOpen(false);
         }}
       />

@@ -34,6 +34,13 @@ export interface PlannerTrackItem {
   corridorId?: string | null;
 }
 
+export const EMPTY_PLANNER_CONTEXT: PlannerStorageContext = {
+  toPlace: null,
+  fromStage: null,
+  preferredNganya: null,
+  preference: "ANY",
+};
+
 export function readStoredJson<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
 
@@ -53,6 +60,103 @@ export function readPlannerStorageContext(): PlannerStorageContext {
     preference:
       readStoredJson<PlannerStorageContext["preference"]>("whereto_preference") ||
       "ANY",
+  };
+}
+
+export function writePlannerStorageContext(plannerContext: PlannerStorageContext) {
+  if (typeof window === "undefined") return;
+
+  if (plannerContext.toPlace) {
+    window.localStorage.setItem(
+      "whereto_toPlace",
+      JSON.stringify(plannerContext.toPlace),
+    );
+  } else {
+    window.localStorage.removeItem("whereto_toPlace");
+  }
+
+  if (plannerContext.fromStage) {
+    window.localStorage.setItem(
+      "whereto_fromStage",
+      JSON.stringify(plannerContext.fromStage),
+    );
+  } else {
+    window.localStorage.removeItem("whereto_fromStage");
+  }
+
+  window.localStorage.setItem("whereto_preference", plannerContext.preference);
+
+  if (plannerContext.preferredNganya) {
+    window.localStorage.setItem(
+      "whereto_preferredNganya",
+      JSON.stringify(plannerContext.preferredNganya),
+    );
+  } else {
+    window.localStorage.removeItem("whereto_preferredNganya");
+  }
+}
+
+export function getPlannerCorridorId(plannerContext: PlannerStorageContext) {
+  return plannerContext.toPlace?.corridor_id || plannerContext.toPlace?.id || null;
+}
+
+export function reconcilePlannerContext(
+  current: PlannerStorageContext,
+  proposed: PlannerStorageContext,
+): PlannerStorageContext {
+  const nextCorridorId = getPlannerCorridorId(proposed);
+  const currentCorridorId = getPlannerCorridorId(current);
+
+  if (!nextCorridorId) {
+    return EMPTY_PLANNER_CONTEXT;
+  }
+
+  const next: PlannerStorageContext = {
+    ...proposed,
+    toPlace: proposed.toPlace
+      ? { ...proposed.toPlace, corridor_id: nextCorridorId }
+      : null,
+  };
+
+  // Keep stage/preference consistent when the route changes.
+  if (currentCorridorId && nextCorridorId !== currentCorridorId) {
+    next.fromStage = null;
+    next.preference = "ANY";
+    next.preferredNganya = null;
+  }
+
+  // Stage can't exist without a route.
+  if (!next.toPlace) next.fromStage = null;
+
+  // Preferred nganya only makes sense for SPECIFIC.
+  if (next.preference !== "SPECIFIC") next.preferredNganya = null;
+
+  return next;
+}
+
+export function applyPlannerSeed(
+  current: PlannerStorageContext,
+  item: PlannerStorageSeedItem,
+  options?: { clearStageOnRouteChange?: boolean },
+): PlannerStorageContext {
+  const currentCorridorId = getPlannerCorridorId(current);
+  const nextCorridorId = item.corridorId || currentCorridorId || null;
+
+  const shouldClearStage =
+    Boolean(options?.clearStageOnRouteChange) &&
+    Boolean(currentCorridorId && nextCorridorId && currentCorridorId !== nextCorridorId);
+
+  return {
+    toPlace: nextCorridorId
+      ? {
+          id: nextCorridorId,
+          name: item.corridorName || current.toPlace?.name || "Route",
+          corridor_id: nextCorridorId,
+        }
+      : null,
+    fromStage: shouldClearStage ? null : current.fromStage,
+    preference: "SPECIFIC",
+    preferredNganya: { id: item.id, name: item.name },
   };
 }
 

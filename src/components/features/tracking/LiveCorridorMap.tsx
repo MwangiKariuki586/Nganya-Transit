@@ -105,6 +105,8 @@ export interface LiveCorridorMapProps {
   /** Optional ETA for the route overlay, in seconds. */
   routeEtaSeconds?: number | null;
   className?: string;
+  /** Optional pin filter: when set, only these nganya ids are rendered. */
+  visibleNganyaIds?: string[] | null;
 }
 
 export default function LiveCorridorMap({
@@ -125,6 +127,7 @@ export default function LiveCorridorMap({
   routeLine = null,
   routeEtaSeconds = null,
   className,
+  visibleNganyaIds = null,
 }: LiveCorridorMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [pins, setPins] = useState<CorridorNganyaMapPin[]>([]);
@@ -356,8 +359,17 @@ export default function LiveCorridorMap({
     ? "rounded-t-[var(--radius-lg)] rounded-b-none"
     : "rounded-[var(--radius-lg)]";
 
-  const liveCount = pins.filter((p) => p.pin_source === "LIVE").length;
-  const sightCount = pins.filter((p) => p.pin_source === "SIGHTING").length;
+  const visibleIdSet =
+    visibleNganyaIds && visibleNganyaIds.length > 0
+      ? new Set(visibleNganyaIds)
+      : null;
+
+  const visiblePins = visibleIdSet
+    ? pins.filter((p) => visibleIdSet.has(p.nganya_id))
+    : pins;
+
+  const liveCount = visiblePins.filter((p) => p.pin_source === "LIVE").length;
+  const sightCount = visiblePins.filter((p) => p.pin_source === "SIGHTING").length;
 
   return (
     <div
@@ -374,7 +386,7 @@ export default function LiveCorridorMap({
         <p className="text-xs font-semibold text-[var(--color-text-secondary)] mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-green)] animate-pulse" />
-            {corridorId ? `${pins.length} on map` : "Map"}
+            {corridorId ? `${visiblePins.length} on map` : "Map"}
           </span>
           {corridorId && liveCount > 0 ? (
             <span className="text-[var(--color-green)]">
@@ -440,7 +452,7 @@ export default function LiveCorridorMap({
                 <StageMarker name={pickupStage.name} size={36} />
               </Marker>
             ) : null}
-            {pins.map((pin) => {
+            {visiblePins.map((pin) => {
               const signal = markerSignalForPin(pin);
               return (
                 <Marker
@@ -499,7 +511,7 @@ export default function LiveCorridorMap({
               "Pick a route in the planner (or use route chips below) to load live matatus."}
           </div>
         ) : null}
-        {corridorId && pins.length === 0 && !loadError ? (
+        {corridorId && visiblePins.length === 0 && !loadError ? (
           <div className="pointer-events-none absolute bottom-2 left-2 right-2 rounded-lg bg-black/70 px-2 py-2 text-center text-[11px] text-white/90 backdrop-blur-sm">
             No Active nganyas on this route yet.
           </div>

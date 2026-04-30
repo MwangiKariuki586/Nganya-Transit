@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useToast } from "@/components/ui/ToastContainer";
 import Card from "@/components/ui/Card";
@@ -16,6 +16,7 @@ import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { vibeTagColors } from "@/lib/mockData";
 import { Clock, TrendingUp, ChevronRight } from "lucide-react";
 import WhereToCard, {
+  type PlannerFiltersValue,
   type RideSearchPayload,
 } from "@/components/features/WhereToCard";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
@@ -29,11 +30,14 @@ import {
 import { fetchOsrmRoute } from "@/lib/osrm";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
 import {
+  applyPlannerSeed,
   canTrackWithPlannerContext,
-  readPlannerStorageContext,
-  seedPlannerStorage,
+  getPlannerCorridorId,
+  reconcilePlannerContext,
 } from "@/modules/fan/services/planner-storage";
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
+import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
+import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
 
 const allVibeTags = Object.keys(vibeTagColors);
 
@@ -248,9 +252,8 @@ export default function HomeScreen({
 }: HomeScreenProps) {
   const router = useRouter();
   const { showErrorToast, addToast } = useToast();
-  const [plannerContext, setPlannerContext] = useState(() =>
-    readPlannerStorageContext(),
-  );
+  const { plannerContext, setPlannerContext, clearPlannerContext } =
+    usePlannerFilters();
   const [plannerResults, setPlannerResults] = useState<JourneyResult[]>([]);
   const [plannerTracking, setPlannerTracking] = useState<JourneyResult | null>(
     null,
@@ -406,6 +409,91 @@ export default function HomeScreen({
     }));
   }, [filteredLiveNganyas, mapCorridorId, mapCorridorName, plannerResults]);
 
+  const visibleNganyaIds = useMemo(
+    () => deriveVisibleNganyaIds(plannerContext, plannerResults),
+    [plannerContext, plannerResults],
+  );
+
+  const plannerCorridorId = useMemo(
+    () => getPlannerCorridorId(plannerContext),
+    [plannerContext],
+  );
+
+  const plannerStageId = plannerContext.fromStage?.id || null;
+
+  useEffect(() => {
+    // Planner route becomes the global active corridor while it's set.
+    if (!plannerCorridorId) return;
+    onCorridorChange(plannerCorridorId);
+  }, [plannerCorridorId, onCorridorChange]);
+
+  const plannerJourneyKey = useMemo(() => {
+    if (!plannerCorridorId || !plannerStageId) return null;
+    const preferredId =
+      plannerContext.preference === "SPECIFIC"
+        ? plannerContext.preferredNganya?.id || ""
+        : "";
+    return `${plannerCorridorId}:${plannerStageId}:${plannerContext.preference}:${preferredId}`;
+  }, [
+    plannerCorridorId,
+    plannerStageId,
+    plannerContext.preference,
+    plannerContext.preferredNganya?.id,
+  ]);
+
+  const plannerJourneyKeyRef = useRef<string | null>(null);
+  const plannerJourneySeqRef = useRef(0);
+
+  useEffect(() => {
+    if (!plannerCorridorId || !plannerStageId) {
+      setPlannerResults([]);
+      return;
+    }
+
+    const key = plannerJourneyKey;
+    if (!key) return;
+
+    // Clear results on route/stage change to avoid filtering against the wrong corridor.
+    const prevKey = plannerJourneyKeyRef.current;
+    plannerJourneyKeyRef.current = key;
+    if (prevKey && prevKey.split(":").slice(0, 2).join(":") !== key.split(":").slice(0, 2).join(":")) {
+      setPlannerResults([]);
+    }
+
+    const seq = ++plannerJourneySeqRef.current;
+    const preferredNganyaId =
+      plannerContext.preference === "SPECIFIC"
+        ? plannerContext.preferredNganya?.id || null
+        : null;
+
+    const vibeTags =
+      plannerContext.preference === "NEWEST" ? ["NEW_BUILD"] : null;
+
+    searchNganyaJourney({
+      corridorId: plannerCorridorId,
+      pickupStageId: plannerStageId,
+      preferredNganyaId,
+      vibeTags,
+      maxResults: 24,
+    })
+      .then((data) => {
+        if (plannerJourneySeqRef.current !== seq) return;
+        if (plannerJourneyKeyRef.current !== key) return;
+        setPlannerResults((data || []) as JourneyResult[]);
+      })
+      .catch(() => {
+        if (plannerJourneySeqRef.current !== seq) return;
+        if (plannerJourneyKeyRef.current !== key) return;
+        setPlannerResults([]);
+      });
+  }, [
+    plannerCorridorId,
+    plannerStageId,
+    plannerContext.preference,
+    plannerContext.preferredNganya?.id,
+    plannerJourneyKey,
+  ]);
+
   const featuredNganya =
     filteredNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
     filteredNganyas[0] ??
@@ -441,21 +529,19 @@ export default function HomeScreen({
   };
 
   const handlePlanRideForNganya = (item: BrowseCardActionItem) => {
-    const nextPlannerContext = readPlannerStorageContext();
-    seedPlannerStorage(
-      nextPlannerContext,
-      {
-        id: item.id,
-        name: item.name,
-        corridorId: item.corridorId,
-        corridorName: item.corridorName,
-      },
-      { clearStageOnRouteChange: true },
+    setPlannerContext((current) =>
+      applyPlannerSeed(
+        current,
+        {
+          id: item.id,
+          name: item.name,
+          corridorId: item.corridorId,
+          corridorName: item.corridorName,
+        },
+        { clearStageOnRouteChange: true },
+      ),
     );
-
-    setPlannerContext(readPlannerStorageContext());
     setPlannerSeed((current) => current + 1);
-    onCorridorChange(item.corridorId);
     window.scrollTo({ top: 0, behavior: "smooth" });
     addToast(
       `Route set to ${item.corridorName}. Pick your pickup stage to plan with ${item.name}.`,
@@ -472,63 +558,34 @@ export default function HomeScreen({
     handlePlanRideForNganya(item);
   };
 
-  const handlePlannerSearch = (payload: RideSearchPayload) => {
+  const handlePlannerSearch = (_payload: RideSearchPayload) => {
+    // Map is driven by the controlled planner filters; "Find my ride" is a submit action only.
+    // We still clear any route overlays when user submits a new search.
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
     plannerRouteAbortRef.current?.abort();
     plannerRouteAbortRef.current = null;
     plannerRouteKeyRef.current = null;
-    setPlannerContext({
-      toPlace: payload.toPlace,
-      fromStage: payload.fromStage,
-      preferredNganya: payload.preferredNganya,
-      preference: payload.preference,
-    });
-
-    const corridorId = payload.toPlace.corridor_id || payload.toPlace.id;
-    onCorridorChange(corridorId);
-
-    // Fetch ranked journey results so marker-clicks can open the inline tracking card
-    // with ETA/confidence (same behavior as SearchResultsOverlayV2).
-    searchNganyaJourney({
-      corridorId,
-      pickupStageId: payload.fromStage.id,
-      preferredNganyaId:
-        payload.preference === "SPECIFIC" ? payload.preferredNganya?.id : null,
-      vibeTags: payload.preference === "NEWEST" ? ["NEW_BUILD"] : null,
-      maxResults: 24,
-    })
-      .then((data) => {
-        setPlannerResults((data || []) as JourneyResult[]);
-      })
-      .catch(() => {
-        setPlannerResults([]);
-      });
   };
 
-  const handlePlannerRouteChange = (
-    corridorId: string | null,
-    corridorName?: string | null,
-  ) => {
-    onCorridorChange(corridorId);
-    setPlannerContext((current) => ({
-      ...current,
-      toPlace: corridorId
-        ? {
-            id: corridorId,
-            name: corridorName || current.toPlace?.name || "Route",
-            corridor_id: corridorId,
-          }
-        : null,
-      fromStage:
-        corridorId &&
-        (current.toPlace?.corridor_id || current.toPlace?.id) === corridorId
-          ? current.fromStage
-          : null,
-      preferredNganya: null,
-      preference: "ANY",
-    }));
+  const handlePlannerChange = (next: PlannerFiltersValue) => {
+    setPlannerContext((current) =>
+      reconcilePlannerContext(current, next),
+    );
+
+    // Any filter change invalidates any currently tracked nganya/route overlay.
+    setPlannerTracking(null);
+    setPlannerRouteLine(null);
+    setPlannerRouteEtaSeconds(null);
+    plannerRouteAbortRef.current?.abort();
+    plannerRouteAbortRef.current = null;
+    plannerRouteKeyRef.current = null;
+  };
+
+  const handlePlannerClear = () => {
+    clearPlannerContext();
+    setPlannerSeed((current) => current + 1);
     setPlannerResults([]);
     setPlannerTracking(null);
     setPlannerRouteLine(null);
@@ -539,21 +596,19 @@ export default function HomeScreen({
   };
 
   const handlePlanRideForRecentRow = (row: AggregatedRecentSightingRow) => {
-    const nextPlannerContext = readPlannerStorageContext();
-    seedPlannerStorage(
-      nextPlannerContext,
-      {
-        id: row.nganyaId,
-        name: row.nganyaName,
-        corridorId: row.corridorId,
-        corridorName: row.corridorName,
-      },
-      { clearStageOnRouteChange: true },
+    setPlannerContext((current) =>
+      applyPlannerSeed(
+        current,
+        {
+          id: row.nganyaId,
+          name: row.nganyaName,
+          corridorId: row.corridorId,
+          corridorName: row.corridorName,
+        },
+        { clearStageOnRouteChange: true },
+      ),
     );
-
-    setPlannerContext(readPlannerStorageContext());
     setPlannerSeed((current) => current + 1);
-    onCorridorChange(row.corridorId);
     window.scrollTo({ top: 0, behavior: "smooth" });
     addToast(
       `Route set to ${row.corridorName}. Pick your pickup stage to plan with ${row.nganyaName}.`,
@@ -588,11 +643,10 @@ export default function HomeScreen({
         <div className="space-y-3 lg:col-span-4 lg:sticky lg:top-[84px] lg:self-start">
           <WhereToCard
             key={plannerSeed}
-            onCorridorChange={handlePlannerRouteChange}
+            value={plannerContext}
+            onChange={handlePlannerChange}
             onSearch={handlePlannerSearch}
-            onClear={() => {
-              onCorridorChange(null);
-            }}
+            onClear={handlePlannerClear}
           />
         </div>
 
@@ -605,6 +659,7 @@ export default function HomeScreen({
                 corridorName={mapCorridorName}
                 pickupStage={plannerContext.fromStage}
                 journeyResults={mapJourneyResults}
+                visibleNganyaIds={visibleNganyaIds}
                 highlightNganyaId={
                   plannerTracking?.nganya_id ??
                   (plannerContext.preference === "SPECIFIC"
