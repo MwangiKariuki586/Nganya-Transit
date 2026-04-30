@@ -1,5 +1,5 @@
 /**
- * Enhanced session storage with IndexedDB fallback for persistence
+ * Crew session storage utilities — all backed by localStorage
  */
 
 const STORAGE_KEYS = {

@@ -214,30 +214,34 @@ export default function SearchResultsOverlayV2({
         }
         onTrackNganya={(j) => setTrackingNganya(j)}
         compact={inline}
+        showCaption={false}
+        flushBottom={inline && !!trackingNganya}
       />
 
-      <div className="mb-3 shrink-0 text-sm text-[var(--color-text-secondary)] flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Map className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
-          Route:{" "}
-          <span className="font-semibold text-[var(--color-text-primary)]">
-            {toPlace.name}
-          </span>
+      {!inline ? (
+        <div className="mb-3 shrink-0 text-sm text-[var(--color-text-secondary)] flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Map className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
+            Route:{" "}
+            <span className="font-semibold text-[var(--color-text-primary)]">
+              {toPlace.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-4 h-4 shrink-0" />
+            Pickup:{" "}
+            <span className="font-semibold text-[var(--color-text-primary)]">
+              {fromStage.name}
+            </span>
+          </div>
+          <div>
+            Preference:{" "}
+            <span className="font-semibold text-[var(--color-text-primary)]">
+              {preferenceLabel}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <MapPin className="w-4 h-4 shrink-0" />
-          Pickup:{" "}
-          <span className="font-semibold text-[var(--color-text-primary)]">
-            {fromStage.name}
-          </span>
-        </div>
-        <div>
-          Preference:{" "}
-          <span className="font-semibold text-[var(--color-text-primary)]">
-            {preferenceLabel}
-          </span>
-        </div>
-      </div>
+      ) : null}
 
       {trackingNganya ? (
         <div ref={trackingCardRef}>
@@ -247,13 +251,14 @@ export default function SearchResultsOverlayV2({
             allResults={results}
             onClose={() => setTrackingNganya(null)}
             onSwitch={(newNganya) => setTrackingNganya(newNganya)}
+            flushTop={inline}
           />
         </div>
       ) : null}
 
-      {isRefetching ? <InlineTableLoader /> : null}
+      {!inline && isRefetching ? <InlineTableLoader /> : null}
 
-      {isLoading ? (
+      {!inline && isLoading ? (
         <div className="flex items-center justify-center gap-2 py-4 text-xs text-[var(--color-text-tertiary)]">
           <div className="animate-pulse w-6 h-6 rounded-full bg-[var(--color-accent)]" />
           Updating trip data…
@@ -268,23 +273,14 @@ export default function SearchResultsOverlayV2({
 
   if (isMobile) {
     return (
-      <BottomSheet
-        isOpen={isOpen}
-        onClose={onClose}
-        title="Live map"
-      >
+      <BottomSheet isOpen={isOpen} onClose={onClose}>
         {content}
       </BottomSheet>
     );
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Live map"
-      size="lg"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
       {content}
     </Modal>
   );

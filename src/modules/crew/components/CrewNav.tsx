@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Radio, History, LogOut, Shield, User, Zap } from "lucide-react";
+import { Radio, History, LogOut, Shield, User, Zap, Bell } from "lucide-react";
 import {
   Link,
   useMatches,
@@ -11,6 +11,7 @@ import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useCrewNotificationCount } from "@/modules/crew/hooks/useCrewNotificationCount";
 import type { Session } from "@supabase/supabase-js";
 
 interface NavProps {
@@ -25,6 +26,7 @@ export function CrewNav({ session, profile }: NavProps) {
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/crew/live";
   const { snapshot } = useCrewBootstrap();
   const crewState = getCrewStatusState(snapshot);
+  const unreadCount = useCrewNotificationCount();
 
   const showRegisterEntry =
     crewState === "UNREGISTERED" ||
@@ -117,6 +119,20 @@ export function CrewNav({ session, profile }: NavProps) {
           <div className="ml-4 pl-4 border-l border-[var(--glass-border)] flex items-center gap-3">
             {session ? (
               <div className="flex items-center gap-3">
+                {/* Notification bell */}
+                <Link
+                  to="/crew/notifications"
+                  className="relative p-2 rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--glass-bg)] transition-all no-underline"
+                  aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+                >
+                  <Bell className="w-4.5 h-4.5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[9px] font-bold text-white shadow-[var(--glow-accent-sm)]">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+
                 <Link
                   to="/crew/profile"
                   className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"

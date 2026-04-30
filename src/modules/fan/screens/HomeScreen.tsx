@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useToast } from "@/components/ui/ToastContainer";
-import { SectionBoundary } from "@/components/error/SectionBoundary";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Chip from "@/components/ui/Chip";
 import LiveBadge from "@/components/ui/LiveBadge";
 import SearchInput from "@/components/ui/SearchInput";
 import Skeleton from "@/components/ui/Skeleton";
-import { formatDirectionLabel, formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
+import {
+  formatDirectionLabel,
+  formatRelativeTime,
+  toNganyaSlug,
+} from "@/lib/formatters";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { vibeTagColors } from "@/lib/mockData";
 import { Clock, TrendingUp, ChevronRight } from "lucide-react";
@@ -16,6 +19,14 @@ import WhereToCard, {
   type RideSearchPayload,
 } from "@/components/features/WhereToCard";
 import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
+import LiveCorridorMap from "@/components/features/tracking/LiveCorridorMap";
+import type { JourneyResult } from "@/lib/types/journey";
+import { searchNganyaJourney } from "@/lib/queries/discover";
+import {
+  fetchNganyaPosition,
+  fetchStagePosition,
+} from "@/lib/queries/tracking";
+import { fetchOsrmRoute } from "@/lib/osrm";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
 import {
   canTrackWithPlannerContext,
@@ -240,9 +251,18 @@ export default function HomeScreen({
   const [plannerContext, setPlannerContext] = useState(() =>
     readPlannerStorageContext(),
   );
-  const [plannerSearch, setPlannerSearch] = useState<RideSearchPayload | null>(
+  const [plannerResults, setPlannerResults] = useState<JourneyResult[]>([]);
+  const [plannerTracking, setPlannerTracking] = useState<JourneyResult | null>(
     null,
   );
+  const [plannerRouteLine, setPlannerRouteLine] = useState<{
+    coordinates: [number, number][];
+  } | null>(null);
+  const [plannerRouteEtaSeconds, setPlannerRouteEtaSeconds] = useState<
+    number | null
+  >(null);
+  const plannerRouteAbortRef = useRef<AbortController | null>(null);
+  const plannerRouteKeyRef = useRef<string | null>(null);
   const [trackingRow, setTrackingRow] =
     useState<AggregatedRecentSightingRow | null>(null);
   const [trackingNganya, setTrackingNganya] =
@@ -342,6 +362,50 @@ export default function HomeScreen({
     return aggregatedRecentSightings;
   }, [aggregatedRecentSightings, recentFilter]);
 
+  const recentSightingsRef = useRef<HTMLElement>(null);
+
+  const mapCorridorId = useMemo(
+    () =>
+      plannerContext.toPlace?.corridor_id ||
+      plannerContext.toPlace?.id ||
+      activeCorridor,
+    [plannerContext.toPlace, activeCorridor],
+  );
+
+  const mapCorridorName = useMemo(() => {
+    if (!mapCorridorId) return "Route";
+    return (
+      corridors.find((c) => c.id === mapCorridorId)?.name ||
+      plannerContext.toPlace?.name ||
+      activeCorridorName ||
+      "Route"
+    );
+  }, [
+    mapCorridorId,
+    corridors,
+    plannerContext.toPlace?.name,
+    activeCorridorName,
+  ]);
+
+  const mapJourneyResults = useMemo((): JourneyResult[] => {
+    if (plannerResults.length > 0) return plannerResults;
+
+    const cid = mapCorridorId ?? "";
+    const cname = mapCorridorName;
+    return filteredLiveNganyas.map((n) => ({
+      nganya_id: n.nganya_id || n.id,
+      nganya_name: n.nganya_name || n.name || "Unknown",
+      corridor_id: n.corridor_id || cid,
+      corridor_name: n.corridor_name || n.corridors?.name || cname,
+      tags: n.tags ?? null,
+      eta_minutes: 5,
+      confidence_level: "HIGH",
+      source: "LIVE",
+      last_seen_at: n.last_ping_at ?? null,
+      profile_photo_url: n.profile_photo_url ?? null,
+    }));
+  }, [filteredLiveNganyas, mapCorridorId, mapCorridorName, plannerResults]);
+
   const featuredNganya =
     filteredNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
     filteredNganyas[0] ??
@@ -390,7 +454,6 @@ export default function HomeScreen({
     );
 
     setPlannerContext(readPlannerStorageContext());
-    setPlannerSearch(null);
     setPlannerSeed((current) => current + 1);
     onCorridorChange(item.corridorId);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -410,14 +473,38 @@ export default function HomeScreen({
   };
 
   const handlePlannerSearch = (payload: RideSearchPayload) => {
-    setPlannerSearch(payload);
+    setPlannerTracking(null);
+    setPlannerRouteLine(null);
+    setPlannerRouteEtaSeconds(null);
+    plannerRouteAbortRef.current?.abort();
+    plannerRouteAbortRef.current = null;
+    plannerRouteKeyRef.current = null;
     setPlannerContext({
       toPlace: payload.toPlace,
       fromStage: payload.fromStage,
       preferredNganya: payload.preferredNganya,
       preference: payload.preference,
     });
-    onCorridorChange(payload.toPlace.corridor_id || payload.toPlace.id);
+
+    const corridorId = payload.toPlace.corridor_id || payload.toPlace.id;
+    onCorridorChange(corridorId);
+
+    // Fetch ranked journey results so marker-clicks can open the inline tracking card
+    // with ETA/confidence (same behavior as SearchResultsOverlayV2).
+    searchNganyaJourney({
+      corridorId,
+      pickupStageId: payload.fromStage.id,
+      preferredNganyaId:
+        payload.preference === "SPECIFIC" ? payload.preferredNganya?.id : null,
+      vibeTags: payload.preference === "NEWEST" ? ["NEW_BUILD"] : null,
+      maxResults: 24,
+    })
+      .then((data) => {
+        setPlannerResults((data || []) as JourneyResult[]);
+      })
+      .catch(() => {
+        setPlannerResults([]);
+      });
   };
 
   const handlePlannerRouteChange = (
@@ -425,7 +512,6 @@ export default function HomeScreen({
     corridorName?: string | null,
   ) => {
     onCorridorChange(corridorId);
-    setPlannerSearch(null);
     setPlannerContext((current) => ({
       ...current,
       toPlace: corridorId
@@ -443,6 +529,13 @@ export default function HomeScreen({
       preferredNganya: null,
       preference: "ANY",
     }));
+    setPlannerResults([]);
+    setPlannerTracking(null);
+    setPlannerRouteLine(null);
+    setPlannerRouteEtaSeconds(null);
+    plannerRouteAbortRef.current?.abort();
+    plannerRouteAbortRef.current = null;
+    plannerRouteKeyRef.current = null;
   };
 
   const handlePlanRideForRecentRow = (row: AggregatedRecentSightingRow) => {
@@ -459,7 +552,6 @@ export default function HomeScreen({
     );
 
     setPlannerContext(readPlannerStorageContext());
-    setPlannerSearch(null);
     setPlannerSeed((current) => current + 1);
     onCorridorChange(row.corridorId);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -492,83 +584,102 @@ export default function HomeScreen({
         </p>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
-        <div className="lg:col-span-4 lg:sticky lg:top-[84px] space-y-3">
+      <section className="grid grid-cols-1 gap-5 md:gap-6 lg:grid-cols-12 lg:items-stretch">
+        <div className="space-y-3 lg:col-span-4 lg:sticky lg:top-[84px] lg:self-start">
           <WhereToCard
             key={plannerSeed}
             onCorridorChange={handlePlannerRouteChange}
             onSearch={handlePlannerSearch}
             onClear={() => {
-              setPlannerSearch(null);
               onCorridorChange(null);
             }}
           />
-          {activeCorridorName && (
-            <div className="text-xs text-[var(--color-text-tertiary)] px-2">
-              Synced route filter:{" "}
-              <span className="text-[var(--color-text-primary)] font-medium">
-                {activeCorridorName}
-              </span>
-            </div>
-          )}
         </div>
 
-        <div className="lg:col-span-8">
-          <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex gap-2 flex-col">
-                <h2 className="text-h3">Top Answers</h2>
-                <p className="text-xs text-[var(--color-text-tertiary)]">
-                  Route-scoped options with ETA and confidence
-                </p>
-              </div>
-            </div>
+        <div className="min-h-[320px] lg:col-span-8 lg:min-h-0 lg:self-stretch">
+          <div className="h-full rounded-[var(--radius-xl)]">
+            <div className="h-full overflow-hidden rounded-[var(--radius-xl)]">
+              <LiveCorridorMap
+                isActive
+                corridorId={mapCorridorId}
+                corridorName={mapCorridorName}
+                pickupStage={plannerContext.fromStage}
+                journeyResults={mapJourneyResults}
+                highlightNganyaId={
+                  plannerTracking?.nganya_id ??
+                  (plannerContext.preference === "SPECIFIC"
+                    ? (plannerContext.preferredNganya?.id ?? null)
+                    : null)
+                }
+                onTrackNganya={async (j) => {
+                  if (!plannerContext.fromStage?.id) return;
+                  if (!mapCorridorId) return;
 
-            {plannerSearch ? (
-              <SectionBoundary
-                title="Trip planner failed to render"
-                areaLabel="fan-home-planner"
-                onRetry={() => setPlannerSearch(null)}
-              >
-                <SearchResultsOverlayV2
-                  inline
-                  isOpen
-                  onClose={() => setPlannerSearch(null)}
-                  fromStage={plannerSearch.fromStage}
-                  toPlace={plannerSearch.toPlace}
-                  preference={plannerSearch.preference}
-                  preferredNganya={plannerSearch.preferredNganya}
-                />
-              </SectionBoundary>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  Set route and pickup stage to get ranked matches instantly.
-                </p>
-                {filteredLiveNganyas.length > 0 ? (
-                  <div className="space-y-2">
-                    {filteredLiveNganyas.slice(0, 3).map((n) => {
-                      const cardData = mapSupabaseToCardProps(n);
-                      if (!cardData) return null;
-                      return (
-                        <Card
-                          key={cardData.id}
-                          nganya={cardData as any}
-                          variant="compact"
-                          isFollowing={followedIds.has(cardData.id)}
-                          onFollow={toggleFollow}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="mt-3 text-sm text-[var(--color-text-secondary)] border border-dashed border-[var(--color-line)] rounded-[var(--radius-md)] p-4">
-                    No live sessions right now. Use recent sightings below while
-                    planning.
-                  </div>
-                )}
-              </div>
-            )}
+                  setPlannerTracking(j);
+
+                  // Resolve positions for OSRM (nganya + selected stage).
+                  const stageId = plannerContext.fromStage.id;
+                  const [stagePos, nganyaPos] = await Promise.all([
+                    fetchStagePosition(stageId),
+                    fetchNganyaPosition(j.nganya_id),
+                  ]);
+
+                  if (!stagePos || !nganyaPos) {
+                    setPlannerRouteLine(null);
+                    setPlannerRouteEtaSeconds(null);
+                    return;
+                  }
+
+                  const key = `${j.nganya_id}:${stageId}:${nganyaPos.lng.toFixed(5)},${nganyaPos.lat.toFixed(5)}:${stagePos.lng.toFixed(5)},${stagePos.lat.toFixed(5)}`;
+                  if (plannerRouteKeyRef.current === key) return;
+                  plannerRouteKeyRef.current = key;
+
+                  plannerRouteAbortRef.current?.abort();
+                  const controller = new AbortController();
+                  plannerRouteAbortRef.current = controller;
+
+                  try {
+                    const route = await fetchOsrmRoute({
+                      from: nganyaPos,
+                      to: stagePos,
+                      signal: controller.signal,
+                    });
+
+                    if (!Number.isFinite(route.durationSeconds)) {
+                      throw new Error("OSRM route missing duration");
+                    }
+
+                    setPlannerRouteLine({ coordinates: route.coordinates });
+                    setPlannerRouteEtaSeconds(route.durationSeconds);
+                  } catch (err) {
+                    // Abort is expected on rapid marker switching.
+                    if ((err as any)?.name === "AbortError") return;
+
+                    // Fallback: straight line + existing ETA if we have it.
+                    setPlannerRouteLine({
+                      coordinates: [
+                        [nganyaPos.lng, nganyaPos.lat],
+                        [stagePos.lng, stagePos.lat],
+                      ],
+                    });
+
+                    const etaMin = Number.isFinite(j.eta_minutes)
+                      ? Math.max(1, Math.round(j.eta_minutes))
+                      : null;
+                    setPlannerRouteEtaSeconds(
+                      etaMin !== null ? etaMin * 60 : null,
+                    );
+                  }
+                }}
+                fillRowHeight
+                showCaption={false}
+                showNoCorridorOverlay={false}
+                flushBottom={!!plannerTracking}
+                routeLine={plannerRouteLine}
+                routeEtaSeconds={plannerRouteEtaSeconds}
+                className="h-full min-h-[320px] lg:min-h-0"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -630,7 +741,7 @@ export default function HomeScreen({
         )}
       </section>
 
-      <section>
+      <section ref={recentSightingsRef}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-h3">Recently Spotted</h2>
@@ -958,12 +1069,12 @@ export function HomeScreenSkeleton() {
         <Skeleton className="h-4 w-[32rem] max-w-full" variant="text" />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
-        <div className="lg:col-span-4 space-y-3">
-          <Skeleton className="h-64 rounded-[var(--radius-xl)]" />
+      <section className="grid grid-cols-1 gap-5 md:gap-6 lg:grid-cols-12 lg:items-stretch">
+        <div className="lg:col-span-4">
+          <Skeleton className="h-[320px] rounded-[var(--radius-xl)] md:h-[360px] lg:h-[420px]" />
         </div>
         <div className="lg:col-span-8">
-          <Skeleton className="h-72 rounded-[var(--radius-xl)]" />
+          <Skeleton className="h-[320px] rounded-[var(--radius-xl)] md:h-[360px] lg:h-[420px]" />
         </div>
       </section>
 

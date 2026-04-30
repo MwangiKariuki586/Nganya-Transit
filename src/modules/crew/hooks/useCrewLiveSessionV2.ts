@@ -11,6 +11,9 @@ import {
   clearSessionState,
   addPositionToHistory,
   getPositionHistory,
+  addQueuedUpdate,
+  getQueuedUpdates,
+  clearQueuedUpdates,
 } from '../lib/session-storage'
 import { isStationary, detectDirectionChange } from '../lib/location-utils'
 
@@ -54,18 +57,26 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
 
       const location = coords ? getLocationPoint(coords) : null
 
-      const result = await crewLiveService.pingSession({
-        sessionId: session.id,
-        seatsLeft: payload.seatsLeft ?? session.seats_left,
-        direction: payload.direction ?? session.direction,
-        lastLocation: location,
-      })
-
-      return result
+      try {
+        const result = await crewLiveService.pingSession({
+          sessionId: session.id,
+          seatsLeft: payload.seatsLeft ?? session.seats_left,
+          direction: payload.direction ?? session.direction,
+          lastLocation: location,
+        })
+        return result
+      } catch (error) {
+        // Persist the failed payload so it can be replayed after a reload
+        addQueuedUpdate({ sessionId: session.id, payload })
+        throw error
+      }
     },
     onSuccess: (updatedSession) => {
       setSession(updatedSession)
       onSessionUpdate?.(updatedSession)
+
+      // Clear any persisted queue once a ping succeeds
+      clearQueuedUpdates()
 
       // Save session state for recovery
       if (updatedSession.status === 'LIVE') {
@@ -85,6 +96,17 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
       console.error('Ping failed:', error)
     },
   })
+
+  // Drain persisted queue on mount when session is LIVE
+  useEffect(() => {
+    if (!session?.id || session.status !== 'LIVE') return
+    const persisted = getQueuedUpdates()
+    const mine = persisted.filter((q) => q.sessionId === session.id)
+    if (mine.length > 0) {
+      // Replay only the latest update (most recent seats + direction state)
+      void ping(mine[mine.length - 1].payload)
+    }
+  }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track position history for movement detection
   useEffect(() => {

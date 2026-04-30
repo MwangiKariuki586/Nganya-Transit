@@ -20,7 +20,7 @@
  * (external URL from Supabase storage or CDN).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import type { TrackingSignalType } from '@/lib/types/tracking'
 
 // ─── Signal type config ───────────────────────────────────────────────────────
@@ -186,6 +186,40 @@ function MotionTrail({ heading }: { heading: number | null }) {
       }}
     />
   )
+}
+
+// ─── Name chips above pins (nganya + stage) ────────────────────────────────
+/** Shared label style so matatu and stage names align visually on the map. */
+function getMarkerNameChipStyle(kind: 'nganya' | 'stage'): CSSProperties {
+  return {
+    backgroundColor: 'rgba(10, 10, 15, 0.96)',
+    color: '#f4f4f5',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.03em',
+    padding: '6px 12px',
+    minWidth: 36,
+    minHeight: 28,
+    borderRadius: 10,
+    whiteSpace: 'nowrap',
+    maxWidth: 160,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    lineHeight: 1.35,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    boxSizing: 'border-box',
+    marginBottom: 6,
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 2px 14px rgba(0,0,0,0.55)',
+    pointerEvents: 'none',
+    border:
+      kind === 'nganya'
+        ? '1px solid rgba(57, 255, 20, 0.4)'
+        : '1px solid rgba(255, 45, 120, 0.55)',
+  }
 }
 
 // ─── Teardrop pin shell ───────────────────────────────────────────────────────
@@ -388,26 +422,7 @@ export function NganyaMarker({
         alignItems: 'center',
       }}
     >
-      <div
-        style={{
-          backgroundColor: 'rgba(10,10,15,0.9)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: '#ffffff',
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: '0.02em',
-          padding: '4px 8px',
-          borderRadius: 8,
-          whiteSpace: 'nowrap',
-          maxWidth: 140,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          marginBottom: 6,
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.45)',
-          pointerEvents: 'none',
-        }}
-      >
+      <div style={getMarkerNameChipStyle('nganya')}>
         {label}
       </div>
       {pinBlock}
@@ -432,25 +447,7 @@ export function StageMarker({ name, size = 40 }: StageMarkerProps) {
       }}
     >
       {/* Floating name label above the pin */}
-      <div
-        style={{
-          backgroundColor: 'rgba(10,10,15,0.88)',
-          border: '1px solid rgba(255,45,120,0.5)',
-          color: '#ffffff',
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: '0.02em',
-          padding: '3px 9px',
-          borderRadius: 7,
-          whiteSpace: 'nowrap',
-          maxWidth: 150,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          marginBottom: 5,
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.55)',
-        }}
-      >
+      <div style={getMarkerNameChipStyle('stage')}>
         {name}
       </div>
 

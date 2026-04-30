@@ -24,12 +24,14 @@ interface WhereToCardProps {
   ) => void;
   onSearch?: (payload: RideSearchPayload) => void;
   onClear?: () => void;
+  className?: string;
 }
 
 export default function WhereToCard({
   onCorridorChange,
   onSearch,
   onClear,
+  className,
 }: WhereToCardProps) {
   const isMobile = useIsMobile();
   const [isCompact, setIsCompact] = useState(false);
@@ -240,7 +242,9 @@ export default function WhereToCard({
   // Compact summary (mobile, after search has been triggered)
   if (isMobile && isCompact && toPlace && fromStage) {
     return (
-      <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6 shadow-sm">
+      <div
+        className={`bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6 shadow-sm ${className ?? ""}`}
+      >
         <div className="flex items-center justify-between gap-3 mb-3">
           <p className="text-sm text-[var(--color-text-primary)] font-medium truncate">
             {summaryText}
@@ -271,7 +275,9 @@ export default function WhereToCard({
   }
 
   return (
-    <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6 shadow-sm">
+    <div
+      className={`bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-xl)] p-4 md:p-6 shadow-sm flex flex-col ${className ?? ""}`}
+    >
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex gap-2 flex-col">
           <h2 className="text-h3 flex items-center gap-2">
@@ -309,7 +315,7 @@ export default function WhereToCard({
             </button>
           </div>
           <div className="flex flex-col gap-1.5">
-            {recents.map((recent, idx) => (
+            {recents.slice(0, 1).map((recent, idx) => (
               <button
                 key={`${recent.fromStage.id}-${recent.toPlace.id}-${idx}`}
                 type="button"
@@ -337,7 +343,8 @@ export default function WhereToCard({
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="flex-1 flex flex-col">
+        <div className="space-y-4 flex-1">
         <div className="flex flex-col gap-3">
           <button
             type="button"
@@ -433,10 +440,12 @@ export default function WhereToCard({
           </div>
         </div>
 
-        <div className="sticky bottom-3 z-10 md:static">
+        </div>
+
+        <div className="sticky bottom-3 z-10 md:static mt-6">
           <Button
             variant="primary"
-            className="w-full mt-2"
+            className="w-full"
             disabled={!canSearch}
             onClick={handleSearch}
           >

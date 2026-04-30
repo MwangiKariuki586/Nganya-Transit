@@ -1,7 +1,7 @@
 import type { Coords, StageOption, StartStageChoice } from "./crew-live-types";
 
-export function clampSeats(value: number) {
-  return Math.max(0, Math.min(20, value));
+export function clampSeats(value: number, max = 33) {
+  return Math.max(0, Math.min(max, value));
 }
 
 export function formatDateTime(value: string | null | undefined) {

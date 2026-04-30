@@ -27,6 +27,7 @@ import { Route as fanNganyaSlugRouteImport } from './routes/(fan)/nganya.$slug'
 import { Route as crewCrewRegisterRouteImport } from './routes/(crew)/crew/register'
 import { Route as crewCrewProfileRouteImport } from './routes/(crew)/crew/profile'
 import { Route as crewCrewPendingRouteImport } from './routes/(crew)/crew/pending'
+import { Route as crewCrewNotificationsRouteImport } from './routes/(crew)/crew/notifications'
 import { Route as crewCrewLiveRouteImport } from './routes/(crew)/crew/live'
 import { Route as crewCrewHistoryRouteImport } from './routes/(crew)/crew/history'
 import { Route as adminAdminUsersRouteImport } from './routes/(admin)/admin/users'
@@ -124,6 +125,11 @@ const crewCrewPendingRoute = crewCrewPendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => crewCrewRouteRoute,
 } as any)
+const crewCrewNotificationsRoute = crewCrewNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => crewCrewRouteRoute,
+} as any)
 const crewCrewLiveRoute = crewCrewLiveRouteImport.update({
   id: '/live',
   path: '/live',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof adminAdminUsersRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
+  '/crew/notifications': typeof crewCrewNotificationsRoute
   '/crew/pending': typeof crewCrewPendingRoute
   '/crew/profile': typeof crewCrewProfileRoute
   '/crew/register': typeof crewCrewRegisterRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof adminAdminUsersRoute
   '/crew/history': typeof crewCrewHistoryRoute
   '/crew/live': typeof crewCrewLiveRoute
+  '/crew/notifications': typeof crewCrewNotificationsRoute
   '/crew/pending': typeof crewCrewPendingRoute
   '/crew/profile': typeof crewCrewProfileRoute
   '/crew/register': typeof crewCrewRegisterRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/(admin)/admin/users': typeof adminAdminUsersRoute
   '/(crew)/crew/history': typeof crewCrewHistoryRoute
   '/(crew)/crew/live': typeof crewCrewLiveRoute
+  '/(crew)/crew/notifications': typeof crewCrewNotificationsRoute
   '/(crew)/crew/pending': typeof crewCrewPendingRoute
   '/(crew)/crew/profile': typeof crewCrewProfileRoute
   '/(crew)/crew/register': typeof crewCrewRegisterRoute
@@ -258,6 +267,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/crew/history'
     | '/crew/live'
+    | '/crew/notifications'
     | '/crew/pending'
     | '/crew/profile'
     | '/crew/register'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/crew/history'
     | '/crew/live'
+    | '/crew/notifications'
     | '/crew/pending'
     | '/crew/profile'
     | '/crew/register'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/(admin)/admin/users'
     | '/(crew)/crew/history'
     | '/(crew)/crew/live'
+    | '/(crew)/crew/notifications'
     | '/(crew)/crew/pending'
     | '/(crew)/crew/profile'
     | '/(crew)/crew/register'
@@ -455,6 +467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof crewCrewPendingRouteImport
       parentRoute: typeof crewCrewRouteRoute
     }
+    '/(crew)/crew/notifications': {
+      id: '/(crew)/crew/notifications'
+      path: '/notifications'
+      fullPath: '/crew/notifications'
+      preLoaderRoute: typeof crewCrewNotificationsRouteImport
+      parentRoute: typeof crewCrewRouteRoute
+    }
     '/(crew)/crew/live': {
       id: '/(crew)/crew/live'
       path: '/live'
@@ -554,6 +573,7 @@ const adminAdminRouteRouteWithChildren = adminAdminRouteRoute._addFileChildren(
 interface crewCrewRouteRouteChildren {
   crewCrewHistoryRoute: typeof crewCrewHistoryRoute
   crewCrewLiveRoute: typeof crewCrewLiveRoute
+  crewCrewNotificationsRoute: typeof crewCrewNotificationsRoute
   crewCrewPendingRoute: typeof crewCrewPendingRoute
   crewCrewProfileRoute: typeof crewCrewProfileRoute
   crewCrewRegisterRoute: typeof crewCrewRegisterRoute
@@ -564,6 +584,7 @@ interface crewCrewRouteRouteChildren {
 const crewCrewRouteRouteChildren: crewCrewRouteRouteChildren = {
   crewCrewHistoryRoute: crewCrewHistoryRoute,
   crewCrewLiveRoute: crewCrewLiveRoute,
+  crewCrewNotificationsRoute: crewCrewNotificationsRoute,
   crewCrewPendingRoute: crewCrewPendingRoute,
   crewCrewProfileRoute: crewCrewProfileRoute,
   crewCrewRegisterRoute: crewCrewRegisterRoute,

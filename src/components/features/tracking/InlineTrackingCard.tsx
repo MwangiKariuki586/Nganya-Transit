@@ -28,6 +28,8 @@ interface InlineTrackingCardProps {
   allResults?: JourneyResult[]
   onClose: () => void
   onSwitch?: (nganya: JourneyResult) => void
+  /** Square top corners when stacked directly under a map (avoids corner gap). */
+  flushTop?: boolean
 }
 
 export default function InlineTrackingCard({
@@ -36,6 +38,7 @@ export default function InlineTrackingCard({
   allResults = [],
   onClose,
   onSwitch,
+  flushTop = false,
 }: InlineTrackingCardProps) {
   const [showFullScreen, setShowFullScreen] = useState(false)
   const [showAlternatives, setShowAlternatives] = useState(false)
@@ -75,7 +78,11 @@ export default function InlineTrackingCard({
 
   return (
     <div
-      className="rounded-[var(--radius-lg)] border overflow-hidden animate-fade-in"
+      className={
+        flushTop
+          ? 'rounded-b-[var(--radius-lg)] rounded-t-none border border-t-0 overflow-hidden animate-fade-in'
+          : 'rounded-[var(--radius-lg)] border overflow-hidden animate-fade-in'
+      }
       style={{
         backgroundColor: 'var(--color-bg-surface)',
         borderColor: 'var(--glass-border)',

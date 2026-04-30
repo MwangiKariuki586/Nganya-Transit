@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Route } from "@/routes/(crew)/crew/profile";
 import { updateCrewProfileServerFn } from "@/shared/server-fns/crew-profile";
@@ -8,6 +8,7 @@ import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
 import { browserSupabase } from "@/shared/supabase/browser-client";
 import { useProfileMediaUpload } from "@/hooks/useProfileMediaUpload";
+import { crewLiveService } from "@/features/crew-live/services/crew-live-service";
 import InlineSpinner from "@/components/ui/InlineSpinner";
 import AvatarRing, { computeCompleteness } from "@/components/ui/AvatarRing";
 import MediaLightbox from "@/components/ui/MediaLightbox";
@@ -26,6 +27,7 @@ export function CrewProfileScreen() {
   const nganyaId = assignment?.nganya_id ?? null;
 
   const [followerCount, setFollowerCount] = useState<number | null>(null);
+  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
 
   useEffect(() => {
     if (!nganyaId) return;
@@ -35,6 +37,47 @@ export function CrewProfileScreen() {
       .eq("nganya_id", nganyaId)
       .then(({ count }) => setFollowerCount(count ?? 0));
   }, [nganyaId]);
+
+  useEffect(() => {
+    crewLiveService
+      .listHistory(50)
+      .then((data) => setSessionHistory(data || []))
+      .catch(() => {});
+  }, []);
+
+  const crewStats = useMemo(() => {
+    if (sessionHistory.length === 0) return null;
+
+    const ended = sessionHistory.filter((s) => s.ended_at);
+    const totalMs = ended.reduce(
+      (acc: number, s: any) =>
+        acc + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()),
+      0,
+    );
+
+    const uniqueDays = new Set(
+      sessionHistory.map((s: any) => new Date(s.started_at).toDateString()),
+    ).size;
+
+    const longestMs = ended.reduce((max: number, s: any) => {
+      const dur = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
+      return dur > max ? dur : max;
+    }, 0);
+
+    const fmtTime = (ms: number) => {
+      const totalMin = Math.floor(ms / 60_000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+
+    return {
+      totalSessions: sessionHistory.length,
+      totalTime: fmtTime(totalMs),
+      daysActive: uniqueDays,
+      longestSession: longestMs > 0 ? fmtTime(longestMs) : "—",
+    };
+  }, [sessionHistory]);
 
   // ── Profile details editor state ──────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false);
@@ -594,6 +637,34 @@ export function CrewProfileScreen() {
           type={lightbox?.type || "image"}
           onClose={() => setLightbox(null)}
         />
+
+        {/* ── Crew Stats ────────────────────────────────────────────── */}
+        {crewStats && (
+          <>
+            <div className="mt-8 border-t border-[var(--color-line)]" />
+            <section className="mt-8">
+              <h2 className="mb-4 text-h3">Crew Stats</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: "Total sessions", value: String(crewStats.totalSessions) },
+                  { label: "Total time live", value: crewStats.totalTime },
+                  { label: "Days active", value: String(crewStats.daysActive) },
+                  { label: "Longest session", value: crewStats.longestSession },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-[18px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 text-center"
+                  >
+                    <div className="text-h4 text-[var(--color-text-primary)]">{stat.value}</div>
+                    <div className="mt-1 text-caption text-[var(--color-text-tertiary)]">
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
 
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
