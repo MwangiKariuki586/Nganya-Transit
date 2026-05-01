@@ -17,6 +17,14 @@ import {
   fetchStagePosition,
   type CorridorNganyaMapPin,
 } from "@/lib/queries/tracking";
+import {
+  getTrackingSignalState,
+  isLiveForCount,
+  isVisibleOnLiveMap,
+  ROUTE_LINE_VISUAL,
+  formatAgeShort,
+  getAgeSeconds,
+} from "@/lib/tracking-signal";
 import { useGeolocationStream } from "@/hooks/useGeolocationStream";
 import { NganyaMarker, StageMarker, UserMarker } from "./TrackingMapMarkers";
 import type { JourneyResult } from "@/lib/types/journey";
@@ -33,12 +41,18 @@ const MAP_STYLE_URL =
 
 const DEFAULT_CENTER = { lat: -1.2921, lng: 36.8219 };
 
+/** Format metres into a compact human-readable distance string. */
+function formatDistance(metres: number): string {
+  if (metres < 1000) return `${Math.round(metres)} m`;
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+/**
+ * Resolve the signal state for a corridor map pin using the canonical helper.
+ * EXPIRED pins are filtered at the query layer, but we guard here too.
+ */
 function markerSignalForPin(pin: CorridorNganyaMapPin): TrackingSignalType {
-  if (pin.pin_source === "LIVE") return "LIVE";
-  const seen = new Date(pin.observed_at).getTime();
-  if (!Number.isFinite(seen)) return "ESTIMATED";
-  const ageMin = (Date.now() - seen) / 60_000;
-  return ageMin > 45 ? "STALE" : "ESTIMATED";
+  return getTrackingSignalState(pin.pin_source, pin.observed_at);
 }
 
 function buildJourneyFromPin(
@@ -104,6 +118,19 @@ export interface LiveCorridorMapProps {
   routeLine?: { coordinates: [number, number][] } | null;
   /** Optional ETA for the route overlay, in seconds. */
   routeEtaSeconds?: number | null;
+  /** Optional route distance in metres, shown alongside ETA on the map badge. */
+  routeDistanceMeters?: number | null;
+  /**
+   * Signal state of the nganya whose route is being shown.
+   * Controls route line colour, opacity, and dash pattern.
+   * Defaults to 'LIVE' when not provided (preserves existing behaviour).
+   */
+  routeSignalType?: TrackingSignalType | null;
+  /**
+   * When true, shows a rerouting loading overlay on the map.
+   * Set by the parent while an OSRM/route fetch is in-flight after a marker click.
+   */
+  isRouting?: boolean;
   className?: string;
   /** Optional pin filter: when set, only these nganya ids are rendered. */
   visibleNganyaIds?: string[] | null;
@@ -126,6 +153,9 @@ export default function LiveCorridorMap({
   flushBottom = false,
   routeLine = null,
   routeEtaSeconds = null,
+  routeDistanceMeters = null,
+  routeSignalType = null,
+  isRouting = false,
   className,
   visibleNganyaIds = null,
 }: LiveCorridorMapProps) {
@@ -133,6 +163,7 @@ export default function LiveCorridorMap({
   const [pins, setPins] = useState<CorridorNganyaMapPin[]>([]);
   const [stagePos, setStagePos] = useState<TrackingPosition | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { coords: userCoords } = useGeolocationStream();
@@ -288,6 +319,9 @@ export default function LiveCorridorMap({
     } as const;
 
     const apply = () => {
+      // Resolve route line visual config from signal state
+      const lineVisual = ROUTE_LINE_VISUAL[routeSignalType ?? "LIVE"];
+
       // Update or add the source.
       const existing = map.getSource?.(sourceId);
       if (existing?.setData) {
@@ -296,38 +330,76 @@ export default function LiveCorridorMap({
         map.addSource(sourceId, { type: "geojson", data: geojson });
       }
 
-      // Add layers if missing; keep them above the basemap.
-      // Prefer inserting below the first symbol layer (labels), so the route sits under labels.
+      // Prefer inserting below the first symbol layer so the route sits under labels.
       const layers = map.getStyle?.()?.layers ?? [];
       const firstSymbol = layers.find((l: any) => l?.type === "symbol")?.id;
-      const beforeId = typeof firstSymbol === "string" ? firstSymbol : undefined;
+      const beforeId =
+        typeof firstSymbol === "string" ? firstSymbol : undefined;
+
+      // ── Shadow layer ──────────────────────────────────────────────────────
       if (!map.getLayer?.(shadowLayerId)) {
-        map.addLayer({
-          id: shadowLayerId,
-          type: "line",
-          source: sourceId,
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-color": "rgba(0,0,0,0.55)",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 10, 14, 16],
-            "line-blur": 1.2,
-            "line-opacity": 0.9,
+        map.addLayer(
+          {
+            id: shadowLayerId,
+            type: "line",
+            source: sourceId,
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: {
+              "line-color": "rgba(0,0,0,0.55)",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                10,
+                14,
+                16,
+              ],
+              "line-blur": 1.2,
+              "line-opacity": lineVisual.shadowOpacity,
+            },
           },
-        }, beforeId);
+          beforeId,
+        );
+      } else {
+        // Layer already exists — update only the opacity (avoids a remove/add race)
+        map.setPaintProperty?.(
+          shadowLayerId,
+          "line-opacity",
+          lineVisual.shadowOpacity,
+        );
       }
+
+      // ── Main line layer ───────────────────────────────────────────────────
       if (!map.getLayer?.(lineLayerId)) {
-        map.addLayer({
-          id: lineLayerId,
-          type: "line",
-          source: sourceId,
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-color": "#ff2d78",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 6, 14, 10],
-            "line-blur": 0.2,
-            "line-opacity": 0.95,
+        const linePaint: Record<string, unknown> = {
+          "line-color": lineVisual.color,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 6, 14, 10],
+          "line-blur": 0.2,
+          "line-opacity": lineVisual.opacity,
+        };
+        if (lineVisual.dasharray) {
+          linePaint["line-dasharray"] = lineVisual.dasharray;
+        }
+        map.addLayer(
+          {
+            id: lineLayerId,
+            type: "line",
+            source: sourceId,
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: linePaint,
           },
-        }, beforeId);
+          beforeId,
+        );
+      } else {
+        // Layer already exists — update paint properties in-place
+        map.setPaintProperty?.(lineLayerId, "line-color", lineVisual.color);
+        map.setPaintProperty?.(lineLayerId, "line-opacity", lineVisual.opacity);
+        map.setPaintProperty?.(
+          lineLayerId,
+          "line-dasharray",
+          lineVisual.dasharray ?? ["literal", [1, 0]],
+        );
       }
     };
 
@@ -345,13 +417,13 @@ export default function LiveCorridorMap({
       }
       ensureRemoved();
     };
-  }, [routeLine?.coordinates]);
+  }, [routeLine?.coordinates, routeSignalType]);
 
   const heightClass = dense
-      ? "min-h-[220px] h-[min(38vh,320px)]"
-      : compact
-        ? "min-h-[260px] h-[min(42vh,360px)]"
-        : "min-h-[320px] h-[min(62vh,640px)]";
+    ? "min-h-[220px] h-[min(38vh,320px)]"
+    : compact
+      ? "min-h-[260px] h-[min(42vh,360px)]"
+      : "min-h-[320px] h-[min(62vh,640px)]";
 
   if (!isActive) return null;
 
@@ -368,8 +440,20 @@ export default function LiveCorridorMap({
     ? pins.filter((p) => visibleIdSet.has(p.nganya_id))
     : pins;
 
-  const liveCount = visiblePins.filter((p) => p.pin_source === "LIVE").length;
-  const sightCount = visiblePins.filter((p) => p.pin_source === "SIGHTING").length;
+  // ── Signal-aware counts — stale/expired must never inflate live metrics ──
+  const liveCount = visiblePins.filter((p) =>
+    isLiveForCount(markerSignalForPin(p)),
+  ).length;
+  const estimatedCount = visiblePins.filter((p) => {
+    const s = markerSignalForPin(p);
+    return s === "ESTIMATED";
+  }).length;
+  const staleCount = visiblePins.filter(
+    (p) => markerSignalForPin(p) === "STALE",
+  ).length;
+  // True when the map has pins but none are live or estimated
+  const onlyStaleAvailable =
+    visiblePins.length > 0 && liveCount === 0 && estimatedCount === 0;
 
   return (
     <div
@@ -393,9 +477,17 @@ export default function LiveCorridorMap({
               {liveCount} live GPS
             </span>
           ) : null}
-          {corridorId && sightCount > 0 ? (
+          {corridorId && estimatedCount > 0 ? (
             <span className="text-[var(--color-text-tertiary)]">
-              {sightCount} from sightings
+              {estimatedCount} from sightings
+            </span>
+          ) : null}
+          {corridorId &&
+          staleCount > 0 &&
+          liveCount === 0 &&
+          estimatedCount === 0 ? (
+            <span className="text-[var(--color-text-tertiary)]">
+              {staleCount} last-known
             </span>
           ) : null}
           {corridorId ? (
@@ -429,6 +521,7 @@ export default function LiveCorridorMap({
             mapStyle={MAP_STYLE_URL}
             attributionControl={false}
             reuseMaps
+            onLoad={() => setMapReady(true)}
           >
             <NavigationControl position="top-right" />
             {userCoords ? (
@@ -500,11 +593,96 @@ export default function LiveCorridorMap({
             })}
           </Map>
         </div>
+
+        {/* ── Initial map tile load ─────────────────────────────────────── */}
+        {!mapReady && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
+            style={{ backgroundColor: "var(--color-bg-body)" }}
+            aria-label="Map loading"
+            aria-live="polite"
+          >
+            {/* Animated map-pin skeleton */}
+            <div className="relative flex items-center justify-center">
+              <span
+                className="absolute w-14 h-14 rounded-full animate-ping"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  opacity: 0.12,
+                }}
+              />
+              <span
+                className="relative w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: "var(--color-accent)" }}
+              />
+            </div>
+            <p
+              className="text-xs font-medium"
+              style={{ color: "var(--color-text-tertiary)" }}
+            >
+              Loading map…
+            </p>
+          </div>
+        )}
+
+        {/* ── Rerouting overlay — shown while OSRM fetch is in-flight ─────── */}
+        {mapReady && isRouting && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10"
+            aria-label="Calculating route"
+            aria-live="polite"
+          >
+            {/* Subtle dark veil so the map stays visible underneath */}
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: "rgba(10,10,15,0.35)" }}
+            />
+            {/* Pill badge centred on the map */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: "rgba(10,10,15,0.88)",
+                  color: "var(--color-text-primary)",
+                  border: "1px solid var(--glass-border)",
+                  backdropFilter: "blur(12px)",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+                }}
+              >
+                <span
+                  className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin shrink-0"
+                  style={{ borderColor: "var(--color-accent)" }}
+                />
+                Calculating route…
+              </div>
+            </div>
+          </div>
+        )}
         {routeEtaSeconds && Number.isFinite(routeEtaSeconds) ? (
-          <div className="pointer-events-none absolute left-3 top-3 z-[6] rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm">
-            ETA {Math.max(1, Math.round(routeEtaSeconds / 60))} min
+          <div className="pointer-events-none absolute left-3 top-3 z-[6] rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm flex items-center gap-2">
+            <span>
+              {routeSignalType === "STALE"
+                ? `~${Math.max(1, Math.round(routeEtaSeconds / 60))} min old estimate`
+                : routeSignalType === "ESTIMATED"
+                  ? `~${Math.max(1, Math.round(routeEtaSeconds / 60))} min estimate`
+                  : `ETA ${Math.max(1, Math.round(routeEtaSeconds / 60))} min`}
+            </span>
+            {routeDistanceMeters && Number.isFinite(routeDistanceMeters) ? (
+              <>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span style={{ opacity: 0.85 }}>
+                  {formatDistance(routeDistanceMeters)}
+                </span>
+              </>
+            ) : null}
           </div>
         ) : null}
+        {/* Stale-only notice — subtle map-level badge when no fresh signals exist */}
+        {onlyStaleAvailable && (
+          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-[6] rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-medium text-white/80 backdrop-blur-sm whitespace-nowrap">
+            No fresh live signals · Showing last-known locations
+          </div>
+        )}
         {showNoCorridorOverlay && !corridorId && !loadError ? (
           <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--color-bg-body)]/80 px-4 text-center text-xs text-[var(--color-text-secondary)] backdrop-blur-sm">
             {emptyOverlay ??

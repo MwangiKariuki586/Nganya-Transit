@@ -8,8 +8,14 @@ export const TRACKING_THRESHOLDS = {
   LIVE_FRESH_MAX_S: 30,
   /** Live GPS ping still usable but aging (seconds) */
   LIVE_AGING_MAX_S: 90,
+  /** Live session too old to show on live map surfaces (minutes) */
+  LIVE_SESSION_EXPIRES_MIN: 15,
+  /** Sighting still fresh for live intel (minutes) */
+  SIGHTING_FRESH_MAX_MIN: 10,
   /** Sighting still usable for live intel (minutes) */
   SIGHTING_USABLE_MAX_MIN: 30,
+  /** Sighting too old to show on live map surfaces (minutes) */
+  SIGHTING_EXPIRES_MIN: 30,
   /** ETA tick interval (ms) */
   ETA_TICK_MS: 15_000,
   /** Walk speed used for time estimation (metres per minute) */
@@ -22,11 +28,15 @@ export const TRACKING_THRESHOLDS = {
 
 /**
  * Resolved signal state after applying freshness rules.
- * - LIVE      → crew GPS, fresh ping ≤ LIVE_FRESH_MAX_S
+ *
+ * - LIVE      → crew GPS, fresh ping ≤ LIVE_FRESH_MAX_S (≤30 s)
  * - ESTIMATED → sightings-based OR aging live ping (31–90 s)
- * - STALE     → last update > LIVE_AGING_MAX_S or sighting > SIGHTING_USABLE_MAX_MIN
+ * - STALE     → last update > LIVE_AGING_MAX_S or sighting > SIGHTING_FRESH_MAX_MIN
+ *               Show as last-known location only. No live pulse, no ETA.
+ * - EXPIRED   → last update > LIVE_SESSION_EXPIRES_MIN or sighting > SIGHTING_EXPIRES_MIN
+ *               Do NOT render on live map surfaces.
  */
-export type TrackingSignalType = 'LIVE' | 'ESTIMATED' | 'STALE'
+export type TrackingSignalType = 'LIVE' | 'ESTIMATED' | 'STALE' | 'EXPIRED'
 
 // ─── Catchability ────────────────────────────────────────────────────────────
 

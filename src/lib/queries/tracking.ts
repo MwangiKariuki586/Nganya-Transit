@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '../supabase'
+import { getTrackingSignalState } from '../tracking-signal'
 import type { TrackingPosition } from '../types/tracking'
 
 /** Cast the Supabase client to `any` to work around incomplete generated types. */
@@ -119,6 +120,9 @@ export interface CorridorNganyaMapPin {
  * Every nganya on this corridor that has a mappable point:
  * 1) LIVE session with last_location (newest ping per nganya)
  * 2) Else latest sighting with location (per nganya), only if no LIVE pin
+ *
+ * EXPIRED signals (> LIVE_SESSION_EXPIRES_MIN or > SIGHTING_EXPIRES_MIN) are
+ * filtered out here so they never reach the live map surface.
  */
 export async function fetchCorridorNganyaMapPins(
   corridorId: string,
@@ -142,6 +146,9 @@ export async function fetchCorridorNganyaMapPins(
     last_ping_at: string
   }>) {
     if (pins.has(row.nganya_id)) continue
+    // Filter expired live sessions — they must not appear on the live map
+    const signalState = getTrackingSignalState('LIVE', row.last_ping_at)
+    if (signalState === 'EXPIRED') continue
     const position = parsePostgisPoint(row.last_location)
     if (!position) continue
     pins.set(row.nganya_id, {
@@ -169,6 +176,9 @@ export async function fetchCorridorNganyaMapPins(
     created_at: string
   }>) {
     if (pins.has(row.nganya_id)) continue
+    // Filter expired sightings — they must not appear on the live map
+    const signalState = getTrackingSignalState('SIGHTING', row.created_at)
+    if (signalState === 'EXPIRED') continue
     const position = parsePostgisPoint(row.location)
     if (!position) continue
     pins.set(row.nganya_id, {

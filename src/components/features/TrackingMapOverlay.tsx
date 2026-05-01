@@ -23,62 +23,83 @@
  * Override via VITE_MAP_STYLE_URL.
  */
 
-import { useEffect, useState, useCallback, useRef, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
-import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/maplibre'
-import { X, MapPin, AlertTriangle, WifiOff, Clock, Navigation2 } from 'lucide-react'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
+import Map, {
+  Marker,
+  NavigationControl,
+  type MapRef,
+} from "react-map-gl/maplibre";
+import {
+  X,
+  MapPin,
+  AlertTriangle,
+  WifiOff,
+  Clock,
+  Navigation2,
+} from "lucide-react";
+import "maplibre-gl/dist/maplibre-gl.css";
 
-import { useTracking } from '@/hooks/useTracking'
-import { useGeolocationStream } from '@/hooks/useGeolocationStream'
-import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
-import { useCameraTracking } from '@/hooks/useCameraTracking'
-import TrackingBottomSheet from './tracking/TrackingBottomSheet'
-import TrackingAlternatives from './tracking/TrackingAlternatives'
+import { useTracking } from "@/hooks/useTracking";
+import { useGeolocationStream } from "@/hooks/useGeolocationStream";
+import { useAnimatedPosition } from "@/hooks/useAnimatedPosition";
+import { useCameraTracking } from "@/hooks/useCameraTracking";
+import TrackingBottomSheet from "./tracking/TrackingBottomSheet";
+import TrackingAlternatives from "./tracking/TrackingAlternatives";
 import {
   NganyaMarker,
   StageMarker,
   UserMarker,
-} from './tracking/TrackingMapMarkers'
-import CatchabilityBadge from '@/components/ui/CatchabilityBadge'
-import TrackingSignalBadge from '@/components/ui/TrackingSignalBadge'
-import ConfidenceBadge from '@/components/ui/ConfidenceBadge'
-import { LoadingButton } from '@/components/ui/loading'
-import { InlineErrorState } from '@/components/error/InlineErrorState'
-import { CheckCircle, XCircle } from 'lucide-react'
+} from "./tracking/TrackingMapMarkers";
+import CatchabilityBadge from "@/components/ui/CatchabilityBadge";
+import TrackingSignalBadge from "@/components/ui/TrackingSignalBadge";
+import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
+import { LoadingButton } from "@/components/ui/loading";
+import { InlineErrorState } from "@/components/error/InlineErrorState";
+import { CheckCircle, XCircle } from "lucide-react";
+import { formatAgeShort } from "@/lib/tracking-signal";
 
-import type { JourneyResult } from '@/lib/types/journey'
-import type { TrackingPosition, SheetSnapState } from '@/lib/types/tracking'
+import type { JourneyResult } from "@/lib/types/journey";
+import type { TrackingPosition, SheetSnapState } from "@/lib/types/tracking";
 
 // ─── Map config ───────────────────────────────────────────────────────────────
 
 const MAP_STYLE_URL =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as unknown as { env: Record<string, string> }).env?.VITE_MAP_STYLE_URL) ||
+  (typeof import.meta !== "undefined" &&
+    (import.meta as unknown as { env: Record<string, string> }).env
+      ?.VITE_MAP_STYLE_URL) ||
   // Voyager: buildings, POI labels, subtle terrain — closer to Uber's aesthetic
-  'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
+  "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 /** Default map center (Nairobi CBD) when no positions are available yet */
-const DEFAULT_CENTER = { lat: -1.2921, lng: 36.8219 }
-const DEFAULT_ZOOM = 15
+const DEFAULT_CENTER = { lat: -1.2921, lng: 36.8219 };
+const DEFAULT_ZOOM = 15;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated Use formatAgeShort from @/lib/tracking-signal instead.
+ * Kept for backward compatibility with InlineTrackingCard which imports this.
+ */
 export function formatSecondsAgo(seconds: number): string {
-  if (seconds < 60) return `${seconds}s ago`
-  const mins = Math.floor(seconds / 60)
-  return `${mins}m ago`
+  return formatAgeShort(seconds);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface TrackingMapOverlayProps {
-  isOpen: boolean
-  onClose: () => void
-  nganya: JourneyResult
-  stage: { id: string; name: string }
-  allResults?: JourneyResult[]
-  onSwitch?: (nganya: JourneyResult) => void
+  isOpen: boolean;
+  onClose: () => void;
+  nganya: JourneyResult;
+  stage: { id: string; name: string };
+  allResults?: JourneyResult[];
+  onSwitch?: (nganya: JourneyResult) => void;
 }
 
 export default function TrackingMapOverlay({
@@ -89,16 +110,16 @@ export default function TrackingMapOverlay({
   allResults = [],
   onSwitch,
 }: TrackingMapOverlayProps) {
-  const mapRef = useRef<MapRef>(null)
-  const [sheetSnap, setSheetSnap] = useState<SheetSnapState>('half')
-  const [mapError, setMapError] = useState(false)
+  const mapRef = useRef<MapRef>(null);
+  const [sheetSnap, setSheetSnap] = useState<SheetSnapState>("half");
+  const [mapError, setMapError] = useState(false);
 
   // ── Continuous user geolocation ───────────────────────────────────────────
   const {
     coords: userCoords,
     permissionStatus,
     requestPermission,
-  } = useGeolocationStream()
+  } = useGeolocationStream();
 
   // ── Domain tracking state + Realtime subscriptions ───────────────────────
   const {
@@ -114,24 +135,26 @@ export default function TrackingMapOverlay({
     stage,
     allResults,
     isActive: isOpen,
-    userCoords: userCoords ? { lat: userCoords.lat, lng: userCoords.lng } : null,
-  })
+    userCoords: userCoords
+      ? { lat: userCoords.lat, lng: userCoords.lng }
+      : null,
+  });
 
   // ── Smooth animated nganya position (rAF lerp) ────────────────────────────
   const animatedNganya = useAnimatedPosition({
     position: payload.nganya_position,
     duration: 1600,
-  })
+  });
 
   // Expose animated position as a TrackingPosition for camera + marker use
   const animatedNganyaPos: TrackingPosition | null = payload.nganya_position
     ? { lat: animatedNganya.lat, lng: animatedNganya.lng }
-    : null
+    : null;
 
   // ── Camera auto-tracking ─────────────────────────────────────────────────
   const userPos: TrackingPosition | null = userCoords
     ? { lat: userCoords.lat, lng: userCoords.lng }
-    : null
+    : null;
 
   const { isAutoTracking, onUserPan, recenter } = useCameraTracking({
     mapRef,
@@ -139,60 +162,64 @@ export default function TrackingMapOverlay({
     stagePosition: payload.pickup_stage_position,
     userPosition: userPos,
     isActive: isOpen,
-  })
+  });
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   // Reset snap + map error when overlay opens
   useEffect(() => {
     if (isOpen) {
-      setSheetSnap('half')
-      setMapError(false)
+      setSheetSnap("half");
+      setMapError(false);
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   // Lock body scroll when open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = '' }
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
-  }, [isOpen])
+  }, [isOpen]);
 
-  // Escalate sheet when signal goes stale / catchability degrades
+  // Escalate sheet when signal goes stale/expired or catchability degrades
   useEffect(() => {
     if (
-      payload.source_type === 'STALE' ||
-      payload.catchability.status === 'TOO_FAR'
+      payload.source_type === "STALE" ||
+      payload.source_type === "EXPIRED" ||
+      payload.catchability.status === "TOO_FAR"
     ) {
-      setSheetSnap((prev) => (prev === 'collapsed' ? 'half' : prev))
+      setSheetSnap((prev) => (prev === "collapsed" ? "half" : prev));
     }
-  }, [payload.source_type, payload.catchability.status])
+  }, [payload.source_type, payload.catchability.status]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleClose = useCallback(() => {
-    onClose()
-  }, [onClose])
+    onClose();
+  }, [onClose]);
 
   const handleSwitch = useCallback(
     (alt: JourneyResult) => {
-      onSwitch?.(alt)
-      onClose()
+      onSwitch?.(alt);
+      onClose();
     },
     [onSwitch, onClose],
-  )
+  );
 
-  if (!isOpen) return null
-  if (typeof document === 'undefined') return null
+  if (!isOpen) return null;
+  if (typeof document === "undefined") return null;
 
   // ── Initial map viewport ─────────────────────────────────────────────────
   const mapCenter =
-    payload.nganya_position ??
-    payload.pickup_stage_position ??
-    DEFAULT_CENTER
+    payload.nganya_position ?? payload.pickup_stage_position ?? DEFAULT_CENTER;
 
   // ── Peek bar content (always visible in collapsed state) ─────────────────
+  const isExpired = payload.source_type === "EXPIRED";
+  const isStale = payload.source_type === "STALE";
+
   const peekContent = (
     <div className="flex items-center justify-between gap-3">
       <div className="flex-1 min-w-0">
@@ -200,99 +227,178 @@ export default function TrackingMapOverlay({
           {payload.nganya_name}
         </p>
         <p className="text-xs text-[var(--color-text-tertiary)] truncate">
-          {stage.name}
+          {isExpired
+            ? "Signal expired"
+            : isStale
+              ? `Last active · ${formatSecondsAgo(payload.freshness_seconds)}`
+              : stage.name}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-2xl font-bold text-[var(--color-accent)] leading-none">
-          {payload.eta_minutes}
-          <span className="text-sm font-normal ml-0.5">m</span>
-        </span>
+        {/* ETA: prominent for LIVE/ESTIMATED, secondary/hidden for STALE/EXPIRED */}
+        {!isExpired && (
+          <span
+            className="text-2xl font-bold leading-none"
+            style={{
+              color: isStale
+                ? "var(--color-text-tertiary)"
+                : "var(--color-accent)",
+              opacity: isStale ? 0.6 : 1,
+            }}
+          >
+            {isStale ? "~" : ""}
+            {payload.eta_minutes}
+            <span className="text-sm font-normal ml-0.5">m</span>
+          </span>
+        )}
         <CatchabilityBadge
           status={payload.catchability.status}
-          label={payload.catchability.status === 'CATCHABLE' ? '✓' :
-                 payload.catchability.status === 'RISKY' ? '!' :
-                 payload.catchability.status === 'TOO_FAR' ? '✗' : '?'}
+          label={
+            payload.catchability.status === "CATCHABLE"
+              ? "✓"
+              : payload.catchability.status === "RISKY"
+                ? "!"
+                : payload.catchability.status === "TOO_FAR"
+                  ? "✗"
+                  : "?"
+          }
         />
       </div>
     </div>
-  )
+  );
 
   // ── Main panel content (half + expanded) ─────────────────────────────────
   const mainContent = (
     <div className="space-y-4">
-      {/* Stale warning */}
-      {payload.source_type === 'STALE' && (
-        <div className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--color-accent-soft)] border border-[var(--color-accent)]">
-          <AlertTriangle className="w-4 h-4 text-[var(--color-accent)] shrink-0 mt-0.5" />
+      {/* EXPIRED banner — signal too old, must not be used for ride decisions */}
+      {isExpired && (
+        <div className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+          <WifiOff className="w-4 h-4 text-[var(--color-text-tertiary)] shrink-0 mt-0.5" />
           <div>
             <p className="text-xs font-semibold text-[var(--color-text-primary)]">
-              Tracking signal lost
+              This signal has expired.
             </p>
             <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
-              Last update {formatSecondsAgo(payload.freshness_seconds)} — data may be unreliable
+              Last seen {formatSecondsAgo(payload.freshness_seconds)} — too old
+              for live tracking.
             </p>
           </div>
         </div>
       )}
 
-      {/* Primary ETA + signal block */}
-      <div
-        className="relative p-5 rounded-[var(--radius-xl)] border overflow-hidden"
-        style={{
-          backgroundColor: 'var(--glass-bg)',
-          borderColor: 'var(--glass-border)',
-        }}
-      >
-        {/* LIVE glow */}
-        {payload.source_type === 'LIVE' && (
-          <div
-            className="absolute inset-0 blur-2xl pointer-events-none animate-pulse-slow"
-            style={{ backgroundColor: 'var(--color-green)', opacity: 0.06 }}
-          />
-        )}
-
-        <div className="relative z-10 flex items-start justify-between gap-4">
-          {/* ETA */}
+      {/* STALE banner — last-known location, not live */}
+      {isStale && !isExpired && (
+        <div className="flex items-start gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+          <AlertTriangle className="w-4 h-4 text-[var(--color-text-tertiary)] shrink-0 mt-0.5" />
           <div>
-            <div
-              className="text-5xl font-bold leading-none"
-              style={{ color: 'var(--color-accent)' }}
-            >
-              {payload.eta_minutes}
-              <span className="text-xl font-normal ml-1 opacity-70">min</span>
-            </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
-              Estimated arrival at {stage.name}
+            <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+              Last active · {formatSecondsAgo(payload.freshness_seconds)}
+            </p>
+            <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+              Signal may no longer be accurate
             </p>
           </div>
+        </div>
+      )}
 
-          {/* Signal badges */}
-          <div className="flex flex-col items-end gap-1.5">
-            <TrackingSignalBadge
-              signalType={payload.source_type}
-              freshnessSeconds={payload.freshness_seconds}
+      {/* Primary ETA + signal block — hidden for EXPIRED */}
+      {!isExpired && (
+        <div
+          className="relative p-5 rounded-[var(--radius-xl)] border overflow-hidden"
+          style={{
+            backgroundColor: "var(--glass-bg)",
+            borderColor: "var(--glass-border)",
+          }}
+        >
+          {/* LIVE glow */}
+          {payload.source_type === "LIVE" && (
+            <div
+              className="absolute inset-0 blur-2xl pointer-events-none animate-pulse-slow"
+              style={{ backgroundColor: "var(--color-green)", opacity: 0.06 }}
             />
-            <ConfidenceBadge level={payload.confidence_level} />
+          )}
+
+          <div className="relative z-10 flex items-start justify-between gap-4">
+            {/* ETA — qualified by signal state */}
+            <div>
+              {isStale ? (
+                /* STALE: ETA is secondary and uncertain — not the primary message */
+                <div>
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    Last known location
+                  </p>
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--color-text-tertiary)" }}
+                  >
+                    ~{payload.eta_minutes} min old estimate · may be inaccurate
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <div
+                    className="text-5xl font-bold leading-none"
+                    style={{ color: "var(--color-accent)" }}
+                  >
+                    {payload.source_type === "ESTIMATED" ? "~" : ""}
+                    {payload.eta_minutes}
+                    <span className="text-xl font-normal ml-1 opacity-70">
+                      min
+                    </span>
+                  </div>
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--color-text-tertiary)" }}
+                  >
+                    {payload.source_type === "ESTIMATED"
+                      ? `Estimated arrival at ${stage.name}`
+                      : `Estimated arrival at ${stage.name}`}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Signal badges */}
+            <div className="flex flex-col items-end gap-1.5">
+              <TrackingSignalBadge
+                signalType={payload.source_type}
+                freshnessSeconds={payload.freshness_seconds}
+              />
+              <ConfidenceBadge level={payload.confidence_level} />
+            </div>
+          </div>
+
+          {/* Last update row */}
+          <div
+            className="relative z-10 flex items-center gap-1.5 mt-3 pt-3 border-t"
+            style={{ borderColor: "var(--glass-border)" }}
+          >
+            <Clock
+              className="w-3 h-3"
+              style={{ color: "var(--color-text-tertiary)" }}
+            />
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-text-tertiary)" }}
+            >
+              {isStale
+                ? `Last active ${formatSecondsAgo(payload.freshness_seconds)}`
+                : `Updated ${formatSecondsAgo(payload.freshness_seconds)}`}
+            </span>
+            {payload.source_type === "ESTIMATED" && (
+              <span
+                className="text-xs ml-1"
+                style={{ color: "var(--color-text-tertiary)" }}
+              >
+                · Sightings-based estimate
+              </span>
+            )}
           </div>
         </div>
-
-        {/* Last update row */}
-        <div
-          className="relative z-10 flex items-center gap-1.5 mt-3 pt-3 border-t"
-          style={{ borderColor: 'var(--glass-border)' }}
-        >
-          <Clock className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} />
-          <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-            Updated {formatSecondsAgo(payload.freshness_seconds)}
-          </span>
-          {payload.source_type === 'ESTIMATED' && (
-            <span className="text-xs ml-1" style={{ color: 'var(--color-text-tertiary)' }}>
-              · Sightings-based estimate
-            </span>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Catchability */}
       <CatchabilityBadge
@@ -301,19 +407,19 @@ export default function TrackingMapOverlay({
         subtext={payload.catchability.subtext}
       />
 
-      {/* Movement guidance / walk time */}
-      {payload.walk_time_minutes !== null ? (
+      {/* Movement guidance / walk time — only for live/estimated */}
+      {!isStale && !isExpired && payload.walk_time_minutes !== null ? (
         <MovementGuidance
           etaMinutes={payload.eta_minutes}
           walkTimeMinutes={payload.walk_time_minutes}
           stageName={stage.name}
         />
-      ) : (
+      ) : !isStale && !isExpired ? (
         <LocationPrompt
           permissionStatus={permissionStatus}
           requestPermission={requestPermission}
         />
-      )}
+      ) : null}
 
       {/* Stage context */}
       {(payload.last_stage_name || payload.stages_away !== null) && (
@@ -324,16 +430,24 @@ export default function TrackingMapOverlay({
         />
       )}
 
-      {/* Feedback */}
-      <FeedbackActions
-        feedbackState={feedbackState}
-        onBoarded={handleBoarded}
-        onMissed={handleMissed}
-        hasAlternatives={payload.alternatives.length > 0}
-        onExpandForAlternatives={() => setSheetSnap('expanded')}
-      />
+      {/* Feedback — only for live/estimated; stale/expired show alternatives prompt */}
+      {!isExpired && !isStale ? (
+        <FeedbackActions
+          feedbackState={feedbackState}
+          onBoarded={handleBoarded}
+          onMissed={handleMissed}
+          hasAlternatives={payload.alternatives.length > 0}
+          onExpandForAlternatives={() => setSheetSnap("expanded")}
+        />
+      ) : (
+        <StaleExpiredActions
+          isExpired={isExpired}
+          hasAlternatives={payload.alternatives.length > 0}
+          onExpandForAlternatives={() => setSheetSnap("expanded")}
+        />
+      )}
     </div>
-  )
+  );
 
   // ── Expanded-only: alternatives ────────────────────────────────────────────
   const expandedContent =
@@ -343,7 +457,7 @@ export default function TrackingMapOverlay({
         catchabilityStatus={payload.catchability.status}
         onSwitch={handleSwitch}
       />
-    ) : null
+    ) : null;
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col">
@@ -357,7 +471,7 @@ export default function TrackingMapOverlay({
               latitude: mapCenter.lat,
               zoom: DEFAULT_ZOOM,
             }}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: "100%", height: "100%" }}
             mapStyle={MAP_STYLE_URL}
             onError={() => setMapError(true)}
             // `onMoveStart` also fires for programmatic flyTo/fitBounds — that wrongly
@@ -411,10 +525,7 @@ export default function TrackingMapOverlay({
             )}
           </Map>
         ) : (
-          <MapFallback
-            nganyaName={nganya.nganya_name}
-            stageName={stage.name}
-          />
+          <MapFallback nganyaName={nganya.nganya_name} stageName={stage.name} />
         )}
       </div>
 
@@ -425,9 +536,9 @@ export default function TrackingMapOverlay({
           onClick={handleClose}
           className="pointer-events-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-lg transition-opacity hover:opacity-80"
           style={{
-            backgroundColor: 'rgba(10,10,15,0.75)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid var(--glass-border)',
+            backgroundColor: "rgba(10,10,15,0.75)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid var(--glass-border)",
           }}
           aria-label="Close tracking"
         >
@@ -450,10 +561,10 @@ export default function TrackingMapOverlay({
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
             style={{
-              backgroundColor: 'rgba(10,10,15,0.8)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--color-text-secondary)',
-              backdropFilter: 'blur(8px)',
+              backgroundColor: "rgba(10,10,15,0.8)",
+              border: "1px solid var(--glass-border)",
+              color: "var(--color-text-secondary)",
+              backdropFilter: "blur(8px)",
             }}
           >
             <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -477,14 +588,15 @@ export default function TrackingMapOverlay({
           <div
             className="px-3 py-2 rounded-xl text-xs text-center"
             style={{
-              backgroundColor: 'rgba(10,10,15,0.88)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--color-text-secondary)',
-              backdropFilter: 'blur(8px)',
+              backgroundColor: "rgba(10,10,15,0.88)",
+              border: "1px solid var(--glass-border)",
+              color: "var(--color-text-secondary)",
+              backdropFilter: "blur(8px)",
             }}
           >
-            No live GPS for this nganya yet — map shows your location only. When the crew
-            shares location or a sighting arrives, the matatu pin appears here.
+            No live GPS for this nganya yet — map shows your location only. When
+            the crew shares location or a sighting arrives, the matatu pin
+            appears here.
           </div>
         </div>
       )}
@@ -497,14 +609,17 @@ export default function TrackingMapOverlay({
           style={{
             bottom: 280,
             right: 16,
-            backgroundColor: 'rgba(10,10,15,0.85)',
-            color: '#ffffff',
-            border: '1px solid var(--glass-border)',
-            backdropFilter: 'blur(12px)',
+            backgroundColor: "rgba(10,10,15,0.85)",
+            color: "#ffffff",
+            border: "1px solid var(--glass-border)",
+            backdropFilter: "blur(12px)",
           }}
           aria-label="Recenter map on nganya"
         >
-          <Navigation2 className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+          <Navigation2
+            className="w-4 h-4"
+            style={{ color: "var(--color-accent)" }}
+          />
           Recenter
         </button>
       )}
@@ -524,7 +639,7 @@ export default function TrackingMapOverlay({
       </div>
     </div>,
     document.body,
-  )
+  );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -534,76 +649,91 @@ export function MovementGuidance({
   walkTimeMinutes,
   stageName,
 }: {
-  etaMinutes: number
-  walkTimeMinutes: number
-  stageName: string
+  etaMinutes: number;
+  walkTimeMinutes: number;
+  stageName: string;
 }) {
-  const BUFFER = 2
-  const margin = etaMinutes - walkTimeMinutes - BUFFER
+  const BUFFER = 2;
+  const margin = etaMinutes - walkTimeMinutes - BUFFER;
 
-  let message: string
-  let isUrgent = false
+  let message: string;
+  let isUrgent = false;
 
   if (margin <= 0) {
-    message = 'Leave now!'
-    isUrgent = true
+    message = "Leave now!";
+    isUrgent = true;
   } else if (margin <= 3) {
-    message = `Get ready — leave in ${Math.round(margin)}m`
-    isUrgent = true
+    message = `Get ready — leave in ${Math.round(margin)}m`;
+    isUrgent = true;
   } else {
-    message = `You can wait — leave in ~${Math.round(margin)}m`
+    message = `You can wait — leave in ~${Math.round(margin)}m`;
   }
 
   return (
     <div
       className="flex items-start gap-3 p-3 rounded-[var(--radius-md)] border"
       style={{
-        backgroundColor: isUrgent ? 'var(--color-accent-soft)' : 'var(--glass-bg)',
-        borderColor: isUrgent ? 'var(--color-accent)' : 'var(--glass-border)',
+        backgroundColor: isUrgent
+          ? "var(--color-accent-soft)"
+          : "var(--glass-bg)",
+        borderColor: isUrgent ? "var(--color-accent)" : "var(--glass-border)",
       }}
     >
       <MapPin
         className="w-4 h-4 shrink-0 mt-0.5"
-        style={{ color: isUrgent ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+        style={{
+          color: isUrgent
+            ? "var(--color-accent)"
+            : "var(--color-text-tertiary)",
+        }}
       />
       <div>
         <p
           className="text-sm font-semibold"
-          style={{ color: isUrgent ? 'var(--color-accent)' : 'var(--color-text-primary)' }}
+          style={{
+            color: isUrgent
+              ? "var(--color-accent)"
+              : "var(--color-text-primary)",
+          }}
         >
           {message}
         </p>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p
+          className="text-xs mt-0.5"
+          style={{ color: "var(--color-text-tertiary)" }}
+        >
           ~{walkTimeMinutes}m walk to {stageName}
         </p>
       </div>
     </div>
-  )
+  );
 }
 
 export function LocationPrompt({
   permissionStatus,
   requestPermission,
 }: {
-  permissionStatus: 'prompt' | 'granted' | 'denied' | 'unsupported'
-  requestPermission: () => void
+  permissionStatus: "prompt" | "granted" | "denied" | "unsupported";
+  requestPermission: () => void;
 }) {
-  if (permissionStatus === 'unsupported') return null
+  if (permissionStatus === "unsupported") return null;
 
-  if (permissionStatus === 'denied') {
+  if (permissionStatus === "denied") {
     return (
       <div
         className="flex items-center gap-2 p-3 rounded-[var(--radius-md)] border"
         style={{
-          backgroundColor: 'var(--glass-bg)',
-          borderColor: 'var(--glass-border)',
-          color: 'var(--color-text-tertiary)',
+          backgroundColor: "var(--glass-bg)",
+          borderColor: "var(--glass-border)",
+          color: "var(--color-text-tertiary)",
         }}
       >
         <MapPin className="w-4 h-4 shrink-0" />
-        <span className="text-xs">Enable location in browser settings for walk-time guidance</span>
+        <span className="text-xs">
+          Enable location in browser settings for walk-time guidance
+        </span>
       </div>
-    )
+    );
   }
 
   return (
@@ -611,15 +741,18 @@ export function LocationPrompt({
       onClick={requestPermission}
       className="w-full flex items-center gap-2 p-3 rounded-[var(--radius-md)] border text-left transition-colors hover:border-[var(--color-accent-soft)]"
       style={{
-        backgroundColor: 'var(--glass-bg)',
-        borderColor: 'var(--glass-border)',
-        color: 'var(--color-text-secondary)',
+        backgroundColor: "var(--glass-bg)",
+        borderColor: "var(--glass-border)",
+        color: "var(--color-text-secondary)",
       }}
     >
-      <MapPin className="w-4 h-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+      <MapPin
+        className="w-4 h-4 shrink-0"
+        style={{ color: "var(--color-text-tertiary)" }}
+      />
       <span className="text-sm">Enable location for walk-time guidance</span>
     </button>
-  )
+  );
 }
 
 export function StageContextRow({
@@ -627,29 +760,35 @@ export function StageContextRow({
   stagesAway,
   signalType,
 }: {
-  lastStageName: string | null
-  stagesAway: number | null
-  signalType: 'LIVE' | 'ESTIMATED' | 'STALE'
+  lastStageName: string | null;
+  stagesAway: number | null;
+  signalType: "LIVE" | "ESTIMATED" | "STALE";
 }) {
-  const isEstimatedOrStale = signalType !== 'LIVE'
+  const isEstimatedOrStale = signalType !== "LIVE";
 
   return (
     <div
       className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)]"
-      style={{ backgroundColor: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+      style={{
+        backgroundColor: "var(--glass-bg)",
+        border: "1px solid var(--glass-border)",
+      }}
     >
-      <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
-      <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+      <MapPin
+        className="w-3.5 h-3.5 shrink-0"
+        style={{ color: "var(--color-text-tertiary)" }}
+      />
+      <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
         {lastStageName
           ? isEstimatedOrStale
             ? `Last seen near ${lastStageName}`
             : `At ${lastStageName}`
           : stagesAway !== null
-            ? `${stagesAway} stage${stagesAway !== 1 ? 's' : ''} away`
-            : 'Position updating…'}
+            ? `${stagesAway} stage${stagesAway !== 1 ? "s" : ""} away`
+            : "Position updating…"}
       </p>
     </div>
-  )
+  );
 }
 
 export function FeedbackActions({
@@ -659,44 +798,68 @@ export function FeedbackActions({
   hasAlternatives,
   onExpandForAlternatives,
 }: {
-  feedbackState: 'idle' | 'submitting' | 'boarded' | 'missed' | 'error'
-  onBoarded: () => void
-  onMissed: () => void
-  hasAlternatives: boolean
-  onExpandForAlternatives: () => void
+  feedbackState: "idle" | "submitting" | "boarded" | "missed" | "error";
+  onBoarded: () => void;
+  onMissed: () => void;
+  hasAlternatives: boolean;
+  onExpandForAlternatives: () => void;
 }) {
-  if (feedbackState === 'boarded') {
+  if (feedbackState === "boarded") {
     return (
       <div
         className="flex items-center gap-2 p-4 rounded-[var(--radius-md)]"
-        style={{ backgroundColor: 'var(--color-green-soft)', border: '1px solid rgba(34,197,94,0.2)' }}
+        style={{
+          backgroundColor: "var(--color-green-soft)",
+          border: "1px solid rgba(34,197,94,0.2)",
+        }}
       >
-        <CheckCircle className="w-5 h-5 shrink-0" style={{ color: 'var(--color-green)' }} />
+        <CheckCircle
+          className="w-5 h-5 shrink-0"
+          style={{ color: "var(--color-green)" }}
+        />
         <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--color-green)' }}>
+          <p
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-green)" }}
+          >
             Boarded!
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: "var(--color-text-tertiary)" }}
+          >
             Thanks — you helped improve this signal.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (feedbackState === 'missed') {
+  if (feedbackState === "missed") {
     return (
       <div className="space-y-3">
         <div
           className="flex items-center gap-2 p-4 rounded-[var(--radius-md)]"
-          style={{ backgroundColor: 'var(--color-accent-soft)', border: '1px solid var(--color-accent)' }}
+          style={{
+            backgroundColor: "var(--color-accent-soft)",
+            border: "1px solid var(--color-accent)",
+          }}
         >
-          <XCircle className="w-5 h-5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+          <XCircle
+            className="w-5 h-5 shrink-0"
+            style={{ color: "var(--color-accent)" }}
+          />
           <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-accent)' }}>
+            <p
+              className="text-sm font-semibold"
+              style={{ color: "var(--color-accent)" }}
+            >
               Missed it
             </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p
+              className="text-xs mt-0.5"
+              style={{ color: "var(--color-text-tertiary)" }}
+            >
               {hasAlternatives
                 ? "Let's find the next best option."
                 : "We'll keep looking for alternatives."}
@@ -708,39 +871,50 @@ export function FeedbackActions({
             onClick={onExpandForAlternatives}
             className="w-full py-2 text-sm font-semibold rounded-[var(--radius-md)] transition-colors"
             style={{
-              backgroundColor: 'var(--color-accent)',
-              color: 'white',
+              backgroundColor: "var(--color-accent)",
+              color: "white",
             }}
           >
             See alternatives
           </button>
         )}
       </div>
-    )
+    );
   }
 
-  if (feedbackState === 'error') {
+  if (feedbackState === "error") {
     return (
       <InlineErrorState
         message="Could not save your feedback. Please try again."
         retryLabel="Retry"
         onRetry={onBoarded}
       />
-    )
+    );
   }
 
-  const isSubmitting = feedbackState === 'submitting'
+  const isSubmitting = feedbackState === "submitting";
 
   return (
-    <div className="pt-3 border-t space-y-3" style={{ borderColor: 'var(--glass-border)' }}>
-      <p className="text-xs text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+    <div
+      className="pt-3 border-t space-y-3"
+      style={{ borderColor: "var(--glass-border)" }}
+    >
+      <p
+        className="text-xs text-center"
+        style={{ color: "var(--color-text-tertiary)" }}
+      >
         Did you catch it?
       </p>
       <div className="flex gap-3">
         <LoadingButton
           variant="secondary"
           className="flex-1 gap-2"
-          style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' } as CSSProperties}
+          style={
+            {
+              borderColor: "var(--color-accent)",
+              color: "var(--color-accent)",
+            } as CSSProperties
+          }
           onClick={onMissed}
           isLoading={isSubmitting}
           loadingLabel="Saving…"
@@ -752,44 +926,103 @@ export function FeedbackActions({
         <LoadingButton
           variant="primary"
           className="flex-1 gap-2"
-          style={{ backgroundColor: 'var(--color-green)', color: 'white' } as CSSProperties}
+          style={
+            {
+              backgroundColor: "var(--color-green)",
+              color: "white",
+            } as CSSProperties
+          }
           onClick={onBoarded}
           isLoading={isSubmitting}
           loadingLabel="Saving…"
           disabled={isSubmitting}
         >
-          <CheckCircle className="w-4 h-4" />
-          I Boarded
+          <CheckCircle className="w-4 h-4" />I Boarded
         </LoadingButton>
       </div>
     </div>
-  )
+  );
 }
 
 function MapFallback({
   nganyaName,
   stageName,
 }: {
-  nganyaName: string
-  stageName: string
+  nganyaName: string;
+  stageName: string;
 }) {
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-      style={{ backgroundColor: 'var(--color-bg-body)' }}
+      style={{ backgroundColor: "var(--color-bg-body)" }}
     >
       <WifiOff
         className="w-10 h-10 opacity-30"
-        style={{ color: 'var(--color-text-tertiary)' }}
+        style={{ color: "var(--color-text-tertiary)" }}
       />
       <div className="text-center space-y-1">
-        <p className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+        <p
+          className="text-sm font-semibold"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
           Map unavailable
         </p>
-        <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>
           Tracking {nganyaName} to {stageName}
         </p>
       </div>
     </div>
-  )
+  );
+}
+
+// ─── StaleExpiredActions ──────────────────────────────────────────────────────
+
+/**
+ * Replaces FeedbackActions when the signal is STALE or EXPIRED.
+ * Guides the user toward alternatives rather than tracking a dead signal.
+ */
+export function StaleExpiredActions({
+  isExpired,
+  hasAlternatives,
+  onExpandForAlternatives,
+}: {
+  isExpired: boolean;
+  hasAlternatives: boolean;
+  onExpandForAlternatives: () => void;
+}) {
+  return (
+    <div
+      className="pt-3 border-t space-y-3"
+      style={{ borderColor: "var(--glass-border)" }}
+    >
+      <p
+        className="text-xs text-center"
+        style={{ color: "var(--color-text-tertiary)" }}
+      >
+        {isExpired
+          ? "This signal has expired — find a fresh option."
+          : "Signal may no longer be accurate — consider alternatives."}
+      </p>
+      {hasAlternatives && (
+        <button
+          onClick={onExpandForAlternatives}
+          className="w-full py-2.5 text-sm font-semibold rounded-[var(--radius-md)] transition-colors"
+          style={{
+            backgroundColor: "var(--color-accent)",
+            color: "white",
+          }}
+        >
+          Find alternatives
+        </button>
+      )}
+      {!hasAlternatives && (
+        <p
+          className="text-xs text-center"
+          style={{ color: "var(--color-text-tertiary)" }}
+        >
+          No alternatives found on this corridor right now.
+        </p>
+      )}
+    </div>
+  );
 }

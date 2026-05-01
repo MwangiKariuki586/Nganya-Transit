@@ -31,6 +31,10 @@ import {
   parsePostgisPoint,
 } from '@/lib/queries/tracking'
 import {
+  getTrackingSignalState,
+  getAgeSeconds,
+} from '@/lib/tracking-signal'
+import {
   TRACKING_THRESHOLDS,
   type TrackingPayload,
   type TrackingPosition,
@@ -69,19 +73,18 @@ async function fetchWalkTimeMinutes(
 
 // ─── Signal type resolver ─────────────────────────────────────────────────────
 
+/**
+ * Delegates to the canonical getTrackingSignalState helper.
+ * Kept as a local wrapper so the hook's internal call sites remain unchanged.
+ */
 function resolveSignalType(
   rawSource: 'LIVE' | 'SIGHTING',
   freshnessSec: number,
 ): TrackingSignalType {
-  if (rawSource === 'LIVE') {
-    if (freshnessSec <= TRACKING_THRESHOLDS.LIVE_FRESH_MAX_S) return 'LIVE'
-    if (freshnessSec <= TRACKING_THRESHOLDS.LIVE_AGING_MAX_S) return 'ESTIMATED'
-    return 'STALE'
-  }
-  // SIGHTING source
-  const freshnessMin = freshnessSec / 60
-  if (freshnessMin <= TRACKING_THRESHOLDS.SIGHTING_USABLE_MAX_MIN) return 'ESTIMATED'
-  return 'STALE'
+  // Reconstruct an approximate timestamp from freshness seconds for the canonical helper.
+  // This avoids duplicating threshold logic here.
+  const approximateTs = new Date(Date.now() - freshnessSec * 1_000)
+  return getTrackingSignalState(rawSource, approximateTs)
 }
 
 // ─── Catchability computation ─────────────────────────────────────────────────
@@ -93,6 +96,14 @@ function computeCatchability(params: {
   confidence: ConfidenceLevel
 }): CatchabilityResult {
   const { etaMinutes, walkTimeMinutes, signalType, confidence } = params
+
+  if (signalType === 'EXPIRED') {
+    return {
+      status: 'STALE_UNCERTAIN',
+      label: 'Signal expired',
+      subtext: 'This signal is too old — find alternatives',
+    }
+  }
 
   if (signalType === 'STALE') {
     return {
@@ -338,14 +349,14 @@ export function useTracking({
       .catch((err) => console.warn('[tracking] walk time fetch failed:', err))
   }, [isActive, userCoords, nganya.corridor_id, stage.id])
 
-  // ── Confidence downgrade on staleness ─────────────────────────────────────
+  // ── Confidence downgrade on staleness / expiry ────────────────────────────
   const signalType = useMemo(
     () => resolveSignalType(rawSource, freshnessSec),
     [rawSource, freshnessSec],
   )
 
   useEffect(() => {
-    if (signalType === 'STALE' && rawSource === 'LIVE') {
+    if ((signalType === 'STALE' || signalType === 'EXPIRED') && rawSource === 'LIVE') {
       setRawSource('SIGHTING')
       setConfidence('LOW')
     } else if (signalType === 'ESTIMATED' && confidence === 'HIGH') {

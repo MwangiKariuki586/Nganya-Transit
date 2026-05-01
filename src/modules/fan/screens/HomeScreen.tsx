@@ -264,8 +264,12 @@ export default function HomeScreen({
   const [plannerRouteEtaSeconds, setPlannerRouteEtaSeconds] = useState<
     number | null
   >(null);
+  const [plannerRouteDistanceMeters, setPlannerRouteDistanceMeters] = useState<
+    number | null
+  >(null);
   const plannerRouteAbortRef = useRef<AbortController | null>(null);
   const plannerRouteKeyRef = useRef<string | null>(null);
+  const [plannerRouteLoading, setPlannerRouteLoading] = useState(false);
   const [trackingRow, setTrackingRow] =
     useState<AggregatedRecentSightingRow | null>(null);
   const [trackingNganya, setTrackingNganya] =
@@ -456,7 +460,11 @@ export default function HomeScreen({
     // Clear results on route/stage change to avoid filtering against the wrong corridor.
     const prevKey = plannerJourneyKeyRef.current;
     plannerJourneyKeyRef.current = key;
-    if (prevKey && prevKey.split(":").slice(0, 2).join(":") !== key.split(":").slice(0, 2).join(":")) {
+    if (
+      prevKey &&
+      prevKey.split(":").slice(0, 2).join(":") !==
+        key.split(":").slice(0, 2).join(":")
+    ) {
       setPlannerResults([]);
     }
 
@@ -564,20 +572,20 @@ export default function HomeScreen({
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
+    setPlannerRouteDistanceMeters(null);
     plannerRouteAbortRef.current?.abort();
     plannerRouteAbortRef.current = null;
     plannerRouteKeyRef.current = null;
   };
 
   const handlePlannerChange = (next: PlannerFiltersValue) => {
-    setPlannerContext((current) =>
-      reconcilePlannerContext(current, next),
-    );
+    setPlannerContext((current) => reconcilePlannerContext(current, next));
 
     // Any filter change invalidates any currently tracked nganya/route overlay.
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
+    setPlannerRouteDistanceMeters(null);
     plannerRouteAbortRef.current?.abort();
     plannerRouteAbortRef.current = null;
     plannerRouteKeyRef.current = null;
@@ -590,6 +598,7 @@ export default function HomeScreen({
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
+    setPlannerRouteDistanceMeters(null);
     plannerRouteAbortRef.current?.abort();
     plannerRouteAbortRef.current = null;
     plannerRouteKeyRef.current = null;
@@ -671,6 +680,7 @@ export default function HomeScreen({
                   if (!mapCorridorId) return;
 
                   setPlannerTracking(j);
+                  setPlannerRouteLoading(true);
 
                   // Resolve positions for OSRM (nganya + selected stage).
                   const stageId = plannerContext.fromStage.id;
@@ -682,11 +692,16 @@ export default function HomeScreen({
                   if (!stagePos || !nganyaPos) {
                     setPlannerRouteLine(null);
                     setPlannerRouteEtaSeconds(null);
+                    setPlannerRouteDistanceMeters(null);
+                    setPlannerRouteLoading(false);
                     return;
                   }
 
                   const key = `${j.nganya_id}:${stageId}:${nganyaPos.lng.toFixed(5)},${nganyaPos.lat.toFixed(5)}:${stagePos.lng.toFixed(5)},${stagePos.lat.toFixed(5)}`;
-                  if (plannerRouteKeyRef.current === key) return;
+                  if (plannerRouteKeyRef.current === key) {
+                    setPlannerRouteLoading(false);
+                    return;
+                  }
                   plannerRouteKeyRef.current = key;
 
                   plannerRouteAbortRef.current?.abort();
@@ -706,8 +721,13 @@ export default function HomeScreen({
 
                     setPlannerRouteLine({ coordinates: route.coordinates });
                     setPlannerRouteEtaSeconds(route.durationSeconds);
+                    setPlannerRouteDistanceMeters(
+                      Number.isFinite(route.distanceMeters)
+                        ? route.distanceMeters
+                        : null,
+                    );
                   } catch (err) {
-                    // Abort is expected on rapid marker switching.
+                    // Abort is expected on rapid marker switching — don't clear loading.
                     if ((err as any)?.name === "AbortError") return;
 
                     // Fallback: straight line + existing ETA if we have it.
@@ -717,6 +737,7 @@ export default function HomeScreen({
                         [stagePos.lng, stagePos.lat],
                       ],
                     });
+                    setPlannerRouteDistanceMeters(null);
 
                     const etaMin = Number.isFinite(j.eta_minutes)
                       ? Math.max(1, Math.round(j.eta_minutes))
@@ -724,6 +745,8 @@ export default function HomeScreen({
                     setPlannerRouteEtaSeconds(
                       etaMin !== null ? etaMin * 60 : null,
                     );
+                  } finally {
+                    setPlannerRouteLoading(false);
                   }
                 }}
                 fillRowHeight
@@ -732,6 +755,8 @@ export default function HomeScreen({
                 flushBottom={!!plannerTracking}
                 routeLine={plannerRouteLine}
                 routeEtaSeconds={plannerRouteEtaSeconds}
+                routeDistanceMeters={plannerRouteDistanceMeters}
+                isRouting={plannerRouteLoading}
                 className="h-full min-h-[320px] lg:min-h-0"
               />
             </div>
@@ -739,7 +764,7 @@ export default function HomeScreen({
         </div>
       </section>
 
-      <section>
+      {/* <section>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <LiveBadge />
@@ -794,7 +819,7 @@ export default function HomeScreen({
             actionable alternatives.
           </div>
         )}
-      </section>
+      </section> */}
 
       <section ref={recentSightingsRef}>
         <div className="flex items-center justify-between mb-4">

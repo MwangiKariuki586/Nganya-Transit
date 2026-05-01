@@ -1,17 +1,21 @@
 /**
  * TrackingSignalBadge — Source state badge for the tracking experience.
- * Clearly distinguishes LIVE (crew GPS), ESTIMATED (sightings-based),
- * and STALE (no fresh data) signals.
+ *
+ * Clearly distinguishes:
+ *   LIVE      → crew GPS, fresh ping (green, pulsing)
+ *   ESTIMATED → sightings-based or aging GPS (amber)
+ *   STALE     → last-known location only (grey, no pulse)
+ *   EXPIRED   → signal too old for live surfaces (muted, no pulse)
  */
 
-import type { TrackingSignalType } from '@/lib/types/tracking'
+import type { TrackingSignalType } from "@/lib/types/tracking";
 
 interface TrackingSignalBadgeProps {
-  signalType: TrackingSignalType
-  freshnessSeconds?: number
-  className?: string
+  signalType: TrackingSignalType;
+  freshnessSeconds?: number;
+  className?: string;
   /** Show full label or compact dot-only */
-  compact?: boolean
+  compact?: boolean;
 }
 
 const config: Record<
@@ -19,42 +23,49 @@ const config: Record<
   { label: string; color: string; bg: string; border: string; pulse: boolean }
 > = {
   LIVE: {
-    label: 'LIVE',
-    color: 'var(--color-green)',
-    bg: 'var(--color-green-soft)',
-    border: 'rgba(57,255,20,0.3)',
+    label: "LIVE",
+    color: "var(--color-green)",
+    bg: "var(--color-green-soft)",
+    border: "rgba(57,255,20,0.3)",
     pulse: true,
   },
   ESTIMATED: {
-    label: 'ESTIMATED',
-    color: 'var(--color-warning)',
-    bg: 'var(--color-warning-soft)',
-    border: 'rgba(255,193,7,0.3)',
+    label: "ESTIMATED",
+    color: "var(--color-warning)",
+    bg: "var(--color-warning-soft)",
+    border: "rgba(255,193,7,0.3)",
     pulse: false,
   },
   STALE: {
-    label: 'STALE',
-    color: 'var(--color-text-tertiary)',
-    bg: 'var(--glass-bg)',
-    border: 'var(--glass-border)',
+    label: "LAST KNOWN",
+    color: "var(--color-text-tertiary)",
+    bg: "var(--glass-bg)",
+    border: "var(--glass-border)",
     pulse: false,
   },
-}
+  EXPIRED: {
+    label: "EXPIRED",
+    color: "var(--color-text-tertiary)",
+    bg: "var(--glass-bg)",
+    border: "var(--glass-border)",
+    pulse: false,
+  },
+};
 
 export default function TrackingSignalBadge({
   signalType,
   freshnessSeconds,
-  className = '',
+  className = "",
   compact = false,
 }: TrackingSignalBadgeProps) {
-  const cfg = config[signalType]
+  const cfg = config[signalType];
 
   const freshnessLabel =
     freshnessSeconds !== undefined
       ? freshnessSeconds < 60
         ? `${freshnessSeconds}s ago`
         : `${Math.floor(freshnessSeconds / 60)}m ago`
-      : null
+      : null;
 
   if (compact) {
     return (
@@ -64,11 +75,11 @@ export default function TrackingSignalBadge({
         title={cfg.label}
       >
         <span
-          className={`w-3 h-3 rounded-full ${cfg.pulse ? 'animate-pulse' : ''}`}
+          className={`w-3 h-3 rounded-full ${cfg.pulse ? "animate-pulse" : ""}`}
           style={{ backgroundColor: cfg.color }}
         />
       </span>
-    )
+    );
   }
 
   return (
@@ -81,15 +92,26 @@ export default function TrackingSignalBadge({
       }}
     >
       <span
-        className={`w-2 h-2 rounded-full shrink-0 ${cfg.pulse ? 'animate-pulse' : ''}`}
+        className={`w-2 h-2 rounded-full shrink-0 ${cfg.pulse ? "animate-pulse" : ""}`}
         style={{ backgroundColor: cfg.color }}
       />
       {cfg.label}
-      {freshnessLabel && signalType !== 'STALE' && (
+      {/* Show freshness for LIVE and ESTIMATED; for STALE show "last active X ago" */}
+      {freshnessLabel && signalType === "LIVE" && (
         <span className="opacity-60 normal-case tracking-normal font-normal">
           · {freshnessLabel}
         </span>
       )}
+      {freshnessLabel && signalType === "ESTIMATED" && (
+        <span className="opacity-60 normal-case tracking-normal font-normal">
+          · {freshnessLabel}
+        </span>
+      )}
+      {freshnessLabel && signalType === "STALE" && (
+        <span className="opacity-60 normal-case tracking-normal font-normal">
+          · last active {freshnessLabel}
+        </span>
+      )}
     </span>
-  )
+  );
 }
