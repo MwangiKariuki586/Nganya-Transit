@@ -18,9 +18,14 @@ const allVibeTags = Object.keys(vibeTagColors);
 
 interface DiscoverScreenProps {
   data: DiscoverRouteData;
+  /** Pre-select a corridor filter on mount (e.g. from a "view all" link on the home page). */
+  initialCorridorId?: string | null;
 }
 
-function DiscoverScreen({ data }: DiscoverScreenProps) {
+function DiscoverScreen({
+  data,
+  initialCorridorId = null,
+}: DiscoverScreenProps) {
   const {
     corridors,
     featuredLive,
@@ -35,6 +40,7 @@ function DiscoverScreen({ data }: DiscoverScreenProps) {
     initialFollowedIds: followedIds,
     liveNganyas,
     corridors,
+    initialCorridorId,
   });
 
   const featuredCards = useMemo(

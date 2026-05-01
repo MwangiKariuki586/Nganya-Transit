@@ -13,7 +13,6 @@ import {
   toNganyaSlug,
 } from "@/lib/formatters";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
-import { vibeTagColors } from "@/lib/mockData";
 import { Clock, TrendingUp, ChevronRight } from "lucide-react";
 import WhereToCard, {
   type PlannerFiltersValue,
@@ -38,8 +37,6 @@ import {
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
 import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
 import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
-
-const allVibeTags = Object.keys(vibeTagColors);
 
 interface HomeScreenProps {
   data: FanHomeRouteData;
@@ -1029,112 +1026,70 @@ export default function HomeScreen({
       )}
 
       <section>
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-h3">Browse Builds</h2>
-            <span className="text-xs text-[var(--color-text-tertiary)]">
-              {activeCorridorName ? activeCorridorName : "All routes"} &middot;{" "}
-              {filteredNganyas.length} nganya
-              {filteredNganyas.length !== 1 ? "s" : ""}
-            </span>
-          </div>
+        {(() => {
+          // Nganyas on the active corridor, sorted newest-first, capped at 3.
+          // Falls back to all nganyas when no corridor is selected.
+          const routeNganyas = [...nganyas]
+            .filter((n) => !mapCorridorId || n.corridor_id === mapCorridorId)
+            .sort(
+              (a, b) =>
+                new Date(b.created_at || 0).getTime() -
+                new Date(a.created_at || 0).getTime(),
+            )
+            .slice(0, 3);
 
-          <SearchInput
-            value={search}
-            onChange={(nextSearch) =>
-              onSearchChange(nextSearch, activeCorridor, activeVibe)
-            }
-            className="mb-4"
-          />
+          if (routeNganyas.length === 0) return null;
 
-          <div className="flex gap-2 overflow-x-auto scroll-hidden pb-3 -mx-5 px-5 md:-mx-8 md:px-8">
-            <Chip
-              label="All Routes"
-              variant="route"
-              isActive={!activeCorridor}
-              onClick={() => onSearchChange(search, null, activeVibe)}
-            />
-            {corridors.map((c) => (
-              <Chip
-                key={c.id}
-                label={c.name}
-                variant="route"
-                isActive={activeCorridor === c.id}
-                onClick={() =>
-                  onSearchChange(
-                    search,
-                    activeCorridor === c.id ? null : c.id,
-                    activeVibe,
-                  )
-                }
-              />
-            ))}
-          </div>
+          return (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-h3">More on this route</h2>
+                <a
+                  href={
+                    mapCorridorId
+                      ? `/discover?corridorId=${encodeURIComponent(mapCorridorId)}`
+                      : "/discover"
+                  }
+                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline shrink-0"
+                >
+                  View all
+                </a>
+              </div>
 
-          <div className="flex gap-2 overflow-x-auto scroll-hidden pb-3 -mx-5 px-5 md:-mx-8 md:px-8">
-            {allVibeTags.map((tag) => (
-              <Chip
-                key={tag}
-                label={tag}
-                variant="vibe"
-                color={activeVibe === tag ? vibeTagColors[tag] : undefined}
-                onClick={() =>
-                  onSearchChange(
-                    search,
-                    activeCorridor,
-                    activeVibe === tag ? null : tag,
-                  )
-                }
-              />
-            ))}
-          </div>
-        </div>
-
-        {filteredNganyas.length > 0 ? (
-          <div className="grid-cards">
-            {filteredNganyas.map((n) => {
-              const cardData = mapSupabaseToCardProps(n);
-              if (!cardData) return null;
-              return (
-                <Card
-                  key={cardData.id}
-                  nganya={cardData as any}
-                  variant="standard"
-                  isFollowing={followedIds.has(cardData.id)}
-                  onFollow={toggleFollow}
-                  onCardClick={() => handleBrowseCardAction(cardData)}
-                  primaryAction={{
-                    label:
-                      cardData.isLive &&
-                      canTrackWithPlannerContext(plannerContext, cardData)
-                        ? "Track"
-                        : "Plan ride",
-                    onClick: () => handleBrowseCardAction(cardData),
-                  }}
-                  secondaryAction={{
-                    label: followedIds.has(cardData.id)
-                      ? "Following"
-                      : "Follow",
-                    onClick: () => void toggleFollow(cardData.id),
-                    variant: "secondary",
-                  }}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
-            <p>No nganyas match your filters</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-3"
-              onClick={() => onSearchChange("", null, null)}
-            >
-              Clear filters
-            </Button>
-          </div>
-        )}
+              <div className="grid-cards">
+                {routeNganyas.map((n) => {
+                  const cardData = mapSupabaseToCardProps(n);
+                  if (!cardData) return null;
+                  return (
+                    <Card
+                      key={cardData.id}
+                      nganya={cardData as any}
+                      variant="standard"
+                      isFollowing={followedIds.has(cardData.id)}
+                      onFollow={toggleFollow}
+                      onCardClick={() => handleBrowseCardAction(cardData)}
+                      primaryAction={{
+                        label:
+                          cardData.isLive &&
+                          canTrackWithPlannerContext(plannerContext, cardData)
+                            ? "Track"
+                            : "Plan ride",
+                        onClick: () => handleBrowseCardAction(cardData),
+                      }}
+                      secondaryAction={{
+                        label: followedIds.has(cardData.id)
+                          ? "Following"
+                          : "Follow",
+                        onClick: () => void toggleFollow(cardData.id),
+                        variant: "secondary",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          );
+        })()}
       </section>
     </div>
   );

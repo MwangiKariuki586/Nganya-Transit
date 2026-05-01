@@ -29,6 +29,8 @@ interface UseDiscoverCatalogueOptions {
   initialFollowedIds: Set<string>;
   liveNganyas: any[];
   corridors: DiscoverCorridorSummary[];
+  /** Pre-select a corridor on mount (e.g. from a "view all on this route" link). */
+  initialCorridorId?: string | null;
 }
 
 /**
@@ -47,11 +49,15 @@ export function useDiscoverCatalogue({
   initialFollowedIds,
   liveNganyas,
   corridors,
+  initialCorridorId = null,
 }: UseDiscoverCatalogueOptions) {
   const router = useRouter();
   const { showErrorToast } = useToast();
 
-  const [filters, setFilters] = useState<DiscoverFilters>(DEFAULT_DISCOVER_FILTERS);
+  const [filters, setFilters] = useState<DiscoverFilters>(() => ({
+    ...DEFAULT_DISCOVER_FILTERS,
+    corridorId: initialCorridorId,
+  }));
   // rawSearch drives the SearchInput value; filters.search is the debounced version.
   const [rawSearch, setRawSearch] = useState("");
 

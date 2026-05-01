@@ -159,8 +159,18 @@ export async function loadDiscoverRouteData(
     }),
   );
 
-  // Curated strip: first 6 live nganyas, no extra query needed.
-  const featuredLive = liveNganyas.slice(0, 6);
+  // Curated strip: first 6 live nganyas, enriched with image data from allNganyas.
+  // liveNganyas rows come from v_live_now which has no nganya_media / crew_nganyas joins,
+  // so we merge each live row with its matching allNganyas entry to get the image fields.
+  const allNganyasById = new Map(allNganyas.map((n: any) => [n.id, n]));
+  const featuredLive = liveNganyas.slice(0, 6).map((live: any) => {
+    const nganyaId = live.nganya_id || live.id;
+    const full = allNganyasById.get(nganyaId);
+    if (!full) return live;
+    // Spread full nganya fields first (has image relations), then overlay live session
+    // fields (nganya_id, status, last_ping_at, etc.) so isLive detection still works.
+    return { ...full, ...live, nganya_media: full.nganya_media, crew_nganyas: full.crew_nganyas };
+  });
 
   return {
     corridors: corridorSummaries,
