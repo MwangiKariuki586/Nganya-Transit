@@ -188,6 +188,20 @@ export function useCrewLocationRuntime(): UseCrewLocationRuntimeReturn {
         const next = mapPermissionState(status.state)
         setReadiness(next)
 
+        // If already granted, get an immediate position fix so latestPosition
+        // is populated before the crew reaches the Start Live button.
+        if (next === 'granted') {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (!active) return
+              setLatestPosition(parsePosition(pos))
+              setError(null)
+            },
+            () => { /* silent — watcher will provide fixes once session starts */ },
+            FAST_GET_OPTIONS,
+          )
+        }
+
         // React to future permission changes (e.g. user revokes in settings)
         status.onchange = () => {
           const updated = mapPermissionState(status.state)

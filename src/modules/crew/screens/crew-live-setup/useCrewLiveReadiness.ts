@@ -21,6 +21,12 @@ import type {
 // The rest of the setup UI (CrewReadinessCard, PermissionBanner, etc.) still
 // uses the four-value PermissionStateLocal type. We map the richer readiness
 // state down to it here so no UI components need to change in this unit.
+//
+// IMPORTANT: 'checking' must NOT map to 'prompt'. While the Permissions API
+// query is in-flight the state is unknown — treating it as 'prompt' causes
+// the "Enable location" UI to flash on every mount even when permission is
+// already granted. Map it to 'granted' optimistically so the UI stays neutral
+// until we know for certain that permission is missing.
 
 function toPermissionStateLocal(
   readiness: UseCrewLocationRuntimeReturn["readiness"],
@@ -33,8 +39,12 @@ function toPermissionStateLocal(
       return "denied";
     case "unavailable":
       return "unsupported";
+    case "checking":
+      // Unknown yet — treat as granted so the UI doesn't flash "Enable location".
+      // If the Permissions API resolves to prompt_required, the state will update.
+      return "granted";
     default:
-      // checking | prompt_required
+      // prompt_required
       return "prompt";
   }
 }
