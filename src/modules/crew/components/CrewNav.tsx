@@ -12,6 +12,11 @@ import { getCrewStatusState } from "@/modules/crew/services/route-access";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useCrewNotificationCount } from "@/modules/crew/hooks/useCrewNotificationCount";
+import { stopCrewSessionServerFn } from "@/shared/server-fns/crew-live";
+import {
+  clearCrewActiveSessionId,
+  clearSessionState,
+} from "@/modules/crew/lib/session-storage";
 import type { Session } from "@supabase/supabase-js";
 
 interface NavProps {
@@ -46,6 +51,29 @@ export function CrewNav({ session, profile }: NavProps) {
   }, [showRegisterEntry]);
 
   const handleSignOut = async () => {
+    // Capture the token NOW before any auth state changes.
+    // We pass it directly to the server function so the stop call
+    // cannot race with supabase.auth.signOut() clearing the session.
+    const {
+      data: { session: currentSession },
+    } = await supabase.auth.getSession();
+    const accessToken = currentSession?.access_token ?? null;
+
+    const activeSessionId = snapshot.bootstrap.active_session?.id;
+    if (activeSessionId && accessToken) {
+      try {
+        await stopCrewSessionServerFn({
+          data: { accessToken, sessionId: activeSessionId },
+        });
+      } catch {
+        // Non-fatal — sign-out proceeds regardless.
+        // The DB-level expiry guard in crew_bootstrap prevents
+        // the stale session from appearing on next login.
+      }
+      clearCrewActiveSessionId();
+      clearSessionState();
+    }
+
     await supabase.auth.signOut();
     clearAuthSessionCookie();
     useAuthStore.getState().invalidateRole();
