@@ -1,13 +1,10 @@
-import { formatDirectionLabel, formatRelativeTime } from '@/lib/formatters'
+import { formatDirectionLabel } from "@/lib/formatters";
 
 interface CrewHeaderStatusProps {
-  isLive: boolean
-  nganyaName: string
-  corridorName: string
-  direction: string
-  seatsLeft: number
-  lastPingAt: string | null
-  lastPingAgeMs?: number
+  isLive: boolean;
+  nganyaName: string;
+  corridorName: string;
+  direction: string;
 }
 
 export function CrewHeaderStatus({
@@ -15,41 +12,31 @@ export function CrewHeaderStatus({
   nganyaName,
   corridorName,
   direction,
-  seatsLeft,
-  lastPingAt,
-  lastPingAgeMs = 0,
 }: CrewHeaderStatusProps) {
-  const isStale = lastPingAgeMs > 90000
-
   return (
-    <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5 shadow-[var(--shadow-md)]">
+    <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 shadow-[var(--shadow-md)]">
+      {/* Live indicator */}
       <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-        <span className={`h-2.5 w-2.5 rounded-full ${isLive ? 'bg-[var(--color-accent)] shadow-[var(--glow-accent-sm)] animate-pulse' : 'bg-[var(--color-text-tertiary)]'}`} />
-        {isLive ? 'Live session active' : 'Session offline'}
+        <span
+          className={`h-2 w-2 rounded-full ${
+            isLive
+              ? "bg-[var(--color-accent)] shadow-[var(--glow-accent-sm)] animate-pulse"
+              : "bg-[var(--color-text-tertiary)]"
+          }`}
+        />
+        {isLive ? "Live session active" : "Session offline"}
       </div>
-      <div className="mt-3">
-        <h1 className="text-h2 text-[var(--color-text-primary)]">{nganyaName}</h1>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {corridorName} &middot; {formatDirectionLabel(direction, corridorName) ?? direction}
+
+      {/* Nganya + route */}
+      <div className="mt-2">
+        <h1 className="text-h2 text-[var(--color-text-primary)] leading-tight">
+          {nganyaName}
+        </h1>
+        <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+          {corridorName} &middot;{" "}
+          {formatDirectionLabel(direction, corridorName) ?? direction}
         </p>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-base)]/50 p-3">
-          <div className="text-[var(--color-text-tertiary)]">Seats</div>
-          <div className="mt-1 text-lg font-semibold text-[var(--color-text-primary)]">
-            {seatsLeft === 0 ? 'Full' : seatsLeft}
-          </div>
-        </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-base)]/50 p-3">
-          <div className="text-[var(--color-text-tertiary)]">Last update</div>
-          <div className="mt-1 text-lg font-semibold text-[var(--color-text-primary)]">
-            {lastPingAt ? formatRelativeTime(lastPingAt) : 'Waiting'}
-          </div>
-          {isStale ? (
-            <div className="mt-1 text-caption text-[var(--color-warning)]">Update is stale</div>
-          ) : null}
-        </div>
-      </div>
     </div>
-  )
+  );
 }

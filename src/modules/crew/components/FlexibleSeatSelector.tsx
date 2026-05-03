@@ -8,6 +8,10 @@ interface FlexibleSeatSelectorProps {
   maxSeats?: number;
   minSeats?: number;
   className?: string;
+  /** Sync state shown below the selector */
+  syncStatus?: "synced" | "saving" | "offline" | "error";
+  /** ISO timestamp of last edit (seat or direction) — shown as relative time when provided */
+  lastSeatUpdateAt?: string | null;
 }
 
 export function FlexibleSeatSelector({
@@ -17,40 +21,49 @@ export function FlexibleSeatSelector({
   maxSeats = 33,
   minSeats = 0,
   className = "",
+  syncStatus,
+  lastSeatUpdateAt,
 }: FlexibleSeatSelectorProps) {
   const [inputValue, setInputValue] = useState(value.toString());
+  const [relativeTime, setRelativeTime] = useState<string | null>(null);
 
   useEffect(() => {
     setInputValue(value.toString());
   }, [value]);
 
+  // Keep relative time fresh
+  useEffect(() => {
+    if (!lastSeatUpdateAt) {
+      setRelativeTime(null);
+      return;
+    }
+    const update = () => {
+      const diffMs = Date.now() - new Date(lastSeatUpdateAt).getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 10) setRelativeTime("just now");
+      else if (diffSec < 60) setRelativeTime(`${diffSec}s ago`);
+      else if (diffSec < 3600)
+        setRelativeTime(`${Math.floor(diffSec / 60)}m ago`);
+      else setRelativeTime(`${Math.floor(diffSec / 3600)}h ago`);
+    };
+    update();
+    const id = setInterval(update, 10_000);
+    return () => clearInterval(id);
+  }, [lastSeatUpdateAt]);
+
   const clamp = (num: number) => Math.max(minSeats, Math.min(maxSeats, num));
 
-  const handleIncrement = () => {
-    const newValue = clamp(value + 1);
-    onChange(newValue);
-  };
-
-  const handleDecrement = () => {
-    const newValue = clamp(value - 1);
-    onChange(newValue);
-  };
+  const handleIncrement = () => onChange(clamp(value + 1));
+  const handleDecrement = () => onChange(clamp(value - 1));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInputValue(val);
-
-    // Only update if it's a valid number
     const num = parseInt(val, 10);
-    if (!isNaN(num)) {
-      onChange(clamp(num));
-    }
+    if (!isNaN(num)) onChange(clamp(num));
   };
 
-  const handleInputBlur = () => {
-    // Ensure input shows the clamped value
-    setInputValue(value.toString());
-  };
+  const handleInputBlur = () => setInputValue(value.toString());
 
   const getStatusColor = () => {
     if (value === 0) return "text-red-400";
@@ -66,6 +79,33 @@ export function FlexibleSeatSelector({
     if (value <= 15) return "Half Full";
     return "Available";
   };
+
+  // Sync status line
+  const syncLine = (() => {
+    if (syncStatus === "saving")
+      return {
+        text: "Saving seat update…",
+        color: "text-[var(--color-text-tertiary)]",
+      };
+    if (syncStatus === "offline")
+      return {
+        text: "Offline — will retry",
+        color: "text-[var(--color-warning)]",
+      };
+    if (syncStatus === "error")
+      return {
+        text: "Sync failed — will retry",
+        color: "text-[var(--color-warning)]",
+      };
+    if (syncStatus === "synced" && relativeTime)
+      return {
+        text: `Last update: ${relativeTime}`,
+        color: "text-[var(--color-text-tertiary)]",
+      };
+    if (syncStatus === "synced")
+      return { text: "Synced", color: "text-[var(--color-text-tertiary)]" };
+    return null;
+  })();
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -154,11 +194,12 @@ export function FlexibleSeatSelector({
         </button>
       </div>
 
-      {/* Capacity Info */}
-      <div className="text-center text-xs text-[var(--color-text-tertiary)]">
-        Capacity: {maxSeats} passengers • {value === 0 ? "No" : value} seat
-        {value !== 1 ? "s" : ""} available
-      </div>
+      {/* Sync metadata */}
+      {syncLine ? (
+        <div className={`text-center text-xs ${syncLine.color}`}>
+          {syncLine.text}
+        </div>
+      ) : null}
     </div>
   );
 }

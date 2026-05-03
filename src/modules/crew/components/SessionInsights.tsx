@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Clock, MapPin } from "lucide-react";
+import { TrendingUp, Users, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface SessionInsightsProps {
@@ -9,8 +9,7 @@ interface SessionInsightsProps {
 interface Insights {
   duration: string;
   totalPings: number;
-  avgSeatsLeft: number;
-  distanceCovered: string;
+  currentSeats: number;
 }
 
 export function SessionInsights({
@@ -20,15 +19,13 @@ export function SessionInsights({
   const [insights, setInsights] = useState<Insights>({
     duration: "0m",
     totalPings: 0,
-    avgSeatsLeft: 0,
-    distanceCovered: "0 km",
+    currentSeats: 0,
   });
 
   useEffect(() => {
     if (!session) return;
 
     const calculateInsights = () => {
-      // Calculate duration
       const start = new Date(session.started_at).getTime();
       const end = session.ended_at
         ? new Date(session.ended_at).getTime()
@@ -38,26 +35,18 @@ export function SessionInsights({
       const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
       const duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
-      // Estimate total pings (every 15s)
+      // Estimate total pings from session duration (approx every 15 s)
       const totalPings = Math.floor(durationMs / 15000);
-
-      // Average seats (placeholder - would need historical data)
-      const avgSeatsLeft = session.seats_left || 0;
-
-      // Distance covered (placeholder - would need position history)
-      const distanceCovered = "0 km";
 
       setInsights({
         duration,
         totalPings,
-        avgSeatsLeft,
-        distanceCovered,
+        currentSeats: session.seats_left ?? 0,
       });
     };
 
     calculateInsights();
-    const intervalId = setInterval(calculateInsights, 30000); // Update every 30s
-
+    const intervalId = setInterval(calculateInsights, 30000);
     return () => clearInterval(intervalId);
   }, [session]);
 
@@ -76,15 +65,10 @@ export function SessionInsights({
     },
     {
       icon: Users,
-      label: "Avg seats",
-      value: insights.avgSeatsLeft.toString(),
+      label: "Current seats",
+      value:
+        insights.currentSeats === 0 ? "Full" : insights.currentSeats.toString(),
       color: "text-[var(--color-cyan)]",
-    },
-    {
-      icon: MapPin,
-      label: "Distance",
-      value: insights.distanceCovered,
-      color: "text-[var(--color-text-secondary)]",
     },
   ];
 
@@ -92,10 +76,10 @@ export function SessionInsights({
     <div
       className={`rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 ${className}`}
     >
-      <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-        Session Insights
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+        Session metrics
       </h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -103,13 +87,13 @@ export function SessionInsights({
               key={stat.label}
               className="rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[rgba(10,10,15,0.4)] p-3"
             >
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className={`h-3.5 w-3.5 ${stat.color}`} />
+              <div className="mb-1 flex items-center gap-1.5">
+                <Icon className={`h-3 w-3 ${stat.color}`} />
                 <span className="text-xs text-[var(--color-text-tertiary)]">
                   {stat.label}
                 </span>
               </div>
-              <div className={`text-lg font-semibold ${stat.color}`}>
+              <div className={`text-base font-semibold ${stat.color}`}>
                 {stat.value}
               </div>
             </div>

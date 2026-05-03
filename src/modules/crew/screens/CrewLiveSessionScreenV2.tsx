@@ -1,23 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/ToastContainer";
 import { crewLiveService } from "@/features/crew-live/services/crew-live-service";
-import { ConnectionBanner } from "@/modules/crew/components/ConnectionBanner";
 import { CrewHeaderStatus } from "@/modules/crew/components/CrewHeaderStatus";
 import { DirectionToggle } from "@/modules/crew/components/DirectionToggle";
 import { PermissionBanner } from "@/modules/crew/components/PermissionBanner";
-import { SeatsQuickButtons } from "@/modules/crew/components/SeatsQuickButtons";
 import { FlexibleSeatSelector } from "@/modules/crew/components/FlexibleSeatSelector";
 import { TrackingHealthPanel } from "@/modules/crew/components/TrackingHealthPanel";
 import { useCrewLocationRuntime } from "@/modules/crew/hooks/useCrewLocationRuntime";
 import { useCrewLiveSessionV2 } from "@/modules/crew/hooks/useCrewLiveSessionV2";
 import { clearCrewActiveSessionId } from "@/modules/crew/lib/session-storage";
 import { SessionTimer } from "@/modules/crew/components/SessionTimer";
-import { QuickSeatPresets } from "@/modules/crew/components/QuickSeatPresets";
-import { StationaryAlert } from "@/modules/crew/components/StationaryAlert";
 import { DirectionChangePrompt } from "@/modules/crew/components/DirectionChangePrompt";
-import { QueuedUpdatesIndicator } from "@/modules/crew/components/QueuedUpdatesIndicator";
 import { SessionInsights } from "@/modules/crew/components/SessionInsights";
 import { KeyboardShortcutsHelp } from "@/modules/crew/components/KeyboardShortcutsHelp";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -44,14 +39,14 @@ export default function CrewLiveSessionScreenV2({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false);
-  const [showStationaryAlert, setShowStationaryAlert] = useState(false);
   const [showDirectionPrompt, setShowDirectionPrompt] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
 
+  // Track when the last edit (seat or direction) was sent so the selector
+  // can show "Last update: just now" etc.
+  const lastEditAtRef = useRef<string | null>(null);
+
   // Location runtime — single watcher owner for this session screen.
-  // Instantiated here (not in the setup screen) because the session screen
-  // is a separate route. The runtime starts watching as soon as the session
-  // is confirmed LIVE (handled inside useCrewLiveSessionV2).
   const locationRuntime = useCrewLocationRuntime();
 
   useEffect(() => {
@@ -62,7 +57,6 @@ export default function CrewLiveSessionScreenV2({
       try {
         const session = await crewLiveService.getSession(sessionId);
 
-        // Redirect if session is not active
         if (session.status !== "LIVE" || session.ended_at) {
           addToast("This session has ended", "error");
           navigate({ to: "/crew/live" });
@@ -98,9 +92,6 @@ export default function CrewLiveSessionScreenV2({
   } = useCrewLiveSessionV2({
     initialSession,
     locationRuntime,
-    onStationaryDetected: () => {
-      setShowStationaryAlert(true);
-    },
     onDirectionChangeDetected: () => {
       setShowDirectionPrompt(true);
     },
@@ -129,11 +120,13 @@ export default function CrewLiveSessionScreenV2({
   const handleSeatUpdate = async (seats: number) => {
     await updateSeats(seats);
     hapticSeatUpdate(seats);
+    lastEditAtRef.current = new Date().toISOString();
   };
 
   const handleDirectionUpdate = async (direction: string) => {
     await updateDirection(direction);
     hapticDirectionChange();
+    lastEditAtRef.current = new Date().toISOString();
   };
 
   const handleDirectionPromptConfirm = async (
@@ -179,6 +172,8 @@ export default function CrewLiveSessionScreenV2({
 
   useKeyboardShortcuts({ shortcuts, enabled: !isLoading && !loadError });
 
+  // ── Loading / error states ─────────────────────────────────────────────────
+
   if (isLoading) {
     return (
       <div className="page-container py-12 text-sm text-[var(--color-text-secondary)]">
@@ -203,76 +198,60 @@ export default function CrewLiveSessionScreenV2({
     );
   }
 
-  const connectionMessage =
-    connectionStatus === "offline"
-      ? "Network connection dropped. Updates will retry when you are back online."
-      : connectionStatus === "poor"
-        ? "Live updates are lagging. Signal looks weak."
-        : connectionStatus === "retrying"
-          ? "Retrying failed updates..."
-          : null;
+  // ── Blocking alert classification ─────────────────────────────────────────
+  // Only show inline alerts that block the live session from functioning.
+  // Non-blocking alerts (weak signal, stationary reminder, minor sync
+  // interruptions) are handled by the Notifications page.
+  //
+  // Blocking = location permission missing/denied, session cannot sync at all.
+  const isLocationBlocked =
+    permissionStatus === "denied" || permissionStatus === "unsupported";
+  const isOffline = connectionStatus === "offline";
+
+  // Derive seat sync status for the selector
+  const seatSyncStatus = (() => {
+    if (isPinging) return "saving" as const;
+    if (isOffline || uploadStatus === "offline" || queuedUpdates.length > 0)
+      return "offline" as const;
+    if (uploadStatus === "error" || hasPendingUpload) return "error" as const;
+    return "synced" as const;
+  })();
+
+  // Use the ref timestamp if available, otherwise fall back to session's last_ping_at
+  const lastEditAt = lastEditAtRef.current ?? session.last_ping_at ?? null;
+
+  // Direction pending state
+  const isDirectionPending = isPinging;
 
   return (
-    <div className="page-container py-8 md:py-10 max-w-2xl space-y-5">
-      {/* Header with status and quality indicators */}
-      <div className="space-y-3">
-        <CrewHeaderStatus
-          isLive={session.status === "LIVE"}
-          nganyaName={session.nganyas?.name || "Mapped nganya"}
-          corridorName={session.nganyas?.corridors?.name || "Unknown corridor"}
-          direction={session.direction}
-          seatsLeft={session.seats_left}
-          lastPingAt={session.last_ping_at}
-          lastPingAgeMs={lastPingAgeMs}
+    <div className="page-container py-8 md:py-10 max-w-2xl space-y-4">
+      {/* ── 2. Blocking alerts only ────────────────────────────────────────── */}
+      {isLocationBlocked && (
+        <PermissionBanner
+          status={permissionStatus}
+          onRequest={() => void requestPermission().catch(() => null)}
         />
+      )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <SessionTimer startedAt={session.started_at} />
-          <TrackingHealthPanel
-            locationReadiness={locationRuntime.readiness}
-            isWatching={locationRuntime.isWatching}
-            uploadStatus={uploadStatus}
-            clientState={clientState}
-            lastUploadAgeMs={lastPingAgeMs}
-            hasPendingUpload={hasPendingUpload}
-            onRetry={() => {
-              void retryNow();
-            }}
-          />
-          <div className="ml-auto">
-            <KeyboardShortcutsHelp shortcuts={shortcuts} />
+      {isOffline && (
+        <div className="rounded-[var(--radius-xl)] border border-red-500/30 bg-red-500/10 p-4">
+          <div className="text-sm font-semibold text-red-300">
+            No network connection
           </div>
+          <p className="mt-1 text-sm text-red-200/80">
+            Seat and direction updates are queued and will sync automatically
+            when you reconnect.
+          </p>
+          {queuedUpdates.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void retryNow()}
+              className="mt-3 text-xs font-medium text-red-300 underline underline-offset-2"
+            >
+              Retry now ({queuedUpdates.length} pending)
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Alerts and banners */}
-      <PermissionBanner
-        status={permissionStatus}
-        onRequest={() => {
-          void requestPermission().catch(() => null);
-        }}
-      />
-      <ConnectionBanner
-        status={connectionStatus}
-        message={connectionMessage}
-        onRetry={() => {
-          void retryNow();
-        }}
-      />
-      <QueuedUpdatesIndicator
-        queuedCount={queuedUpdates.length}
-        onRetry={() => {
-          void retryNow();
-        }}
-        isRetrying={isPinging}
-      />
-
-      {showStationaryAlert && (
-        <StationaryAlert
-          onStopSession={requestStop}
-          onDismiss={() => setShowStationaryAlert(false)}
-          isStopping={isStopping}
-        />
       )}
 
       {showDirectionPrompt && (
@@ -286,100 +265,67 @@ export default function CrewLiveSessionScreenV2({
         />
       )}
 
-      {/* Quick seat presets */}
-      {/* <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
-        <div className="mb-4">
-          <div className="text-caption text-[var(--color-text-tertiary)]">
-            Quick updates
-          </div>
-          <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            One-tap seat status updates
-          </div>
+      {/* ── 3. Seat control ────────────────────────────────────────────────── */}
+      <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
+        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+          Seats
         </div>
-        <QuickSeatPresets
-          onSelect={(seats, label) => {
-            void handleSeatUpdate(seats);
-            addToast(`Set to ${label}`, "success");
-          }}
+        <FlexibleSeatSelector
+          value={session.seats_left}
+          onChange={(value) => void handleSeatUpdate(value)}
           disabled={isPinging}
           maxSeats={33}
+          syncStatus={seatSyncStatus}
+          lastSeatUpdateAt={lastEditAt}
         />
-      </section> */}
-
-      {/* Seats update */}
-      <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-caption text-[var(--color-text-tertiary)]">
-              Fine-tune seats
-            </div>
-            <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Use +/- buttons or arrow keys. Updates sync instantly.
-            </div>
-          </div>
-          <div className="text-xs text-[var(--color-text-tertiary)]">
-            {isPinging ? "Syncing..." : "Synced"}
-          </div>
-        </div>
-        <div className="mt-4">
-          <FlexibleSeatSelector
-            value={session.seats_left}
-            onChange={(value) => {
-              void handleSeatUpdate(value);
-            }}
-            disabled={isPinging}
-            maxSeats={33}
-          />
-        </div>
-        {session.seats_left === 0 ? (
-          <div className="mt-3 text-body-sm text-[var(--color-text-secondary)]">
-            Full selected. If boarding is closed for a while, consider stopping
-            the session.
-          </div>
-        ) : null}
+        {session.seats_left === 0 && (
+          <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+            Full — if boarding is closed for a while, consider stopping the
+            session.
+          </p>
+        )}
       </section>
 
-      {/* Direction */}
+      {/* ── 4. Direction control ───────────────────────────────────────────── */}
       <section className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5">
-        <div className="text-caption text-[var(--color-text-tertiary)]">
-          Direction
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+            Direction
+          </div>
+          {isDirectionPending && (
+            <span className="text-xs text-[var(--color-text-tertiary)]">
+              Updating…
+            </span>
+          )}
         </div>
-        <div className="mt-3">
-          <DirectionToggle
-            value={session.direction}
-            onChange={(value) => {
-              void handleDirectionUpdate(value);
-            }}
-            disabled={isPinging}
-            toTownLabel="→ Town"
-            fromTownLabel={`→ ${session.nganyas?.corridors?.name || "Terminal"}`}
-          />
-        </div>
-        <div className="mt-3 text-sm text-[var(--color-text-secondary)]">
-          Press 'D' key to toggle. Auto-detection will prompt if U-turn
-          detected.
-        </div>
+        <DirectionToggle
+          value={session.direction}
+          onChange={(value) => void handleDirectionUpdate(value)}
+          disabled={isPinging}
+          toTownLabel="→ Town"
+          fromTownLabel={`→ ${session.nganyas?.corridors?.name || "Terminal"}`}
+        />
       </section>
 
-      {/* Session insights */}
+      {/* ── 5. Compact session metrics ─────────────────────────────────────── */}
       <SessionInsights session={session} />
 
-      {/* Actions */}
+      {/* ── 6. Session actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button
           variant="secondary"
-          className="min-h-[56px]"
+          className="min-h-[52px]"
           onClick={() => navigate({ to: "/crew/history" })}
         >
           Session history
         </Button>
         <Button
           variant="primary"
-          className="min-h-[56px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)/90] shadow-none"
+          className="min-h-[52px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 shadow-none"
           isLoading={isStopping}
           onClick={requestStop}
         >
-          Stop session (Ctrl+S)
+          Stop session
         </Button>
       </div>
 
@@ -390,9 +336,7 @@ export default function CrewLiveSessionScreenV2({
         message="This will end your broadcast. Riders will no longer see your location. You can start a new session at any time."
         confirmText="Stop session"
         cancelText="Keep live"
-        onConfirm={() => {
-          void confirmStop();
-        }}
+        onConfirm={() => void confirmStop()}
         onCancel={() => setShowStopConfirm(false)}
       />
     </div>
