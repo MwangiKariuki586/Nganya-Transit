@@ -95,7 +95,15 @@ export const startCrewSessionServerFn = createServerFn({ method: 'POST' })
       throw error
     }
 
-    const sessionId = typeof session === 'string' ? session : session?.id
+    // create_live_session uses RETURN QUERY ... RETURNING id, so Supabase
+    // returns an array of rows: [{ id: "uuid" }]. Handle all shapes defensively.
+    const sessionId =
+      Array.isArray(session)
+        ? (session[0] as any)?.id
+        : typeof session === 'string'
+          ? session
+          : (session as any)?.id
+
     if (!sessionId) {
       throw new Error('RPC create_live_session returned no session id')
     }

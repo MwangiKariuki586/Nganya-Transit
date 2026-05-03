@@ -20,6 +20,7 @@ import { DirectionChangePrompt } from "@/modules/crew/components/DirectionChange
 import { QueuedUpdatesIndicator } from "@/modules/crew/components/QueuedUpdatesIndicator";
 import { SessionInsights } from "@/modules/crew/components/SessionInsights";
 import { KeyboardShortcutsHelp } from "@/modules/crew/components/KeyboardShortcutsHelp";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import {
   useKeyboardShortcuts,
   getCrewLiveShortcuts,
@@ -45,6 +46,7 @@ export default function CrewLiveSessionScreenV2({
   const [isStopping, setIsStopping] = useState(false);
   const [showStationaryAlert, setShowStationaryAlert] = useState(false);
   const [showDirectionPrompt, setShowDirectionPrompt] = useState(false);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   // Location runtime — single watcher owner for this session screen.
   // Instantiated here (not in the setup screen) because the session screen
@@ -104,7 +106,12 @@ export default function CrewLiveSessionScreenV2({
     },
   });
 
-  const handleStop = async () => {
+  /** Open the confirmation dialog — never stops the session directly. */
+  const requestStop = () => setShowStopConfirm(true);
+
+  /** Called only after the crew confirms in the dialog. */
+  const confirmStop = async () => {
+    setShowStopConfirm(false);
     setIsStopping(true);
     try {
       await stopSession();
@@ -165,7 +172,7 @@ export default function CrewLiveSessionScreenV2({
     },
     stopSession: () => {
       if (!isStopping) {
-        void handleStop();
+        requestStop();
       }
     },
   });
@@ -262,7 +269,7 @@ export default function CrewLiveSessionScreenV2({
 
       {showStationaryAlert && (
         <StationaryAlert
-          onStopSession={handleStop}
+          onStopSession={requestStop}
           onDismiss={() => setShowStationaryAlert(false)}
           isStopping={isStopping}
         />
@@ -370,11 +377,24 @@ export default function CrewLiveSessionScreenV2({
           variant="primary"
           className="min-h-[56px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)/90] shadow-none"
           isLoading={isStopping}
-          onClick={handleStop}
+          onClick={requestStop}
         >
           Stop session (Ctrl+S)
         </Button>
       </div>
+
+      <ConfirmDialog
+        isOpen={showStopConfirm}
+        variant="danger"
+        title="Stop live session?"
+        message="This will end your broadcast. Riders will no longer see your location. You can start a new session at any time."
+        confirmText="Stop session"
+        cancelText="Keep live"
+        onConfirm={() => {
+          void confirmStop();
+        }}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </div>
   );
 }
