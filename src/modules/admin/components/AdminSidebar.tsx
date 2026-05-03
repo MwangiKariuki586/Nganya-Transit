@@ -1,10 +1,12 @@
-import { LogOut, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { adminNavItems } from "@/modules/admin/components/admin-nav-items";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface AdminSidebarProps {
   session: Session | null;
@@ -16,6 +18,7 @@ export function AdminSidebar({ session, profile }: AdminSidebarProps) {
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -65,8 +68,15 @@ export function AdminSidebar({ session, profile }: AdminSidebarProps) {
         </nav>
 
         <div className="mt-auto rounded-[24px] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.03)] p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-[var(--glass-border)] bg-[var(--color-bg-elevated)]">
+          <div className="relative flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--glass-border)] bg-[var(--color-bg-elevated)] hover:border-[var(--glass-border-hover)] transition-all cursor-pointer"
+              aria-label="Open profile menu"
+              aria-haspopup="true"
+              aria-expanded={dropdownOpen}
+            >
               {profile?.avatar_url ? (
                 <img
                   src={profile.avatar_url}
@@ -78,7 +88,7 @@ export function AdminSidebar({ session, profile }: AdminSidebarProps) {
                   {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
                 </span>
               )}
-            </div>
+            </button>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-white">
                 {profile?.full_name || "Admin account"}
@@ -87,16 +97,18 @@ export function AdminSidebar({ session, profile }: AdminSidebarProps) {
                 @{profile?.handle || session?.user?.email || "admin"}
               </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[18px] border border-[var(--glass-border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
+            {dropdownOpen && (
+              <ProfileDropdown
+                profile={profile}
+                profileTo="/profile"
+                onSignOut={handleSignOut}
+                onClose={() => setDropdownOpen(false)}
+                align="left"
+                upward
+              />
+            )}
+          </div>
         </div>
       </div>
     </aside>

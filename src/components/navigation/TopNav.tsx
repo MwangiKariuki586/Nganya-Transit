@@ -4,12 +4,19 @@
  * Glass header with backdrop blur.
  */
 
-import { Home, Search, Camera, Zap, LogOut } from "lucide-react";
-import { Link, useMatches, useNavigate, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { Home, Search, Camera, Zap } from "lucide-react";
+import {
+  Link,
+  useMatches,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
   session: Session | null;
@@ -28,13 +35,23 @@ export default function TopNav({ session, profile }: NavProps) {
   const navigate = useNavigate();
   const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/";
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     clearAuthSessionCookie();
     useAuthStore.getState().invalidateRole();
     await router.invalidate();
-    navigate({ to: "/", search: { q: undefined, corridor: undefined, vibe: undefined, recent: undefined }, replace: true });
+    navigate({
+      to: "/",
+      search: {
+        q: undefined,
+        corridor: undefined,
+        vibe: undefined,
+        recent: undefined,
+      },
+      replace: true,
+    });
   };
 
   return (
@@ -47,7 +64,16 @@ export default function TopNav({ session, profile }: NavProps) {
 
       <div className="relative page-container flex items-center justify-between h-[var(--top-nav-height)]">
         {/* Logo */}
-        <Link to="/" search={{ q: undefined, corridor: undefined, vibe: undefined, recent: undefined }} className="flex items-center gap-2 no-underline group">
+        <Link
+          to="/"
+          search={{
+            q: undefined,
+            corridor: undefined,
+            vibe: undefined,
+            recent: undefined,
+          }}
+          className="flex items-center gap-2 no-underline group"
+        >
           <div className="w-8 h-8 rounded-sm bg-[var(--color-accent)] flex items-center justify-center shadow-[var(--glow-accent-sm)]">
             <Zap className="w-4.5 h-4.5 text-white" />
           </div>
@@ -79,36 +105,37 @@ export default function TopNav({ session, profile }: NavProps) {
           {/* Auth Status */}
           <div className="ml-4 pl-4 border-l border-[var(--glass-border)] flex items-center gap-3">
             {session ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/profile"
-                  className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"
-                >
-                  <div className="w-7 h-7 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.handle}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
-                        {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">
-                    @{profile?.handle || "user"}
-                  </span>
-                </Link>
-
+              <div className="relative">
                 <button
-                  onClick={handleSignOut}
-                  className="p-2 rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
-                  title="Sign Out"
+                  type="button"
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="w-8 h-8 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all cursor-pointer"
+                  aria-label="Open profile menu"
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
                 >
-                  <LogOut className="w-4.5 h-4.5" />
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.handle}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
+                      {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
+                    </div>
+                  )}
                 </button>
+
+                {dropdownOpen && (
+                  <ProfileDropdown
+                    profile={profile}
+                    profileTo="/profile"
+                    onSignOut={handleSignOut}
+                    onClose={() => setDropdownOpen(false)}
+                    align="right"
+                  />
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2">

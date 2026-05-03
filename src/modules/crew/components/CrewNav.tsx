@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Radio, History, LogOut, Shield, User, Zap, Bell } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Radio, History, Shield, Bell } from "lucide-react";
 import {
   Link,
   useMatches,
@@ -18,6 +18,7 @@ import {
   clearSessionState,
 } from "@/modules/crew/lib/session-storage";
 import type { Session } from "@supabase/supabase-js";
+import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
   session: Session | null;
@@ -32,6 +33,7 @@ export function CrewNav({ session, profile }: NavProps) {
   const { snapshot } = useCrewBootstrap();
   const crewState = getCrewStatusState(snapshot);
   const unreadCount = useCrewNotificationCount();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const showRegisterEntry =
     crewState === "UNREGISTERED" ||
@@ -161,11 +163,16 @@ export function CrewNav({ session, profile }: NavProps) {
                   )}
                 </Link>
 
-                <Link
-                  to="/crew/profile"
-                  className="flex items-center gap-2 p-1 pr-3 rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all no-underline group"
-                >
-                  <div className="w-7 h-7 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
+                {/* Avatar button with dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setDropdownOpen((o) => !o)}
+                    className="w-8 h-8 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all cursor-pointer"
+                    aria-label="Open profile menu"
+                    aria-haspopup="true"
+                    aria-expanded={dropdownOpen}
+                  >
                     {profile?.avatar_url ? (
                       <img
                         src={profile.avatar_url}
@@ -177,19 +184,18 @@ export function CrewNav({ session, profile }: NavProps) {
                         {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
                       </div>
                     )}
-                  </div>
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">
-                    @{profile?.handle || "user"}
-                  </span>
-                </Link>
+                  </button>
 
-                <button
-                  onClick={handleSignOut}
-                  className="p-2 rounded-[var(--radius-md)] text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] hover:bg-red-500/10 transition-all cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4.5 h-4.5" />
-                </button>
+                  {dropdownOpen && (
+                    <ProfileDropdown
+                      profile={profile}
+                      profileTo="/crew/profile"
+                      onSignOut={handleSignOut}
+                      onClose={() => setDropdownOpen(false)}
+                      align="right"
+                    />
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2">

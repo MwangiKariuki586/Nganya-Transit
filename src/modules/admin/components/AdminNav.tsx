@@ -1,10 +1,12 @@
-import { LogOut, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import type { Session } from "@supabase/supabase-js";
 import { getAdminNavLabel } from "@/modules/admin/components/admin-nav-items";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
   session: Session | null;
@@ -17,6 +19,7 @@ export function AdminNav({ session, profile }: NavProps) {
     select: (state) => state.location.pathname,
   });
   const activeLabel = getAdminNavLabel(currentPath);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -53,28 +56,41 @@ export function AdminNav({ session, profile }: NavProps) {
         </Link>
 
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 rounded-[var(--radius-full)] border border-[var(--glass-border)] bg-[var(--glass-bg)] px-2 py-1">
-            <div className="w-8 h-8 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)]">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile?.handle || "Admin avatar"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)]">
-                  {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
-                </div>
-              )}
-            </div>
-            <div className="hidden lg:block pr-2">
-              <div className="text-[11px] font-semibold text-white">
-                {profile?.full_name || "Admin account"}
+          <div className="hidden md:flex items-center gap-2">
+            {session && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="w-9 h-9 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] transition-all cursor-pointer"
+                  aria-label="Open profile menu"
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                >
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile?.handle || "Admin avatar"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)]">
+                      {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
+                    </div>
+                  )}
+                </button>
+
+                {dropdownOpen && (
+                  <ProfileDropdown
+                    profile={profile}
+                    profileTo="/profile"
+                    onSignOut={handleSignOut}
+                    onClose={() => setDropdownOpen(false)}
+                    align="right"
+                  />
+                )}
               </div>
-              <div className="text-[10px] text-[var(--color-text-tertiary)]">
-                @{profile?.handle || session?.user?.email || "admin"}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
