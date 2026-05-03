@@ -9,10 +9,10 @@ import { DirectionToggle } from "@/modules/crew/components/DirectionToggle";
 import { PermissionBanner } from "@/modules/crew/components/PermissionBanner";
 import { SeatsQuickButtons } from "@/modules/crew/components/SeatsQuickButtons";
 import { FlexibleSeatSelector } from "@/modules/crew/components/FlexibleSeatSelector";
+import { TrackingHealthPanel } from "@/modules/crew/components/TrackingHealthPanel";
+import { useCrewLocationRuntime } from "@/modules/crew/hooks/useCrewLocationRuntime";
 import { useCrewLiveSessionV2 } from "@/modules/crew/hooks/useCrewLiveSessionV2";
 import { clearCrewActiveSessionId } from "@/modules/crew/lib/session-storage";
-import { GpsQualityIndicator } from "@/modules/crew/components/GpsQualityIndicator";
-import { NetworkQualityIndicator } from "@/modules/crew/components/NetworkQualityIndicator";
 import { SessionTimer } from "@/modules/crew/components/SessionTimer";
 import { QuickSeatPresets } from "@/modules/crew/components/QuickSeatPresets";
 import { StationaryAlert } from "@/modules/crew/components/StationaryAlert";
@@ -46,6 +46,12 @@ export default function CrewLiveSessionScreenV2({
   const [showStationaryAlert, setShowStationaryAlert] = useState(false);
   const [showDirectionPrompt, setShowDirectionPrompt] = useState(false);
 
+  // Location runtime — single watcher owner for this session screen.
+  // Instantiated here (not in the setup screen) because the session screen
+  // is a separate route. The runtime starts watching as soon as the session
+  // is confirmed LIVE (handled inside useCrewLiveSessionV2).
+  const locationRuntime = useCrewLocationRuntime();
+
   useEffect(() => {
     async function loadSession() {
       setIsLoading(true);
@@ -74,9 +80,7 @@ export default function CrewLiveSessionScreenV2({
 
   const {
     session,
-    coords,
     permissionStatus,
-    networkStatus,
     connectionStatus,
     isPinging,
     lastPingAgeMs,
@@ -86,8 +90,12 @@ export default function CrewLiveSessionScreenV2({
     updateDirection,
     stopSession,
     retryNow,
+    uploadStatus,
+    clientState,
+    hasPendingUpload,
   } = useCrewLiveSessionV2({
     initialSession,
+    locationRuntime,
     onStationaryDetected: () => {
       setShowStationaryAlert(true);
     },
@@ -213,8 +221,17 @@ export default function CrewLiveSessionScreenV2({
 
         <div className="flex flex-wrap items-center gap-3">
           <SessionTimer startedAt={session.started_at} />
-          <GpsQualityIndicator accuracy={coords?.accuracy ?? null} />
-          <NetworkQualityIndicator showDetails />
+          <TrackingHealthPanel
+            locationReadiness={locationRuntime.readiness}
+            isWatching={locationRuntime.isWatching}
+            uploadStatus={uploadStatus}
+            clientState={clientState}
+            lastUploadAgeMs={lastPingAgeMs}
+            hasPendingUpload={hasPendingUpload}
+            onRetry={() => {
+              void retryNow();
+            }}
+          />
           <div className="ml-auto">
             <KeyboardShortcutsHelp shortcuts={shortcuts} />
           </div>

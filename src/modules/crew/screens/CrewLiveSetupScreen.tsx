@@ -9,6 +9,7 @@ import { CrewActiveSessionBanner } from "@/modules/crew/components/CrewActiveSes
 import { CrewReadinessCard } from "@/modules/crew/components/CrewReadinessCard";
 import type { CrewDirectionValue } from "@/modules/crew/components/DirectionToggle";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
+import { useCrewLocationRuntime } from "@/modules/crew/hooks/useCrewLocationRuntime";
 import {
   clearCrewActiveSessionId,
   writeCrewActiveSessionId,
@@ -30,15 +31,20 @@ export default function CrewLiveSetupScreen() {
   const assignment = snapshot.bootstrap.assignment;
   const rawActiveSession = snapshot.bootstrap.active_session;
 
-  const activeSession =
-    rawActiveSession?.status === "LIVE" && !rawActiveSession?.ended_at
-      ? rawActiveSession
-      : null;
+  const activeSession = rawActiveSession ?? null;
+
+  // Single location runtime instance — shared with the session screen via
+  // navigation state is not needed here because the setup screen and session
+  // screen are separate routes. The runtime is re-created on the session screen.
+  // What matters is that within this screen, only one runtime (and therefore
+  // one watcher) exists.
+  const locationRuntime = useCrewLocationRuntime();
 
   const readiness = useCrewLiveReadiness(
     assignment,
     snapshot.bootstrap.request,
     addToast,
+    locationRuntime,
   );
 
   const [isStagePickerOpen, setIsStagePickerOpen] = useState(false);
@@ -293,7 +299,7 @@ export default function CrewLiveSetupScreen() {
                 seatsSectionRef={seatsSectionRef}
               />
 
-              <div className="xl:hidden">
+              <div className="md:hidden">
                 <Button
                   variant="ghost"
                   className={`min-h-[44px] w-full rounded-[18px] border px-4 text-sm font-semibold transition-all ${startIsActive ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.10)] text-[var(--color-accent)] shadow-[0_12px_32px_rgba(255,45,120,0.10)]" : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)] text-[var(--color-text-secondary)]"} disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none`}
@@ -305,7 +311,7 @@ export default function CrewLiveSetupScreen() {
                 </Button>
               </div>
 
-              <div className="hidden xl:block">
+              <div className="hidden md:block">
                 <Button
                   variant="primary"
                   className={`min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold transition-all disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none ${startIsActive ? "ring-1 ring-[var(--color-accent)]/35 shadow-[0_16px_42px_rgba(255,45,120,0.16)]" : ""}`}
@@ -347,7 +353,7 @@ export default function CrewLiveSetupScreen() {
             </aside>
           </div>
 
-          <div className="h-24 xl:hidden" />
+          <div className="h-40 md:hidden" />
 
           <CrewMobileStickyBar
             nextRequired={readiness.nextRequired}

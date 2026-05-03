@@ -1,3 +1,5 @@
+import { TRACKING_THRESHOLDS } from '@/lib/types/tracking'
+
 /**
  * Admin utility functions for formatting and display
  */
@@ -47,13 +49,20 @@ export function formatTimeAgo(value: string | Date | null | undefined): string {
   return `${diffYears}y ago`
 }
 
+/**
+ * Health tone for admin live session monitoring.
+ * Uses canonical TRACKING_THRESHOLDS — never inline magic numbers.
+ *
+ *   green  → LIVE   (≤ LIVE_FRESH_MAX_S)
+ *   amber  → AGING  (≤ LIVE_AGING_MAX_S)
+ *   red    → STALE or no ping
+ */
 export function getLiveHealthTone(lastPingAt: string | null): 'green' | 'amber' | 'red' {
   if (!lastPingAt) return 'red'
 
-  const diffMs = Date.now() - new Date(lastPingAt).getTime()
-  const diffSeconds = Math.floor(diffMs / 1000)
+  const diffSeconds = Math.floor((Date.now() - new Date(lastPingAt).getTime()) / 1000)
 
-  if (diffSeconds < 30) return 'green'
-  if (diffSeconds < 90) return 'amber'
+  if (diffSeconds <= TRACKING_THRESHOLDS.LIVE_FRESH_MAX_S) return 'green'
+  if (diffSeconds <= TRACKING_THRESHOLDS.LIVE_AGING_MAX_S) return 'amber'
   return 'red'
 }

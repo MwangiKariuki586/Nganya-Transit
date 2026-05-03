@@ -32,7 +32,6 @@ import {
 } from '@/lib/queries/tracking'
 import {
   getTrackingSignalState,
-  getAgeSeconds,
 } from '@/lib/tracking-signal'
 import {
   TRACKING_THRESHOLDS,
@@ -43,6 +42,10 @@ import {
   type FeedbackState,
 } from '@/lib/types/tracking'
 import type { ConfidenceLevel, JourneyResult } from '@/lib/types/journey'
+import {
+  useCorridorLiveBroadcast,
+  type LiveLocationBroadcastPayload,
+} from './useCorridorLiveBroadcast'
 
 // ─── RPC walk-time helper ─────────────────────────────────────────────────────
 
@@ -237,7 +240,12 @@ export function useTracking({
     return () => clearInterval(id)
   }, [isActive])
 
-  // ── Realtime: live_sessions for this nganya ────────────────────────────────
+  // ── Realtime: live_sessions for this nganya (CDC fallback) ───────────────
+  // This postgres_changes subscription remains as the fallback path.
+  // The Broadcast subscription below is the primary fast path.
+  // Both can coexist — the Broadcast fires first (Edge Function pushes it
+  // immediately after the DB write), CDC fires shortly after.
+  // Duplicate position updates are harmless: setNganyaPosition is idempotent.
   useEffect(() => {
     if (!isActive) return
 
@@ -274,6 +282,40 @@ export function useTracking({
       supabase.removeChannel(channel)
     }
   }, [isActive, nganya.nganya_id])
+
+  // ── Realtime: Broadcast channel for this corridor (primary fast path) ─────
+  // Receives LIVE_LOCATION_UPDATED events broadcast by the live-location-ingest
+  // Edge Function immediately after each accepted location upload.
+  // Filtered client-side to this nganya_id so other nganyas on the same
+  // corridor don't trigger unnecessary re-renders.
+  //
+  // On reconnect: re-fetch the latest server position to fill any gap that
+  // occurred while the channel was disconnected.
+  const handleBroadcastUpdate = useCallback(
+    (payload: LiveLocationBroadcastPayload) => {
+      // Only process updates for this specific nganya
+      if (payload.nganya_id !== nganya.nganya_id) return
+
+      setLastUpdateAt(new Date())
+      setRawSource('LIVE')
+      setNganyaPosition({ lat: payload.lat, lng: payload.lng })
+    },
+    [nganya.nganya_id],
+  )
+
+  const handleBroadcastReconnect = useCallback(() => {
+    // Channel reconnected — re-fetch server state to fill the gap
+    void fetchNganyaPosition(nganya.nganya_id).then((pos) => {
+      if (pos) setNganyaPosition(pos)
+    })
+  }, [nganya.nganya_id])
+
+  useCorridorLiveBroadcast({
+    corridorId: nganya.corridor_id,
+    isActive,
+    onUpdate: handleBroadcastUpdate,
+    onReconnect: handleBroadcastReconnect,
+  })
 
   // ── Realtime: sightings for this corridor (estimated mode) ────────────────
   useEffect(() => {

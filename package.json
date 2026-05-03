@@ -12,6 +12,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "lint": "eslint src/",
     "check:boundaries": "node scripts/check-boundaries.mjs"
   },
@@ -40,6 +42,7 @@
     "@content-collections/mdx": "^0.2.2",
     "@content-collections/vite": "^0.2.8",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "^0.3.11",
     "@testing-library/dom": "^10.4.0",

@@ -17,9 +17,21 @@
  *    STALE     → created_at 10–30 min ago  (aging sighting, last-known)
  *    EXPIRED   → created_at > 30 min ago   (hide from live surfaces)
  *
+ * Spec naming aliases (Unit 05):
+ *  Live GPS freshness states (getLiveSessionFreshness):
+ *    LIVE    → ≤ 30 s
+ *    AGING   → 31–90 s   (maps to ESTIMATED in TrackingSignalType)
+ *    STALE   → 91 s – 15 min
+ *    EXPIRED → > 15 min
+ *
+ *  Sighting freshness states (getSightingFreshness):
+ *    FRESH_SIGHTING  → ≤ 10 min
+ *    AGING_SIGHTING  → 10–30 min
+ *    EXPIRED_SIGHTING → > 30 min
+ *
  * Marker visual language:
  *    LIVE      → solid green ring, pulse halo, motion trail
- *    ESTIMATED → amber ring, no pulse
+ *    ESTIMATED → amber ring, no pulse  (same as AGING)
  *    STALE     → grey ring, dashed outline, 0.45 opacity, no pulse, no trail
  *    EXPIRED   → not rendered on live map
  *
@@ -31,6 +43,21 @@
  */
 
 import { TRACKING_THRESHOLDS, type TrackingSignalType } from './types/tracking'
+
+// ─── Spec-named freshness state types (Unit 05) ───────────────────────────────
+
+/**
+ * Freshness state for a live GPS session.
+ * Spec-canonical names — use these in new code.
+ * Maps to TrackingSignalType: LIVE→LIVE, AGING→ESTIMATED, STALE→STALE, EXPIRED→EXPIRED
+ */
+export type LiveSessionFreshnessState = 'LIVE' | 'AGING' | 'STALE' | 'EXPIRED'
+
+/**
+ * Freshness state for a fan sighting.
+ * Spec-canonical names — use these in new code.
+ */
+export type SightingFreshnessState = 'FRESH_SIGHTING' | 'AGING_SIGHTING' | 'EXPIRED_SIGHTING'
 
 // ─── Core resolvers ───────────────────────────────────────────────────────────
 
@@ -78,6 +105,108 @@ export function getTrackingSignalState(
   return source === 'LIVE'
     ? getLiveSessionSignalState(observedAt)
     : getSightingSignalState(observedAt)
+}
+
+// ─── Spec-named freshness helpers (Unit 05) ───────────────────────────────────
+
+/**
+ * Resolve freshness state for a live GPS session using spec-canonical names.
+ *
+ * AGING (31–90 s) is the spec's name for what the existing system calls ESTIMATED.
+ * Both represent the same visual state — amber ring, no pulse, still usable.
+ *
+ * @param lastPingAt  ISO string or Date of the last crew ping.
+ */
+export function getLiveSessionFreshness(lastPingAt: string | Date): LiveSessionFreshnessState {
+  const ts = lastPingAt instanceof Date ? lastPingAt.getTime() : new Date(lastPingAt).getTime()
+  if (!Number.isFinite(ts)) return 'STALE'
+
+  const ageSec = (Date.now() - ts) / 1_000
+
+  if (ageSec <= TRACKING_THRESHOLDS.LIVE_FRESH_MAX_S) return 'LIVE'
+  if (ageSec <= TRACKING_THRESHOLDS.LIVE_AGING_MAX_S) return 'AGING'
+  if (ageSec <= TRACKING_THRESHOLDS.LIVE_SESSION_EXPIRES_MIN * 60) return 'STALE'
+  return 'EXPIRED'
+}
+
+/**
+ * Resolve freshness state for a fan sighting using spec-canonical names.
+ *
+ * @param createdAt  ISO string or Date of the sighting.
+ */
+export function getSightingFreshness(createdAt: string | Date): SightingFreshnessState {
+  const ts = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime()
+  if (!Number.isFinite(ts)) return 'EXPIRED_SIGHTING'
+
+  const ageMin = (Date.now() - ts) / 60_000
+
+  if (ageMin <= TRACKING_THRESHOLDS.SIGHTING_FRESH_MAX_MIN) return 'FRESH_SIGHTING'
+  if (ageMin <= TRACKING_THRESHOLDS.SIGHTING_EXPIRES_MIN) return 'AGING_SIGHTING'
+  return 'EXPIRED_SIGHTING'
+}
+
+/**
+ * Map a spec LiveSessionFreshnessState to the TrackingSignalType used by
+ * existing UI components (markers, badges, overlays).
+ *
+ * AGING → ESTIMATED (same visual treatment — amber, no pulse)
+ */
+export function liveSessionFreshnessToSignalType(
+  freshness: LiveSessionFreshnessState,
+): TrackingSignalType {
+  switch (freshness) {
+    case 'LIVE': return 'LIVE'
+    case 'AGING': return 'ESTIMATED'
+    case 'STALE': return 'STALE'
+    case 'EXPIRED': return 'EXPIRED'
+  }
+}
+
+/**
+ * Map a spec SightingFreshnessState to the TrackingSignalType used by
+ * existing UI components.
+ *
+ * FRESH_SIGHTING → ESTIMATED (usable, amber)
+ * AGING_SIGHTING → STALE     (last-known, grey)
+ * EXPIRED_SIGHTING → EXPIRED (hidden)
+ */
+export function sightingFreshnessToSignalType(
+  freshness: SightingFreshnessState,
+): TrackingSignalType {
+  switch (freshness) {
+    case 'FRESH_SIGHTING': return 'ESTIMATED'
+    case 'AGING_SIGHTING': return 'STALE'
+    case 'EXPIRED_SIGHTING': return 'EXPIRED'
+  }
+}
+
+/**
+ * Get the marker visual state for a live session row from v_live_now.
+ * Accepts the server-computed `freshness_state` string directly.
+ *
+ * @param freshnessState  Value of v_live_now.freshness_state ('LIVE'|'AGING'|'STALE')
+ */
+export function getMarkerVisualState(
+  freshnessState: string | null | undefined,
+): TrackingSignalType {
+  switch (freshnessState) {
+    case 'LIVE': return 'LIVE'
+    case 'AGING': return 'ESTIMATED'
+    case 'STALE': return 'STALE'
+    default: return 'STALE'
+  }
+}
+
+/**
+ * Get tracking copy for a live session row from v_live_now.
+ * Thin wrapper over getTrackingCalloutCopy that accepts the server freshness_state.
+ */
+export function getTrackingCopy(
+  freshnessState: string | null | undefined,
+  ageSec: number,
+  lastStageName?: string | null,
+): TrackingCalloutCopy {
+  return getTrackingCalloutCopy(getMarkerVisualState(freshnessState), ageSec, lastStageName)
 }
 
 // ─── Freshness age helpers ────────────────────────────────────────────────────
@@ -165,6 +294,18 @@ export const MARKER_VISUAL: Record<TrackingSignalType, MarkerVisualConfig> = {
     ringWidth: 1,
     dashedRing: false,
   },
+}
+
+/**
+ * Marker visual config keyed by spec LiveSessionFreshnessState.
+ * AGING maps to the same amber style as ESTIMATED — softer than LIVE, no pulse.
+ * Use this when consuming v_live_now.freshness_state directly.
+ */
+export const MARKER_VISUAL_BY_FRESHNESS: Record<LiveSessionFreshnessState, MarkerVisualConfig> = {
+  LIVE: MARKER_VISUAL.LIVE,
+  AGING: MARKER_VISUAL.ESTIMATED,   // amber ring, no pulse — softer than LIVE
+  STALE: MARKER_VISUAL.STALE,
+  EXPIRED: MARKER_VISUAL.EXPIRED,
 }
 
 // ─── Route line visual config ─────────────────────────────────────────────────

@@ -12,7 +12,10 @@
  */
 
 import { supabase } from '../supabase'
-import { getTrackingSignalState } from '../tracking-signal'
+import {
+  getLiveSessionFreshness,
+  getSightingFreshness,
+} from '../tracking-signal'
 import type { TrackingPosition } from '../types/tracking'
 
 /** Cast the Supabase client to `any` to work around incomplete generated types. */
@@ -146,9 +149,9 @@ export async function fetchCorridorNganyaMapPins(
     last_ping_at: string
   }>) {
     if (pins.has(row.nganya_id)) continue
-    // Filter expired live sessions — they must not appear on the live map
-    const signalState = getTrackingSignalState('LIVE', row.last_ping_at)
-    if (signalState === 'EXPIRED') continue
+    // Use spec-named freshness function — EXPIRED sessions must not appear on the live map
+    const freshness = getLiveSessionFreshness(row.last_ping_at)
+    if (freshness === 'EXPIRED') continue
     const position = parsePostgisPoint(row.last_location)
     if (!position) continue
     pins.set(row.nganya_id, {
@@ -176,9 +179,9 @@ export async function fetchCorridorNganyaMapPins(
     created_at: string
   }>) {
     if (pins.has(row.nganya_id)) continue
-    // Filter expired sightings — they must not appear on the live map
-    const signalState = getTrackingSignalState('SIGHTING', row.created_at)
-    if (signalState === 'EXPIRED') continue
+    // Use spec-named freshness function — EXPIRED_SIGHTING must not appear on the live map
+    const freshness = getSightingFreshness(row.created_at)
+    if (freshness === 'EXPIRED_SIGHTING') continue
     const position = parsePostgisPoint(row.location)
     if (!position) continue
     pins.set(row.nganya_id, {

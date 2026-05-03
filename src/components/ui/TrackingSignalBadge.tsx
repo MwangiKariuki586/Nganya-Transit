@@ -3,12 +3,13 @@
  *
  * Clearly distinguishes:
  *   LIVE      → crew GPS, fresh ping (green, pulsing)
- *   ESTIMATED → sightings-based or aging GPS (amber)
+ *   ESTIMATED → sightings-based or aging GPS (amber) — also covers AGING state
  *   STALE     → last-known location only (grey, no pulse)
  *   EXPIRED   → signal too old for live surfaces (muted, no pulse)
  */
 
 import type { TrackingSignalType } from "@/lib/types/tracking";
+import { formatAgeShort } from "@/lib/tracking-signal";
 
 interface TrackingSignalBadgeProps {
   signalType: TrackingSignalType;
@@ -30,7 +31,7 @@ const config: Record<
     pulse: true,
   },
   ESTIMATED: {
-    label: "ESTIMATED",
+    label: "AGING",
     color: "var(--color-warning)",
     bg: "var(--color-warning-soft)",
     border: "rgba(255,193,7,0.3)",
@@ -61,11 +62,7 @@ export default function TrackingSignalBadge({
   const cfg = config[signalType];
 
   const freshnessLabel =
-    freshnessSeconds !== undefined
-      ? freshnessSeconds < 60
-        ? `${freshnessSeconds}s ago`
-        : `${Math.floor(freshnessSeconds / 60)}m ago`
-      : null;
+    freshnessSeconds !== undefined ? formatAgeShort(freshnessSeconds) : null;
 
   if (compact) {
     return (
@@ -96,7 +93,6 @@ export default function TrackingSignalBadge({
         style={{ backgroundColor: cfg.color }}
       />
       {cfg.label}
-      {/* Show freshness for LIVE and ESTIMATED; for STALE show "last active X ago" */}
       {freshnessLabel && signalType === "LIVE" && (
         <span className="opacity-60 normal-case tracking-normal font-normal">
           · {freshnessLabel}

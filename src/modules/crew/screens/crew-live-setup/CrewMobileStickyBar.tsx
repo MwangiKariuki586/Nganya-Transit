@@ -31,7 +31,7 @@ export function CrewMobileStickyBar({
   startLiveButtonRef,
 }: CrewMobileStickyBarProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[var(--z-fab)] border-t border-[var(--glass-border)] bg-[var(--color-bg-base)]/92 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl xl:hidden">
+    <div className="fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-[var(--z-fab)] border-t border-[var(--glass-border)] bg-[var(--color-bg-base)]/92 px-4 py-3 backdrop-blur-xl md:hidden">
       <div className="mx-auto max-w-7xl space-y-3">
         <div className="min-w-0">
           <div className="text-caption text-[var(--color-text-tertiary)]">
@@ -69,9 +69,7 @@ export function CrewMobileStickyBar({
                 }}
               >
                 {nextRequired === "location" &&
-                  (permissionStatus === "denied"
-                    ? "Retry location"
-                    : "Enable")}
+                  (permissionStatus === "denied" ? "Retry location" : "Enable")}
                 {nextRequired === "direction" && "Set direction"}
                 {nextRequired === "seats" && "Set seats"}
               </button>

@@ -17,6 +17,8 @@ mcp.json
 __unconfig*
 todos.json
 migrations
+playwright-report
+test-results
 
 
 # Ignore Cursor MCP configs (contains sensitive token)

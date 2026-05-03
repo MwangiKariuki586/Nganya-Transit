@@ -1,28 +1,52 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { stageRepository } from "@/entities/stage/repository";
 import { crewLiveService } from "@/features/crew-live/services/crew-live-service";
 import { nganyaRegistrationService } from "@/features/nganya-registration/services/nganya-registration-service";
 import type { CrewDirectionValue } from "@/modules/crew/components/DirectionToggle";
+import type { UseCrewLocationRuntimeReturn } from "@/modules/crew/hooks/useCrewLocationRuntime";
+import type { ToastType } from "@/components/ui/Toast";
 import {
   readCrewSetupDraft,
   writeCrewSetupDraft,
 } from "@/modules/crew/lib/storage";
 import { clampSeats, detectNearestStage, getGpsQuality } from "./crew-live-domain";
 import type {
-  Coords,
   NetworkStateLocal,
   PermissionStateLocal,
   StageOption,
   StartStageChoice,
 } from "./crew-live-types";
 
+// ─── Readiness → legacy PermissionStateLocal bridge ──────────────────────────
+// The rest of the setup UI (CrewReadinessCard, PermissionBanner, etc.) still
+// uses the four-value PermissionStateLocal type. We map the richer readiness
+// state down to it here so no UI components need to change in this unit.
+
+function toPermissionStateLocal(
+  readiness: UseCrewLocationRuntimeReturn["readiness"],
+): PermissionStateLocal {
+  switch (readiness) {
+    case "granted":
+      return "granted";
+    case "denied":
+    case "blocked":
+      return "denied";
+    case "unavailable":
+      return "unsupported";
+    default:
+      // checking | prompt_required
+      return "prompt";
+  }
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
 export function useCrewLiveReadiness(
   assignment: any,
   bootstrapRequest: any,
-  addToast: (msg: string, type: string) => void,
+  addToast: (msg: string, type: ToastType) => void,
+  locationRuntime: UseCrewLocationRuntimeReturn,
 ) {
-  const permissionWatcherRef = useRef<PermissionStatus | null>(null);
-
   const [registrationRequest, setRegistrationRequest] = useState<any>(null);
   const [lastLiveAt, setLastLiveAt] = useState<string | null>(null);
   const [direction, setDirection] = useState<CrewDirectionValue | null>(() => {
@@ -37,10 +61,6 @@ export function useCrewLiveReadiness(
     const draft = readCrewSetupDraft();
     return Boolean(draft?.seatsConfirmed);
   });
-  const [permissionStatus, setPermissionStatus] =
-    useState<PermissionStateLocal>("prompt");
-  const [coords, setCoords] = useState<Coords | null>(null);
-  const [lastFixAt, setLastFixAt] = useState<string | null>(null);
   const [networkStatus, setNetworkStatus] = useState<NetworkStateLocal>(
     typeof navigator === "undefined" || navigator.onLine ? "healthy" : "offline",
   );
@@ -51,70 +71,25 @@ export function useCrewLiveReadiness(
   const [showAssignmentHelp, setShowAssignmentHelp] = useState(false);
   const [isAssignmentExpanded, setIsAssignmentExpanded] = useState(false);
 
-  const captureLocation = useCallback(async () => {
-    if (!navigator.geolocation) {
-      setPermissionStatus("unsupported");
-      throw new Error("This browser does not support geolocation.");
-    }
+  // Derive legacy permission state from the runtime readiness
+  const permissionStatus = toPermissionStateLocal(locationRuntime.readiness);
 
-    const applyFix = (position: GeolocationPosition): Coords => {
-      const nextCoords: Coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
-      };
-      setCoords(nextCoords);
-      setPermissionStatus("granted");
-      setLastFixAt(new Date().toISOString());
-      return nextCoords;
-    };
-
-    const toError = (error: GeolocationPositionError): Error => {
-      let errorMessage = "Location permission is required to go Live.";
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          setPermissionStatus("denied");
-          errorMessage =
-            typeof window !== "undefined" && window.isSecureContext === false
-              ? "Location requires a secure connection. Please use HTTPS or localhost."
-              : "Location permission denied. Please enable location in your browser settings or app settings.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          errorMessage = "Location information is unavailable. Please check your device's location services.";
-          break;
-        case error.TIMEOUT:
-          setPermissionStatus("prompt");
-          errorMessage = "Location request timed out. Please ensure location is enabled and try again.";
-          break;
-        default:
-          setPermissionStatus("prompt");
-          errorMessage = "An unknown error occurred while getting location.";
-          break;
+  // Derive coords shape expected by the rest of the setup UI
+  const coords = locationRuntime.latestPosition
+    ? {
+        lat: locationRuntime.latestPosition.lat,
+        lng: locationRuntime.latestPosition.lng,
+        accuracy: locationRuntime.latestPosition.accuracy,
       }
-      return new Error(errorMessage);
-    };
+    : null;
 
-    const getPosition = (opts: PositionOptions) =>
-      new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, opts);
-      });
-
-    // Stage 1: fast network/cached fix
-    try {
-      const pos = await getPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
-      return applyFix(pos);
-    } catch (fastErr: any) {
-      if (fastErr?.code === 1) throw toError(fastErr); // PERMISSION_DENIED — don't retry
+  // Track when we last got a fix (for the GPS quality indicator)
+  const [lastFixAt, setLastFixAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (locationRuntime.latestPosition) {
+      setLastFixAt(new Date().toISOString());
     }
-
-    // Stage 2: high-accuracy GPS fallback
-    try {
-      const pos = await getPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
-      return applyFix(pos);
-    } catch (err: any) {
-      throw toError(err);
-    }
-  }, []);
+  }, [locationRuntime.latestPosition]);
 
   // Load registration request + history
   useEffect(() => {
@@ -136,7 +111,7 @@ export function useCrewLiveReadiness(
         addToast(err?.message || "Failed to load your assigned nganya.", "error");
       });
     return () => { active = false; };
-  }, [bootstrapRequest?.id]);
+  }, [bootstrapRequest?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load corridor stages
   useEffect(() => {
@@ -155,34 +130,11 @@ export function useCrewLiveReadiness(
     const handleOffline = () => { setNetworkStatus("offline"); setNetworkMessage("Offline. Reconnect before starting Live."); };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
-  }, []);
-
-  // Permission watcher
-  useEffect(() => {
-    if (typeof navigator === "undefined") return;
-    if (!navigator.geolocation) { setPermissionStatus("unsupported"); return; }
-    if (!("permissions" in navigator) || !navigator.permissions?.query) { setPermissionStatus("prompt"); return; }
-
-    let active = true;
-    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((status) => {
-      if (!active) return;
-      permissionWatcherRef.current = status;
-      const next = status.state === "granted" ? "granted" : status.state === "denied" ? "denied" : "prompt";
-      setPermissionStatus(next);
-      if (next === "granted") void captureLocation().catch(() => null);
-      status.onchange = () => {
-        const updated = status.state === "granted" ? "granted" : status.state === "denied" ? "denied" : "prompt";
-        setPermissionStatus(updated);
-        if (updated === "granted") void captureLocation().catch(() => null);
-      };
-    }).catch(() => { setPermissionStatus("prompt"); });
-
     return () => {
-      active = false;
-      if (permissionWatcherRef.current) permissionWatcherRef.current.onchange = null;
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
-  }, [captureLocation]);
+  }, []);
 
   // Persist draft
   useEffect(() => {
@@ -190,8 +142,11 @@ export function useCrewLiveReadiness(
     writeCrewSetupDraft({ direction, seatsLeft, seatsConfirmed: hasConfirmedSeats });
   }, [assignment, direction, seatsLeft, hasConfirmedSeats]);
 
-  // Auto-detect nearest stage
-  const autoDetectedStage = useMemo(() => detectNearestStage(stages, coords), [coords, stages]);
+  // Auto-detect nearest stage from latest position
+  const autoDetectedStage = useMemo(
+    () => detectNearestStage(stages, coords),
+    [coords, stages],
+  );
 
   useEffect(() => {
     if (!autoDetectedStage) return;
@@ -215,11 +170,12 @@ export function useCrewLiveReadiness(
 
   const gpsQuality = getGpsQuality(coords?.accuracy ?? null);
 
+  // Location action: delegate to the runtime
   const handleLocationAction = useCallback(() => {
-    void captureLocation().catch((err: any) => {
+    locationRuntime.requestPermission().catch((err: any) => {
       addToast(err?.message || "Location permission is required to go Live.", "error");
     });
-  }, [addToast, captureLocation]);
+  }, [locationRuntime, addToast]);
 
   return {
     registrationRequest,
@@ -236,7 +192,9 @@ export function useCrewLiveReadiness(
     selectedStartStage, setSelectedStartStage,
     showAssignmentHelp, setShowAssignmentHelp,
     isAssignmentExpanded, setIsAssignmentExpanded,
-    captureLocation,
+    // Expose captureLocation as a thin wrapper over requestPermission so
+    // CrewLiveSetupScreen.handleStart can still call it for the initial fix.
+    captureLocation: locationRuntime.requestPermission,
     handleLocationAction,
     assignmentReady,
     locationGranted,
