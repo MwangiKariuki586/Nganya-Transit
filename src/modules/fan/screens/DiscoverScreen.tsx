@@ -13,6 +13,13 @@ import { mapNganyaToCardProps } from "./discover/discover-domain";
 import { SORT_OPTIONS } from "./discover/discover-types";
 import { useDiscoverCatalogue } from "./discover/useDiscoverCatalogue";
 import type { DiscoverRouteData } from "@/modules/fan/services/route-data";
+import { useToast } from "@/components/ui/ToastContainer";
+import {
+  applyPlannerSeed,
+  canTrackWithPlannerContext,
+  readPlannerStorageContext,
+  writePlannerStorageContext,
+} from "@/modules/fan/services/planner-storage";
 
 const allVibeTags = Object.keys(vibeTagColors);
 
@@ -35,6 +42,8 @@ function DiscoverScreen({
     totalCount,
   } = data;
 
+  const { addToast } = useToast();
+
   const catalogue = useDiscoverCatalogue({
     allNganyas,
     initialFollowedIds: followedIds,
@@ -50,6 +59,37 @@ function DiscoverScreen({
         .filter(Boolean),
     [featuredLive, liveNganyas],
   );
+
+  // ── Plan ride / Track CTA ─────────────────────────────────────────────────
+  const handleCardAction = (cardData: any) => {
+    const plannerContext = readPlannerStorageContext();
+    if (
+      cardData.isLive &&
+      canTrackWithPlannerContext(plannerContext, cardData)
+    ) {
+      // Navigate to home where the tracker lives
+      window.location.href = "/";
+      return;
+    }
+    // Seed the planner and navigate home to the WhereToCard
+    const next = applyPlannerSeed(
+      plannerContext,
+      {
+        id: cardData.id,
+        name: cardData.name,
+        corridorId: cardData.corridorId,
+        corridorName: cardData.corridorName,
+      },
+      { clearStageOnRouteChange: true },
+    );
+    // Persist to localStorage so the home page picks it up
+    writePlannerStorageContext(next);
+    addToast(
+      `Route set to ${cardData.corridorName}. Pick your pickup stage to plan with ${cardData.name}.`,
+      "info",
+    );
+    window.location.href = "/";
+  };
 
   const hasActiveFilters = catalogue.isFiltered;
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -169,6 +209,17 @@ function DiscoverScreen({
                   variant="standard"
                   isFollowing={catalogue.followedIds.has(cardData.id)}
                   onFollow={catalogue.toggleFollow}
+                  primaryAction={{
+                    label: "Track",
+                    onClick: () => handleCardAction(cardData),
+                  }}
+                  secondaryAction={{
+                    label: catalogue.followedIds.has(cardData.id)
+                      ? "Following"
+                      : "Follow",
+                    onClick: () => void catalogue.toggleFollow(cardData.id),
+                    variant: "secondary",
+                  }}
                 />
               </div>
             ))}
@@ -276,6 +327,24 @@ function DiscoverScreen({
                 variant="standard"
                 isFollowing={catalogue.followedIds.has(cardData.id)}
                 onFollow={catalogue.toggleFollow}
+                primaryAction={{
+                  label:
+                    cardData.isLive &&
+                    canTrackWithPlannerContext(
+                      readPlannerStorageContext(),
+                      cardData,
+                    )
+                      ? "Track"
+                      : "Plan ride",
+                  onClick: () => handleCardAction(cardData),
+                }}
+                secondaryAction={{
+                  label: catalogue.followedIds.has(cardData.id)
+                    ? "Following"
+                    : "Follow",
+                  onClick: () => void catalogue.toggleFollow(cardData.id),
+                  variant: "secondary",
+                }}
               />
             ))}
           </div>
