@@ -23,7 +23,7 @@ export function CrewRouteFrame({
         <CrewNav session={session} profile={profile} />
         <main className="flex-1">{children}</main>
         <CrewFooter />
-        <CrewBottomNav session={session} />
+        <CrewBottomNav session={session} profile={profile} />
       </div>
     </CrewBootstrapProvider>
   );
