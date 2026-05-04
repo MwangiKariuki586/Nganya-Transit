@@ -13,7 +13,7 @@ import InlineSpinner from "@/components/ui/InlineSpinner";
 import AvatarRing, { computeCompleteness } from "@/components/ui/AvatarRing";
 import MediaLightbox from "@/components/ui/MediaLightbox";
 import { ProfileGallery } from "@/modules/crew/components/ProfileGallery";
-import { User, Check, ImagePlus, Pencil, X } from "lucide-react";
+import { User, Check, ChevronLeft, ImagePlus, Pencil, X } from "lucide-react";
 
 export function CrewProfileScreen() {
   const router = useRouter();
@@ -316,6 +316,16 @@ export function CrewProfileScreen() {
               }
             />
           )}
+
+        {/* Back button — top-left */}
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={() => router.history.back()}
+          className="absolute top-4 left-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/70"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
 
         {/* Cover controls — top-right */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">

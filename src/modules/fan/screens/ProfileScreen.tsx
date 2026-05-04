@@ -6,6 +6,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import MediaLightbox from "@/components/ui/MediaLightbox";
 import {
   Check,
+  ChevronLeft,
   ImagePlus,
   Pencil,
   X,
@@ -79,8 +80,15 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     existingCoverUrl: profile?.cover_media_url || null,
     existingCoverType: null,
     toast,
-    persistAvatar: async (url) => { await updateCurrentUserProfile({ avatar_url: url }); },
-    persistCover: async (url, type) => { await updateCurrentUserProfile({ cover_media_url: url, cover_media_type: type }); },
+    persistAvatar: async (url) => {
+      await updateCurrentUserProfile({ avatar_url: url });
+    },
+    persistCover: async (url, type) => {
+      await updateCurrentUserProfile({
+        cover_media_url: url,
+        cover_media_type: type,
+      });
+    },
     onSuccess: () => router.invalidate(),
   });
 
@@ -91,7 +99,6 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
   const hasChanges =
     formData.full_name !== originalData.full_name ||
     formData.handle !== originalData.handle;
-
 
   // ── Profile save ──────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -184,7 +191,7 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         nganyaData.corridors?.name ||
         "Unknown Route",
       vibeTags: nganyaData.vibeTags || nganyaData.tags || [],
-      imageUrl: pickPrimaryNganyaImageUrl(nganyaData) ?? '',
+      imageUrl: pickPrimaryNganyaImageUrl(nganyaData) ?? "",
       isLive,
       isNewBuild:
         nganyaData.tags?.includes("NEW_BUILD") || nganyaData.is_new_build,
@@ -240,6 +247,16 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
               "linear-gradient(to bottom, rgba(10,10,15,0.15) 0%, rgba(10,10,15,0.1) 50%, rgba(10,10,15,0.7) 85%, var(--color-bg-base) 100%)",
           }}
         />
+
+        {/* Back button — top-left */}
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={() => router.history.back()}
+          className="absolute top-4 left-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/70"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
 
         {/* Cover controls — top-right */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
@@ -483,7 +500,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
           </div>
 
           <div>
-            <label htmlFor="profile-fullname" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+            <label
+              htmlFor="profile-fullname"
+              className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]"
+            >
               Display Name
             </label>
             {isEditing ? (
@@ -511,7 +531,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
           </div>
 
           <div>
-            <label htmlFor="profile-handle" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+            <label
+              htmlFor="profile-handle"
+              className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]"
+            >
               Handle
             </label>
             {isEditing ? (
@@ -535,7 +558,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
           </div>
 
           {editError && (
-            <p role="alert" className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <p
+              role="alert"
+              className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+            >
               {editError}
             </p>
           )}

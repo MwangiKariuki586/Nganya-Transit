@@ -311,14 +311,7 @@ export default function CrewLiveSessionScreenV2({
       <SessionInsights session={session} />
 
       {/* ── 6. Session actions ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button
-          variant="secondary"
-          className="min-h-[52px]"
-          onClick={() => navigate({ to: "/crew/history" })}
-        >
-          Session history
-        </Button>
+      <div className="grid items-center">
         <Button
           variant="primary"
           className="min-h-[52px] bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90 shadow-none"
