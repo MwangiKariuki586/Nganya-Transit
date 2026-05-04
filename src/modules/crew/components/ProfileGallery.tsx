@@ -265,70 +265,86 @@ export function ProfileGallery({ userId }: ProfileGalleryProps) {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-h3">
-          Gallery{" "}
-          <span className="text-sm text-[var(--color-text-tertiary)]">
-            ({allItems.length}/{GALLERY_LIMIT})
-          </span>
-        </h2>
+      {!isLoading && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-h3">
+            Gallery{" "}
+            <span className="text-sm text-[var(--color-text-tertiary)]">
+              ({allItems.length}/{GALLERY_LIMIT})
+            </span>
+          </h2>
 
-        <div className="flex items-center gap-2">
-          {hasStagedItems && !isUploading && (
-            <>
-              {/* Discard staged */}
+          <div className="flex items-center gap-2">
+            {hasStagedItems && !isUploading && (
+              <>
+                {/* Discard staged */}
+                <button
+                  type="button"
+                  aria-label="Discard staged photos"
+                  onClick={discardAll}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                {/* Confirm upload */}
+                <button
+                  type="button"
+                  aria-label="Confirm upload"
+                  onClick={confirmUpload}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white transition-colors hover:bg-[var(--color-accent-hover)]"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+
+            {/* Add button — only when no staged items and slots available */}
+            {!hasStagedItems && canStageMore && (
               <button
                 type="button"
-                aria-label="Discard staged photos"
-                onClick={discardAll}
+                aria-label="Add photos or videos"
+                onClick={() => inputRef.current?.click()}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
               >
-                <X className="h-3.5 w-3.5" />
+                <ImagePlus className="h-3.5 w-3.5" />
               </button>
-              {/* Confirm upload */}
-              <button
-                type="button"
-                aria-label="Confirm upload"
-                onClick={confirmUpload}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white transition-colors hover:bg-[var(--color-accent-hover)]"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-
-          {/* Add button — only when no staged items and slots available */}
-          {!hasStagedItems && canStageMore && (
-            <button
-              type="button"
-              aria-label="Add photos or videos"
-              onClick={() => inputRef.current?.click()}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
-            >
-              <ImagePlus className="h-3.5 w-3.5" />
-            </button>
-          )}
+            )}
+          </div>
         </div>
+      )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
-          multiple
-          className="sr-only"
-          onChange={handleFileChange}
-        />
-      </div>
+      {/* Hidden file input — always mounted so ref is stable */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+        multiple
+        className="sr-only"
+        onChange={handleFileChange}
+      />
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-3 gap-1 sm:gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-square animate-pulse rounded-lg bg-[var(--glass-bg)]"
-            />
-          ))}
+        <div className="space-y-4">
+          {/* Skeleton header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-16 animate-pulse rounded-md bg-[var(--glass-bg)]" />
+              <div className="h-4 w-10 animate-pulse rounded-md bg-[var(--glass-bg)]" />
+            </div>
+            <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--glass-bg)]" />
+          </div>
+          {/* Skeleton grid */}
+          <div className="grid grid-cols-3 gap-1 sm:gap-2">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="relative aspect-square overflow-hidden rounded-lg bg-[var(--glass-bg)]"
+              >
+                <div className="animate-shimmer absolute inset-0" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : allItems.length === 0 && staged.length === 0 ? (
         <button

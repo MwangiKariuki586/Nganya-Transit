@@ -51,7 +51,8 @@ export function CrewProfileScreen() {
     const ended = sessionHistory.filter((s) => s.ended_at);
     const totalMs = ended.reduce(
       (acc: number, s: any) =>
-        acc + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()),
+        acc +
+        (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()),
       0,
     );
 
@@ -60,7 +61,8 @@ export function CrewProfileScreen() {
     ).size;
 
     const longestMs = ended.reduce((max: number, s: any) => {
-      const dur = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
+      const dur =
+        new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
       return dur > max ? dur : max;
     }, 0);
 
@@ -91,13 +93,35 @@ export function CrewProfileScreen() {
   const [originalData, setOriginalData] = useState(formData);
   const [displayData, setDisplayData] = useState(formData);
 
-  const persistAvatar = useCallback(async (url: string) => {
-    await retryWithBackoff(() => updateCrewProfileServerFn({ data: { accessToken: session?.access_token ?? "", avatar_url: url } }), { maxAttempts: 3 });
-  }, [session?.access_token]);
+  const persistAvatar = useCallback(
+    async (url: string) => {
+      await retryWithBackoff(
+        () =>
+          updateCrewProfileServerFn({
+            data: { accessToken: session?.access_token ?? "", avatar_url: url },
+          }),
+        { maxAttempts: 3 },
+      );
+    },
+    [session?.access_token],
+  );
 
-  const persistCover = useCallback(async (url: string, type: "image" | "video") => {
-    await retryWithBackoff(() => updateCrewProfileServerFn({ data: { accessToken: session?.access_token ?? "", cover_media_url: url, cover_media_type: type } }), { maxAttempts: 3 });
-  }, [session?.access_token]);
+  const persistCover = useCallback(
+    async (url: string, type: "image" | "video") => {
+      await retryWithBackoff(
+        () =>
+          updateCrewProfileServerFn({
+            data: {
+              accessToken: session?.access_token ?? "",
+              cover_media_url: url,
+              cover_media_type: type,
+            },
+          }),
+        { maxAttempts: 3 },
+      );
+    },
+    [session?.access_token],
+  );
 
   const media = useProfileMediaUpload({
     userId: session?.user?.id,
@@ -117,13 +141,13 @@ export function CrewProfileScreen() {
   } | null>(null);
   const heroFrameRef = useRef<HTMLDivElement | null>(null);
 
-  const currentCoverType = media.cover.previewType || initialProfile.cover_media_type;
+  const currentCoverType =
+    media.cover.previewType || initialProfile.cover_media_type;
 
   const hasChanges =
     formData.full_name !== originalData.full_name ||
     formData.handle !== originalData.handle ||
     formData.bio !== originalData.bio;
-
 
   // ── Profile details save ──────────────────────────────────────────────────
   const handleSave = async () => {
@@ -214,6 +238,10 @@ export function CrewProfileScreen() {
 
   const displayedAvatarSrc = media.avatar.displayedSrc;
 
+  // Skeleton loading state for cover and avatar images
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
+
   return (
     <div className="pb-10 md:pb-16">
       {media.isUploading && (
@@ -246,6 +274,7 @@ export function CrewProfileScreen() {
               src={media.cover.currentSrc}
               alt="Cover"
               className="absolute inset-0 h-full w-full object-cover"
+              onLoad={() => setCoverLoaded(true)}
             />
           )
         ) : (
@@ -257,6 +286,15 @@ export function CrewProfileScreen() {
             }}
           />
         )}
+
+        {/* Cover skeleton — shown while a cover URL exists but hasn't loaded yet */}
+        {media.cover.currentSrc &&
+          currentCoverType !== "video" &&
+          !coverLoaded && (
+            <div className="absolute inset-0 bg-[var(--glass-bg)]">
+              <div className="animate-shimmer absolute inset-0" />
+            </div>
+          )}
 
         <div
           className="absolute inset-0 pointer-events-none"
@@ -363,11 +401,18 @@ export function CrewProfileScreen() {
                     }}
                   >
                     {displayedAvatarSrc ? (
-                      <img
-                        src={displayedAvatarSrc}
-                        alt={displayData.handle}
-                        className="h-full w-full object-cover"
-                      />
+                      <>
+                        {/* Avatar skeleton shown until image loads */}
+                        {!avatarLoaded && (
+                          <div className="absolute inset-0 animate-pulse rounded-full bg-[var(--glass-bg)]" />
+                        )}
+                        <img
+                          src={displayedAvatarSrc}
+                          alt={displayData.handle}
+                          className="h-full w-full object-cover"
+                          onLoad={() => setAvatarLoaded(true)}
+                        />
+                      </>
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xl font-bold text-[var(--color-text-primary)]">
                         {displayData.handle?.substring(0, 2).toUpperCase() ||
@@ -536,98 +581,107 @@ export function CrewProfileScreen() {
           </div>
 
           <div className="space-y-6">
-          <div>
-            <label htmlFor="crew-fullname" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Display Name
-            </label>
-            {isEditing ? (
-              <input
-                id="crew-fullname"
-                type="text"
-                value={formData.full_name}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    full_name: e.target.value,
-                  }))
-                }
-                placeholder="Your display name"
-                maxLength={100}
-                className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
-                disabled={isSaving}
-              />
-            ) : (
-              <p className="text-body text-[var(--color-text-primary)]">
-                {displayData.full_name || (
-                  <span className="text-[var(--color-text-tertiary)]">
-                    Not set
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="crew-handle" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Handle
-            </label>
-            {isEditing ? (
-              <input
-                id="crew-handle"
-                type="text"
-                value={formData.handle}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, handle: e.target.value }))
-                }
-                placeholder="your_handle"
-                maxLength={30}
-                pattern="[a-zA-Z0-9_]+"
-                className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 font-mono text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
-                disabled={isSaving}
-              />
-            ) : (
-              <p className="text-body font-mono text-[var(--color-text-primary)]">
-                @{displayData.handle}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="crew-bio" className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Bio
-            </label>
-            {isEditing ? (
-              <>
-                <textarea
-                  id="crew-bio"
-                  value={formData.bio}
+            <div>
+              <label
+                htmlFor="crew-fullname"
+                className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]"
+              >
+                Display Name
+              </label>
+              {isEditing ? (
+                <input
+                  id="crew-fullname"
+                  type="text"
+                  value={formData.full_name}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, bio: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      full_name: e.target.value,
+                    }))
                   }
-                  placeholder="Tell us about yourself..."
-                  maxLength={500}
-                  rows={4}
-                  className="w-full resize-none rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
+                  placeholder="Your display name"
+                  maxLength={100}
+                  className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
                   disabled={isSaving}
                 />
-                <div className="mt-1 flex justify-end">
-                  <span
-                    className={`text-xs font-mono ${formData.bio.length > 450 ? "text-[var(--color-warning)]" : "text-[var(--color-text-tertiary)]"}`}
-                  >
-                    {formData.bio.length}/500
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="whitespace-pre-wrap text-body text-[var(--color-text-primary)]">
-                {displayData.bio || (
-                  <span className="text-[var(--color-text-tertiary)]">
-                    No bio yet
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
+              ) : (
+                <p className="text-body text-[var(--color-text-primary)]">
+                  {displayData.full_name || (
+                    <span className="text-[var(--color-text-tertiary)]">
+                      Not set
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="crew-handle"
+                className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]"
+              >
+                Handle
+              </label>
+              {isEditing ? (
+                <input
+                  id="crew-handle"
+                  type="text"
+                  value={formData.handle}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, handle: e.target.value }))
+                  }
+                  placeholder="your_handle"
+                  maxLength={30}
+                  pattern="[a-zA-Z0-9_]+"
+                  className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 font-mono text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
+                  disabled={isSaving}
+                />
+              ) : (
+                <p className="text-body font-mono text-[var(--color-text-primary)]">
+                  @{displayData.handle}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="crew-bio"
+                className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]"
+              >
+                Bio
+              </label>
+              {isEditing ? (
+                <>
+                  <textarea
+                    id="crew-bio"
+                    value={formData.bio}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, bio: e.target.value }))
+                    }
+                    placeholder="Tell us about yourself..."
+                    maxLength={500}
+                    rows={4}
+                    className="w-full resize-none rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] transition-all focus:border-[var(--color-accent)] focus:shadow-[var(--glow-accent-sm)] focus:outline-none"
+                    disabled={isSaving}
+                  />
+                  <div className="mt-1 flex justify-end">
+                    <span
+                      className={`text-xs font-mono ${formData.bio.length > 450 ? "text-[var(--color-warning)]" : "text-[var(--color-text-tertiary)]"}`}
+                    >
+                      {formData.bio.length}/500
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="whitespace-pre-wrap text-body text-[var(--color-text-primary)]">
+                  {displayData.bio || (
+                    <span className="text-[var(--color-text-tertiary)]">
+                      No bio yet
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -646,7 +700,10 @@ export function CrewProfileScreen() {
               <h2 className="mb-4 text-h3">Crew Stats</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { label: "Total sessions", value: String(crewStats.totalSessions) },
+                  {
+                    label: "Total sessions",
+                    value: String(crewStats.totalSessions),
+                  },
                   { label: "Total time live", value: crewStats.totalTime },
                   { label: "Days active", value: String(crewStats.daysActive) },
                   { label: "Longest session", value: crewStats.longestSession },
@@ -655,7 +712,9 @@ export function CrewProfileScreen() {
                     key={stat.label}
                     className="rounded-[18px] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 text-center"
                   >
-                    <div className="text-h4 text-[var(--color-text-primary)]">{stat.value}</div>
+                    <div className="text-h4 text-[var(--color-text-primary)]">
+                      {stat.value}
+                    </div>
                     <div className="mt-1 text-caption text-[var(--color-text-tertiary)]">
                       {stat.label}
                     </div>

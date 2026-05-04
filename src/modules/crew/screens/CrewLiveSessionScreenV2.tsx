@@ -224,7 +224,7 @@ export default function CrewLiveSessionScreenV2({
   const isDirectionPending = isPinging;
 
   return (
-    <div className="page-container py-8 md:py-10 max-w-2xl space-y-4">
+    <div className="page-container py-8 md:py-10 max-w-2xl space-y-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+1.5rem)] md:pb-10">
       {/* ── 2. Blocking alerts only ────────────────────────────────────────── */}
       {isLocationBlocked && (
         <PermissionBanner

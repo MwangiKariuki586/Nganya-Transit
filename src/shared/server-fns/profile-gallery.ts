@@ -2,19 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 
 export const getProfileGalleryServerFn = createServerFn({ method: 'GET' })
   .inputValidator((data: { userId: string }) => data)
-  .handler(async ({ data, context }) => {
-    const { getRequestAccessToken, resolveSessionSnapshotFromRequest } = await import('@/server/auth/session.server')
-    const request = (context as { request?: Request }).request ?? null
-    const token = getRequestAccessToken(request)
-    if (!token) {
-      const { authRequired } = await import('@/shared/errors/app-error')
-      throw authRequired('Authentication required to view gallery')
-    }
-    const snapshot = await resolveSessionSnapshotFromRequest(request)
-    if (!snapshot?.userId || snapshot.userId !== data.userId) {
-      const { forbidden } = await import('@/shared/errors/app-error')
-      throw forbidden('You can only view your own gallery')
-    }
+  .handler(async ({ data }) => {
+    // Gallery reads are public (RLS policy: using (true)), so no auth check needed here.
+    // Write operations (add/delete) are protected separately via their own server functions.
     const gallery = await import('@/server/crew/gallery.server')
     return gallery.getProfileGallery(data.userId)
   })
