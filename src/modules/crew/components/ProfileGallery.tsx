@@ -285,7 +285,7 @@ export function ProfileGallery({ userId }: ProfileGalleryProps) {
                   type="button"
                   aria-label="Confirm upload"
                   onClick={confirmUpload}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white transition-colors hover:bg-[var(--color-accent-hover)]"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] transition-colors hover:bg-[var(--color-accent-hover)]"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>

@@ -17,7 +17,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<string, string> = {
     primary: [
-        'bg-[var(--color-accent)] text-white font-semibold',
+        'bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-semibold',
         'shadow-[var(--glow-accent-sm)]',
         'hover:bg-[var(--color-accent-hover)] hover:shadow-[var(--glow-accent)]',
         'active:scale-95',
@@ -26,7 +26,7 @@ const variantStyles: Record<string, string> = {
     primaryOutline: [
         'bg-transparent text-[var(--color-accent)] font-semibold',
         'border border-[var(--color-accent)]',
-        'hover:bg-[var(--color-accent)] hover:text-white',
+        'hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]',
         'hover:shadow-[var(--glow-accent-sm)]',
         'active:scale-95',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-accent)] disabled:hover:shadow-none',
@@ -38,7 +38,7 @@ const variantStyles: Record<string, string> = {
         'backdrop-blur-md',
         'transition-all duration-200',
         'hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-accent-soft)]',
-        'hover:shadow-[0_0_22px_-10px_rgba(255,45,120,0.45)]',
+        'hover:shadow-[0_0_22px_-10px_var(--theme-accent-shadow-strong)]',
         'hover:-translate-y-px',
         'active:scale-[0.98] active:translate-y-0',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0',

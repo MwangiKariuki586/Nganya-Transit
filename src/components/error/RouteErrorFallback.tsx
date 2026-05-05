@@ -56,7 +56,7 @@ export function RouteErrorFallback({
               reset()
               await router.invalidate()
             }}
-            className="rounded-[16px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="rounded-[16px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-accent-foreground)]"
           >
             {retryLabel}
           </button>

@@ -9,6 +9,7 @@ import { AuthSessionBridge } from "@/shared/auth/AuthSessionBridge";
 import { RouteErrorFallback } from "@/components/error/RouteErrorFallback";
 import { AppRenderBoundary } from "@/components/error/AppRenderBoundary";
 import { ToastProvider } from "@/components/ui/ToastContainer";
+import { MatwanaThemeProvider } from "@/shared/theme/MatwanaThemeProvider";
 
 import appCss from "../styles.css?url";
 
@@ -42,14 +43,16 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <ToastProvider>
-      <AuthSessionBridge />
-      <AppRenderBoundary>
-        <AppShell>
-          <Outlet />
-        </AppShell>
-      </AppRenderBoundary>
-    </ToastProvider>
+    <MatwanaThemeProvider>
+      <ToastProvider>
+        <AuthSessionBridge />
+        <AppRenderBoundary>
+          <AppShell>
+            <Outlet />
+          </AppShell>
+        </AppRenderBoundary>
+      </ToastProvider>
+    </MatwanaThemeProvider>
   );
 }
 

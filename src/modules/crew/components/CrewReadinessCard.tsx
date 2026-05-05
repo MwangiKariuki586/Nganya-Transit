@@ -214,7 +214,7 @@ export function CrewReadinessCard({
                   key={item.id}
                   className={`rounded-[16px] border px-3 py-2.5 ${
                     item.id === nextRequired
-                      ? "border-[var(--color-accent)]/35 bg-[rgba(255,45,120,0.07)]"
+                      ? "border-[var(--color-accent)]/35 bg-[var(--color-accent-subtle)]"
                       : "border-[var(--glass-border)] bg-[rgba(10,10,15,0.55)]"
                   }`}
                 >

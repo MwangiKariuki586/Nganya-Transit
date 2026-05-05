@@ -174,7 +174,7 @@ export default function MediaUpload({
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-4">
                 <button
                   onClick={handleClick}
-                  className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-white font-semibold hover:bg-[var(--color-accent)]/90 transition-colors"
+                  className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-semibold hover:bg-[var(--color-accent-hover)] transition-colors"
                 >
                   Replace
                 </button>

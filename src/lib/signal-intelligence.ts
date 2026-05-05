@@ -125,22 +125,22 @@ export function getCredibilityStyle(level: CredibilityLevel) {
     'active-spotter': {
       color: 'var(--color-accent)',
       bg: 'var(--color-accent-soft)',
-      border: 'rgba(255,45,120,0.3)',
+      border: 'var(--color-accent-border)',
     },
     'reliable-contributor': {
       color: 'var(--color-accent)',
       bg: 'var(--color-accent-soft)',
-      border: 'rgba(255,45,120,0.3)',
+      border: 'var(--color-accent-border)',
     },
     'occasional-contributor': {
       color: 'var(--color-accent)',
       bg: 'var(--color-accent-soft)',
-      border: 'rgba(255,45,120,0.3)',
+      border: 'var(--color-accent-border)',
     },
     'new-spotter': {
       color: 'var(--color-accent)',
       bg: 'var(--color-accent-soft)',
-      border: 'rgba(255,45,120,0.3)',
+      border: 'var(--color-accent-border)',
     },
   };
   return styles[level];

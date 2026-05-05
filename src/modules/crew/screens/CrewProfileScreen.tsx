@@ -280,7 +280,7 @@ export function CrewProfileScreen() {
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse 120% 100% at 60% 40%, rgba(255,45,120,0.18) 0%, rgba(0,240,255,0.08) 50%, transparent 80%), var(--color-bg-elevated)",
+                "radial-gradient(ellipse 120% 100% at 60% 40%, var(--theme-accent-vignette) 0%, rgba(0,240,255,0.08) 50%, transparent 80%), var(--color-bg-elevated)",
             }}
           />
         )}
@@ -351,7 +351,7 @@ export function CrewProfileScreen() {
                 type="button"
                 aria-label="Save cover photo"
                 onClick={media.cover.confirm}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
               >
                 <Check className="h-4 w-4" />
               </button>
@@ -470,7 +470,7 @@ export function CrewProfileScreen() {
                             e.stopPropagation();
                             void media.avatar.confirm();
                           }}
-                          className="absolute right-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
+                          className="absolute right-1.5 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-lg transition-colors hover:bg-[var(--color-accent-hover)]"
                         >
                           <Check className="h-3.5 w-3.5" />
                         </button>
@@ -573,7 +573,7 @@ export function CrewProfileScreen() {
                   id="profile-save-btn"
                   className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:opacity-40 ${
                     hasChanges
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]"
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] hover:bg-[var(--color-accent-hover)]"
                       : "border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
                   }`}
                 >

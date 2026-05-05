@@ -113,7 +113,7 @@ export function CrewNav({ session, profile }: NavProps) {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className="ml-2 inline-flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-white text-sm font-semibold shadow-[var(--glow-accent-sm)] hover:shadow-[var(--glow-accent)] hover:bg-[var(--color-accent-hover)] transition-all duration-150 no-underline"
+                  className="ml-2 inline-flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-accent-foreground)] text-sm font-semibold shadow-[var(--glow-accent-sm)] hover:shadow-[var(--glow-accent)] hover:bg-[var(--color-accent-hover)] transition-all duration-150 no-underline"
                 >
                   <Shield className="w-4 h-4" />
                   {item.label}
@@ -149,7 +149,7 @@ export function CrewNav({ session, profile }: NavProps) {
                 >
                   <Bell className="w-4.5 h-4.5" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[9px] font-bold text-white shadow-[var(--glow-accent-sm)]">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[9px] font-bold text-[var(--color-accent-foreground)] shadow-[var(--glow-accent-sm)]">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}

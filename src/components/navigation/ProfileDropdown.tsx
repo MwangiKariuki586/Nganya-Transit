@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { User, LogOut } from "lucide-react";
+import { MatwanaColorwayPicker } from "@/components/ui/MatwanaColorwayPicker";
 
 interface ProfileDropdownProps {
   profile: any;
@@ -28,10 +29,14 @@ export function ProfileDropdown({
 }: ProfileDropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click — but not when interacting with the colorway sheet
+  // portal (data-colorway-portal), which renders outside this component's DOM tree.
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // Ignore clicks inside any colorway portal (desktop dropdown or mobile sheet)
+      if ((target as Element).closest?.("[data-colorway-portal]")) return;
+      if (ref.current && !ref.current.contains(target)) {
         onClose();
       }
     }
@@ -56,7 +61,7 @@ export function ProfileDropdown({
   return (
     <div
       ref={ref}
-      className={`absolute ${positionClasses} z-50 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)] backdrop-blur-xl overflow-hidden`}
+      className={`absolute ${positionClasses} z-50 w-[280px] max-w-[calc(100vw-1rem)] rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-lg)] backdrop-blur-xl overflow-hidden`}
       role="menu"
       aria-label="Profile menu"
     >
@@ -69,6 +74,8 @@ export function ProfileDropdown({
           @{profile?.handle || "user"}
         </div>
       </div>
+
+      <MatwanaColorwayPicker variant="menu" />
 
       {/* Actions */}
       <div className="py-1">

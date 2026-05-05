@@ -265,7 +265,7 @@ function getMarkerNameChipStyle(kind: "nganya" | "stage"): CSSProperties {
     border:
       kind === "nganya"
         ? "1px solid rgba(57, 255, 20, 0.4)"
-        : "1px solid rgba(255, 45, 120, 0.55)",
+        : "1px solid var(--color-accent-border-strong)",
   };
 }
 
@@ -516,17 +516,17 @@ export function StageMarker({ name, size = 40 }: StageMarkerProps) {
 
       <TearDropPin
         size={size}
-        bgColor="#ff2d78"
-        ringColor="#ff2d78"
+        bgColor="var(--color-accent)"
+        ringColor="var(--color-accent)"
         ringWidth={0}
-        boxShadow="0 4px 16px rgba(255,45,120,0.6)"
+        boxShadow="0 4px 16px var(--color-accent-glow)"
       >
         {/* Map pin icon */}
         <svg
           width={size * 0.5}
           height={size * 0.5}
           viewBox="0 0 24 24"
-          fill="white"
+          fill="var(--color-accent-foreground)"
           aria-hidden="true"
         >
           <path d="M12 2C8.686 2 6 4.686 6 8c0 5 6 12 6 12s6-7 6-12c0-3.314-2.686-6-6-6zm0 8.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />

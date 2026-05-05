@@ -29,7 +29,7 @@ const statusConfig: Record<
   TOO_FAR: {
     dot: 'var(--color-accent)',
     pill: 'var(--color-accent-soft)',
-    border: 'rgba(255,45,120,0.3)',
+    border: 'var(--color-accent-border)',
   },
   STALE_UNCERTAIN: {
     dot: 'var(--color-text-tertiary)',

@@ -274,7 +274,7 @@ export default function NganyaDetailScreen() {
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse 120% 100% at 60% 40%, rgba(255,45,120,0.18) 0%, rgba(0,240,255,0.08) 50%, transparent 80%), var(--color-bg-elevated)",
+                "radial-gradient(ellipse 120% 100% at 60% 40%, var(--theme-accent-vignette) 0%, rgba(0,240,255,0.08) 50%, transparent 80%), var(--color-bg-elevated)",
             }}
           />
         )}
@@ -396,7 +396,7 @@ export default function NganyaDetailScreen() {
         </div>
 
         {/* ── Action buttons ──────────────────────────────────────────────── */}
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap justify-between">
           <Button
             variant={isFollowing ? "secondary" : "primary"}
             onClick={handleFollowToggle}
@@ -407,16 +407,7 @@ export default function NganyaDetailScreen() {
             />
             {isFollowing ? "Following" : "Follow"}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setIsNotifying(!isNotifying)}
-          >
-            <Bell
-              className="w-4 h-4"
-              fill={isNotifying ? "currentColor" : "none"}
-            />
-            {isNotifying ? "Notifying" : "Notify"}
-          </Button>
+
           <Link to="/spot" className="no-underline">
             <Button variant="secondary">
               <Camera className="w-4 h-4" />
@@ -431,40 +422,40 @@ export default function NganyaDetailScreen() {
         <section className="mt-8">
           <h2 className="text-h3 mb-4">Profile Details</h2>
           <div className="space-y-6">
-          <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Name
-            </label>
-            <p className="text-body text-[var(--color-text-primary)]">
-              {nganya.name}
-            </p>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+                Name
+              </label>
+              <p className="text-body text-[var(--color-text-primary)]">
+                {nganya.name}
+              </p>
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Corridor
-            </label>
-            <p className="text-body text-[var(--color-text-primary)]">
-              {corridorName}
-            </p>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+                Corridor
+              </label>
+              <p className="text-body text-[var(--color-text-primary)]">
+                {corridorName}
+              </p>
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
-              Bio
-            </label>
-            <p className="whitespace-pre-wrap text-body text-[var(--color-text-primary)]">
-              {nganya.bio ? (
-                nganya.bio
-              ) : (
-                <span className="text-[var(--color-text-tertiary)]">
-                  Operates on the {corridorName} corridor with{" "}
-                  {nganya.is_verified ? "verified" : "community"} status and a
-                  culture profile shaped by recent sightings.
-                </span>
-              )}
-            </p>
-          </div>
+            <div>
+              <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
+                Bio
+              </label>
+              <p className="whitespace-pre-wrap text-body text-[var(--color-text-primary)]">
+                {nganya.bio ? (
+                  nganya.bio
+                ) : (
+                  <span className="text-[var(--color-text-tertiary)]">
+                    Operates on the {corridorName} corridor with{" "}
+                    {nganya.is_verified ? "verified" : "community"} status and a
+                    culture profile shaped by recent sightings.
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
         </section>
 
@@ -567,7 +558,7 @@ export default function NganyaDetailScreen() {
                       isNewBuild: (relatedNganya.tags || []).includes(
                         "NEW_BUILD",
                       ),
-                      imageUrl: pickPrimaryNganyaImageUrl(relatedNganya) ?? '',
+                      imageUrl: pickPrimaryNganyaImageUrl(relatedNganya) ?? "",
                       description: "",
                     }}
                     variant="standard"

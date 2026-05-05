@@ -36,7 +36,7 @@ export function CrewActiveSessionBanner({
             <Link
               to="/crew/session/$id"
               params={{ id: session.id }}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-[18px] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white no-underline"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-[18px] bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent-foreground)] no-underline"
             >
               Resume session
             </Link>

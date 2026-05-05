@@ -15,7 +15,7 @@ interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<string, string> = {
   primary: [
-    "bg-[var(--color-accent)] text-white font-semibold",
+    "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-semibold",
     "shadow-[var(--glow-accent-sm)]",
     "hover:bg-[var(--color-accent-hover)] hover:shadow-[var(--glow-accent)]",
     "active:scale-95",

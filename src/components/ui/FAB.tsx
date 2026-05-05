@@ -15,7 +15,7 @@ export default function FAB({ className = '' }: FABProps) {
     return (
         <Link
             to="/spot"
-            className={`inline-flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-accent)] text-white shadow-[var(--glow-accent)] animate-glow-pulse transition-transform duration-150 active:scale-90 no-underline ${className}`}
+            className={`inline-flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-[var(--glow-accent)] animate-glow-pulse transition-transform duration-150 active:scale-90 no-underline ${className}`}
             aria-label="Spot a nganya"
         >
             <Camera className="w-6 h-6" />

@@ -188,7 +188,7 @@ export function CrewDashboardSidebar() {
 
               {/* Badge */}
               {item.badge !== null && item.badge > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-(--color-accent) px-1 text-[9px] font-bold text-white shadow-(--glow-accent-sm)">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-(--color-accent) px-1 text-[9px] font-bold text-(--color-accent-foreground) shadow-(--glow-accent-sm)">
                   {item.badge > 9 ? "9+" : item.badge}
                 </span>
               )}

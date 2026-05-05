@@ -370,7 +370,7 @@ export default function CrewRegistrationScreen({
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <Link
               to="/crew"
-              className="inline-flex min-h-[48px] items-center justify-center rounded-[18px] bg-[var(--color-accent)] px-5 text-sm font-semibold text-white no-underline shadow-[var(--glow-accent-sm)]"
+              className="inline-flex min-h-[48px] items-center justify-center rounded-[18px] bg-[var(--color-accent)] px-5 text-sm font-semibold text-[var(--color-accent-foreground)] no-underline shadow-[var(--glow-accent-sm)]"
             >
               Return to crew setup
             </Link>

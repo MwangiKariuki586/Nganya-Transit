@@ -261,7 +261,7 @@ function DiscoverScreen({
             <SlidersHorizontal className="w-4 h-4" />
             <span className="hidden sm:inline">Filters</span>
             {drawerActiveCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-[var(--color-accent)] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-accent)] text-[10px] font-bold leading-none text-[var(--color-accent-foreground)]">
                 {drawerActiveCount}
               </span>
             )}

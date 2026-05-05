@@ -81,7 +81,7 @@ export function CrewMobileStickyBar({
             variant="primary"
             className={`min-h-[48px] w-full rounded-[18px] px-4 text-sm font-semibold transition-all disabled:bg-[rgba(109,25,61,0.85)] disabled:text-[var(--color-text-secondary)] disabled:shadow-none ${
               startIsActive
-                ? "ring-1 ring-[var(--color-accent)]/35 shadow-[0_16px_42px_rgba(255,45,120,0.16)]"
+                ? "ring-1 ring-[var(--color-accent)]/35 shadow-[0_16px_42px_var(--theme-accent-vignette)]"
                 : ""
             }`}
             isLoading={isStarting}

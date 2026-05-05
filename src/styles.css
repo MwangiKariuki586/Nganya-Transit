@@ -41,10 +41,29 @@
   --glass-border-hover: rgba(255, 255, 255, 0.14);
 
   /* Accent — Primary: Neon Magenta */
-  --color-accent: #FF2D78;
-  --color-accent-soft: rgba(255, 45, 120, 0.15);
-  --color-accent-glow: rgba(255, 45, 120, 0.35);
-  --color-accent-hover: #FF4D8E;
+  --theme-accent: #FF2D78;
+  --theme-accent-rgb: 255 45 120;
+  --theme-accent-soft: rgba(255, 45, 120, 0.15);
+  --theme-accent-glow: rgba(255, 45, 120, 0.35);
+  --theme-accent-hover: #FF4D8E;
+  --theme-accent-foreground: #FFFFFF;
+  --theme-accent-border: rgba(255, 45, 120, 0.3);
+  --theme-accent-border-strong: rgba(255, 45, 120, 0.5);
+  --theme-accent-subtle: rgba(255, 45, 120, 0.1);
+  --theme-accent-vignette: rgba(255, 45, 120, 0.18);
+  --theme-accent-aura: rgba(255, 45, 120, 0.1);
+  --theme-accent-shadow-soft: rgba(255, 45, 120, 0.25);
+  --theme-accent-shadow-strong: rgba(255, 45, 120, 0.45);
+
+  --color-accent: var(--theme-accent);
+  --color-accent-rgb: var(--theme-accent-rgb);
+  --color-accent-soft: var(--theme-accent-soft);
+  --color-accent-glow: var(--theme-accent-glow);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-accent-foreground: var(--theme-accent-foreground);
+  --color-accent-border: var(--theme-accent-border);
+  --color-accent-border-strong: var(--theme-accent-border-strong);
+  --color-accent-subtle: var(--theme-accent-subtle);
 
   /* Accent — Secondary: Cyan */
   --color-cyan: #00F0FF;
@@ -105,10 +124,10 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
 
-  --glow-accent: 0 0 20px var(--color-accent-glow), 0 0 60px rgba(255, 45, 120, 0.1);
+  --glow-accent: 0 0 20px var(--color-accent-glow), 0 0 60px var(--theme-accent-aura);
   --glow-accent-sm: 0 0 10px var(--color-accent-glow);
   --glow-cyan: 0 0 20px var(--color-cyan-glow), 0 0 60px rgba(0, 240, 255, 0.08);
-  --glow-live: 0 0 12px rgba(255, 45, 120, 0.5), 0 0 40px rgba(255, 45, 120, 0.15);
+  --glow-live: 0 0 12px var(--color-accent-border-strong), 0 0 40px var(--color-accent-soft);
 
   /* ─── BLUR LEVELS ─────────────────────────────────────── */
   --blur-sm: blur(4px);
@@ -186,7 +205,7 @@ body::before {
   pointer-events: none;
   z-index: -2;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 45, 120, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 0%, var(--theme-accent-vignette) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at 100% 0%, rgba(0, 240, 255, 0.04) 0%, transparent 50%),
     radial-gradient(ellipse 100% 100% at 50% 100%, rgba(0, 0, 0, 0.8) 0%, transparent 60%);
 }
@@ -277,7 +296,7 @@ body::after {
   justify-content: center;
   min-height: 44px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 45, 120, 0.20);
+  border: 1px solid var(--color-accent-border);
   background: var(--glass-bg);
   color: var(--color-text-primary);
   font-size: 0.875rem;
@@ -289,15 +308,15 @@ body::after {
 }
 
 .btn-option:hover:not(:disabled):not(.btn-option-selected) {
-  border-color: rgba(255, 45, 120, 0.35);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 0 22px -10px rgba(255, 45, 120, 0.25);
+  border-color: var(--color-accent-border-strong);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 0 22px -10px var(--theme-accent-shadow-soft);
 }
 
 .btn-option-selected {
-  border-color: rgba(255, 45, 120, 0.50);
+  border-color: var(--color-accent-border-strong);
   background: var(--glass-bg);
   color: #fff;
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 0 22px -10px rgba(255, 45, 120, 0.45);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 0 22px -10px var(--theme-accent-shadow-strong);
 }
 
 .btn-option:disabled {
@@ -347,7 +366,7 @@ body::after {
 
 /* ─── SELECTION ───────────────────────────────────────── */
 ::selection {
-  background: rgba(255, 45, 120, 0.3);
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
   color: var(--color-text-primary);
 }
 

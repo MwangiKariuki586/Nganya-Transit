@@ -85,7 +85,7 @@ export default function CrewHomeScreen() {
 
       {/* Active session banner */}
       {isLive && activeSession && (
-        <div className="rounded-[24px] border border-[var(--color-accent)]/30 bg-[var(--color-accent-soft)] p-5 shadow-[0_8px_32px_rgba(255,45,120,0.12)]">
+        <div className="rounded-[24px] border border-[var(--color-accent)]/30 bg-[var(--color-accent-soft)] p-5 shadow-[0_8px_32px_var(--theme-accent-subtle)]">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] shadow-[var(--glow-accent-sm)]">
@@ -102,7 +102,7 @@ export default function CrewHomeScreen() {
             <Link
               to="/crew/session/$id"
               params={{ id: activeSession.id }}
-              className="inline-flex items-center gap-1.5 rounded-[14px] bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white no-underline shadow-[var(--glow-accent-sm)] hover:bg-[var(--color-accent-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-[14px] bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-accent-foreground)] no-underline shadow-[var(--glow-accent-sm)] hover:bg-[var(--color-accent-hover)] transition-colors"
             >
               Resume <ArrowRight className="h-4 w-4" />
             </Link>

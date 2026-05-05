@@ -575,7 +575,7 @@ export default function LiveCorridorMap({
                     <span
                       className={
                         highlightNganyaId === pin.nganya_id
-                          ? "block scale-110 drop-shadow-[0_0_14px_rgba(255,45,120,0.85)]"
+                          ? "block scale-110 drop-shadow-[0_0_14px_var(--color-accent)]"
                           : "block"
                       }
                     >

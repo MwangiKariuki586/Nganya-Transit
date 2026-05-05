@@ -174,7 +174,7 @@ function StandardCard({
           disabled={isMutating}
           className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-150 cursor-pointer ${
             isFollowing
-              ? "bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]"
+              ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-[var(--glow-accent-sm)]"
               : "bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70"
           } ${isMutating ? "opacity-70 cursor-wait" : ""}`}
           aria-label={isFollowing ? "Unfollow" : "Follow"}
@@ -384,7 +384,7 @@ function FeatureCard({ nganya, isFollowing, onFollow, className }: CardProps) {
         }}
         className={`absolute top-4 right-4 p-2.5 rounded-full transition-all duration-150 cursor-pointer ${
           isFollowing
-            ? "bg-[var(--color-accent)] text-white shadow-[var(--glow-accent-sm)]"
+            ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-[var(--glow-accent-sm)]"
             : "bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70"
         }`}
         aria-label={isFollowing ? "Unfollow" : "Follow"}

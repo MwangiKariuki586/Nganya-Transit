@@ -25,7 +25,7 @@ export const SpotlightCard = forwardRef<HTMLDivElement, SpotlightCardProps>(
     }, []);
 
     const spotlightClasses = isActive
-      ? "relative border-[var(--color-accent)]/55 shadow-[0_16px_42px_rgba(255,45,120,0.10),0_0_0_1px_rgba(255,45,120,0.20)]"
+      ? "relative border-[var(--color-accent)]/55 shadow-[0_16px_42px_var(--theme-accent-subtle),0_0_0_1px_var(--color-accent-border)]"
       : "border-white/[0.08]";
 
     return (

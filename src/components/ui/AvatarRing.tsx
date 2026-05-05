@@ -44,28 +44,28 @@ export function computeCompleteness(fields: {
 const STROKE_COLOR: Record<CompletionStatus, string> = {
   low: "#5A5A6E", // muted
   mid: "#00F0FF", // cyan
-  high: "#FF2D78", // accent
+  high: "var(--color-accent)", // accent
   complete: "#39FF14", // green
 };
 
 const PILL_BG: Record<CompletionStatus, string> = {
   low: "rgba(90,90,110,0.85)",
   mid: "rgba(0,240,255,0.15)",
-  high: "rgba(255,45,120,0.15)",
+  high: "var(--color-accent-soft)",
   complete: "rgba(57,255,20,0.15)",
 };
 
 const PILL_TEXT: Record<CompletionStatus, string> = {
   low: "#8B8B9E",
   mid: "#00F0FF",
-  high: "#FF2D78",
+  high: "var(--color-accent)",
   complete: "#39FF14",
 };
 
 const PILL_BORDER: Record<CompletionStatus, string> = {
   low: "rgba(90,90,110,0.4)",
   mid: "rgba(0,240,255,0.35)",
-  high: "rgba(255,45,120,0.35)",
+  high: "var(--color-accent-border)",
   complete: "rgba(57,255,20,0.35)",
 };
 
@@ -202,7 +202,7 @@ export default function AvatarRing({
             status === "complete"
               ? "0 0 8px rgba(57,255,20,0.3)"
               : status === "high"
-                ? "0 0 8px rgba(255,45,120,0.25)"
+                ? "0 0 8px var(--theme-accent-shadow-soft)"
                 : "none",
           zIndex: 10,
           position: "relative",
