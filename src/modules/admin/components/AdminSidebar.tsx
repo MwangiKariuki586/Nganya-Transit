@@ -2,10 +2,9 @@ import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { adminNavItems } from "@/modules/admin/components/admin-nav-items";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface AdminSidebarProps {
@@ -14,18 +13,12 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ session, profile }: AdminSidebarProps) {
-  const navigate = useNavigate();
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    navigate({ to: "/signin", search: {} });
-  };
+  const handleSignOut = useSignOut({ redirectTo: "/signin" });
 
   return (
     <aside className="hidden lg:flex lg:w-[280px] lg:flex-col lg:border-r lg:border-[var(--glass-border)] lg:bg-[rgba(12,12,18,0.9)] lg:backdrop-blur-xl">
@@ -85,7 +78,7 @@ export function AdminSidebar({ session, profile }: AdminSidebarProps) {
                 />
               ) : (
                 <span className="text-xs font-bold text-[var(--color-text-tertiary)]">
-                  {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
+                  {getAvatarInitials(profile?.handle, "AD")}
                 </span>
               )}
             </button>

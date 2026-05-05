@@ -13,6 +13,7 @@ import {
   deleteGalleryItemServerFn,
 } from "@/shared/server-fns/profile-gallery";
 import MediaLightbox from "@/components/ui/MediaLightbox";
+import { UploadProgressBar } from "@/components/ui/UploadProgressBar";
 import { ImagePlus, Trash2, Play, Check, X } from "lucide-react";
 
 const GALLERY_LIMIT = 30;
@@ -255,14 +256,7 @@ export function ProfileGallery({ userId }: ProfileGalleryProps) {
   return (
     <section className="mt-8 space-y-4">
       {/* Upload progress bar */}
-      {isUploading && (
-        <div className="fixed left-0 right-0 top-0 z-[var(--z-nav)] h-0.5 bg-black/20 md:top-[var(--top-nav-height)]">
-          <div
-            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
-            style={{ width: `${uploadProgress}%` }}
-          />
-        </div>
-      )}
+      <UploadProgressBar isUploading={isUploading} progress={uploadProgress} />
 
       {/* Header */}
       {!isLoading && (

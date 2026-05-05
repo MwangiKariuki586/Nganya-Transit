@@ -6,16 +6,10 @@
 
 import { useState } from "react";
 import { Home, Search, Camera, Zap } from "lucide-react";
-import {
-  Link,
-  useMatches,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
-import { supabase } from "@/lib/supabase";
+import { Link, useMatches } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
@@ -32,27 +26,18 @@ const navItems = [
 
 export default function TopNav({ session, profile }: NavProps) {
   const matches = useMatches();
-  const navigate = useNavigate();
-  const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/";
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    await router.invalidate();
-    navigate({
-      to: "/",
-      search: {
-        q: undefined,
-        corridor: undefined,
-        vibe: undefined,
-        recent: undefined,
-      },
-      replace: true,
-    });
-  };
+  const handleSignOut = useSignOut({
+    redirectTo: "/",
+    clearSearch: {
+      q: undefined,
+      corridor: undefined,
+      vibe: undefined,
+      recent: undefined,
+    },
+  });
 
   return (
     <header
@@ -122,7 +107,7 @@ export default function TopNav({ session, profile }: NavProps) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
-                      {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
+                      {getAvatarInitials(profile?.handle)}
                     </div>
                   )}
                 </button>

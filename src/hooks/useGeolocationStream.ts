@@ -11,24 +11,21 @@
  *
  * This is NOT the crew useGeolocation hook. The crew version has start/stop
  * semantics for session management; this one is always-on while the overlay is open.
+ *
+ * Shared utilities (parsePosition, watchPermission, GeoPermission) live in
+ * src/lib/geolocation.ts to avoid duplication with the crew hook.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { parsePosition, watchPermission } from '@/lib/geolocation'
+import type { GeoPermission, GeoCoords } from '@/lib/geolocation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type GeoPermission = 'prompt' | 'granted' | 'denied' | 'unsupported'
+export type { GeoPermission }
 
-export interface StreamCoords {
-  lat: number
-  lng: number
-  /** Accuracy radius in metres. null if device doesn't report it. */
-  accuracy: number | null
-  /** Direction of travel in degrees [0-360). null if not moving or unavailable. */
-  heading: number | null
-  /** Speed in m/s. null if unavailable. */
-  speed: number | null
-}
+/** Fan-facing coords alias — same shape as GeoCoords, re-exported for consumers. */
+export type StreamCoords = GeoCoords
 
 export interface UseGeolocationStreamReturn {
   coords: StreamCoords | null
@@ -75,13 +72,7 @@ export function useGeolocationStream(): UseGeolocationStreamReturn {
       (pos) => {
         setPermissionStatus('granted')
         setError(null)
-        setCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
-          heading: Number.isFinite(pos.coords.heading ?? NaN) ? pos.coords.heading : null,
-          speed: Number.isFinite(pos.coords.speed ?? NaN) ? pos.coords.speed : null,
-        })
+        setCoords(parsePosition(pos))
       },
       (err) => {
         switch (err.code) {
@@ -106,54 +97,12 @@ export function useGeolocationStream(): UseGeolocationStreamReturn {
 
   // Check existing permission and auto-start if already granted
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setPermissionStatus('unsupported')
-      return
-    }
-
-    if (!navigator.permissions?.query) {
-      // Browser doesn't support permissions API — defer until requestPermission is called
-      return
-    }
-
-    let active = true
-
-    navigator.permissions
-      .query({ name: 'geolocation' as PermissionName })
-      .then((status) => {
-        if (!active) return
-
-        const mapped: GeoPermission =
-          status.state === 'granted'
-            ? 'granted'
-            : status.state === 'denied'
-              ? 'denied'
-              : 'prompt'
-
-        setPermissionStatus(mapped)
-        if (mapped === 'granted') startWatch()
-
-        // React to permission changes in-session
-        status.onchange = () => {
-          const updated: GeoPermission =
-            status.state === 'granted'
-              ? 'granted'
-              : status.state === 'denied'
-                ? 'denied'
-                : 'prompt'
-          setPermissionStatus(updated)
-          if (updated === 'granted') startWatch()
-          if (updated === 'denied') stopWatch()
-        }
-      })
-      .catch(() => {
-        // Permissions API failed — leave at 'prompt', user must trigger manually
-        setPermissionStatus('prompt')
-      })
-
-    return () => {
-      active = false
-    }
+    const cleanup = watchPermission((status) => {
+      setPermissionStatus(status)
+      if (status === 'granted') startWatch()
+      if (status === 'denied') stopWatch()
+    })
+    return cleanup
   }, [startWatch, stopWatch])
 
   // Cleanup watch on unmount

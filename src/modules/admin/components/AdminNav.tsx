@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { supabase } from "@/lib/supabase";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import type { Session } from "@supabase/supabase-js";
 import { getAdminNavLabel } from "@/modules/admin/components/admin-nav-items";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
@@ -14,19 +13,13 @@ interface NavProps {
 }
 
 export function AdminNav({ session, profile }: NavProps) {
-  const navigate = useNavigate();
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
   const activeLabel = getAdminNavLabel(currentPath);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    navigate({ to: "/signin", search: {} });
-  };
+  const handleSignOut = useSignOut({ redirectTo: "/signin" });
 
   return (
     <header className="sticky top-0 z-[var(--z-nav)]" role="banner">
@@ -75,7 +68,7 @@ export function AdminNav({ session, profile }: NavProps) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)]">
-                      {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
+                      {getAvatarInitials(profile?.handle, "AD")}
                     </div>
                   )}
                 </button>

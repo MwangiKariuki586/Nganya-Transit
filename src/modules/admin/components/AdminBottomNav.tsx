@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
 import { adminNavItems } from "@/modules/admin/components/admin-nav-items";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
@@ -24,12 +23,7 @@ export default function AdminBottomNav({ session, profile }: NavProps) {
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    window.location.href = "/signin";
-  };
+  const handleSignOut = useSignOut({ redirectTo: "/signin" });
 
   return (
     <nav
@@ -78,7 +72,7 @@ export default function AdminBottomNav({ session, profile }: NavProps) {
                 />
               ) : (
                 <div className="w-full h-full bg-[var(--glass-bg)] flex items-center justify-center text-[8px] font-bold">
-                  {profile?.handle?.substring(0, 2).toUpperCase() || "AD"}
+                  {getAvatarInitials(profile?.handle, "AD")}
                 </div>
               )}
             </div>

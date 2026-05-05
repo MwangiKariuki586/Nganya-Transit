@@ -32,6 +32,7 @@ import { updateCurrentUserProfile } from "@/lib/queries/profile";
 import { useToast } from "@/components/ui/ToastContainer";
 import { useProfileMediaUpload } from "@/hooks/useProfileMediaUpload";
 import InlineSpinner from "@/components/ui/InlineSpinner";
+import { UploadProgressBar } from "@/components/ui/UploadProgressBar";
 import type { ProfileRouteData } from "@/modules/fan/services/route-data";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 
@@ -211,14 +212,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
   return (
     <div className="pb-10 md:pb-16">
       {/* Progress bar */}
-      {media.isUploading && (
-        <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
-          <div
-            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
-            style={{ width: `${media.uploadProgress}%` }}
-          />
-        </div>
-      )}
+      <UploadProgressBar
+        isUploading={media.isUploading}
+        progress={media.uploadProgress}
+      />
 
       {/* ── Cover ────────────────────────────────────────────────────────── */}
       <div

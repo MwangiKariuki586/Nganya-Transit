@@ -24,6 +24,7 @@ import { Link, useMatches } from "@tanstack/react-router";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { useCrewNotificationCount } from "@/modules/crew/hooks/useCrewNotificationCount";
 import { useAuthSession } from "@/hooks/useAuthSession";
+import { getAvatarInitials } from "@/lib/formatters";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export function CrewDashboardSidebar() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-(--color-text-tertiary)">
-                  {profile?.handle?.substring(0, 2).toUpperCase() ?? "CR"}
+                  {getAvatarInitials(profile?.handle, "CR")}
                 </div>
               )}
             </div>

@@ -69,6 +69,23 @@ export function getInitials(name: string | null | undefined, fallback: string = 
 }
 
 /**
+ * Returns a 2-character uppercase initials string from a handle or name.
+ * Used for avatar fallbacks across nav components and profile screens.
+ *
+ * @param value  - handle or display name (with or without leading @)
+ * @param fallback - returned when value is empty (default: "??")
+ */
+export function getAvatarInitials(
+  value: string | null | undefined,
+  fallback: string = '??',
+): string {
+  if (!value) return fallback
+  const cleaned = value.replace(/^@+/, '').trim()
+  if (!cleaned) return fallback
+  return cleaned.substring(0, 2).toUpperCase()
+}
+
+/**
  * Unified direction display label for TO_TOWN / FROM_TOWN values
  * and freeform strings containing "town" or "terminal".
  */

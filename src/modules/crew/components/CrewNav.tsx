@@ -1,16 +1,9 @@
 import { useMemo, useState } from "react";
 import { Radio, History, Shield, Bell } from "lucide-react";
-import {
-  Link,
-  useMatches,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { Link, useMatches } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
-import { useAuthStore } from "@/stores/useAuthStore";
 import { useCrewNotificationCount } from "@/modules/crew/hooks/useCrewNotificationCount";
 import { stopCrewSessionServerFn } from "@/shared/server-fns/crew-live";
 import {
@@ -18,6 +11,8 @@ import {
   clearSessionState,
 } from "@/modules/crew/lib/session-storage";
 import type { Session } from "@supabase/supabase-js";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 
 interface NavProps {
@@ -27,13 +22,13 @@ interface NavProps {
 
 export function CrewNav({ session, profile }: NavProps) {
   const matches = useMatches();
-  const navigate = useNavigate();
-  const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/crew/live";
   const { snapshot } = useCrewBootstrap();
   const crewState = getCrewStatusState(snapshot);
   const unreadCount = useCrewNotificationCount();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const baseSignOut = useSignOut({ redirectTo: "/signin" });
 
   const showRegisterEntry =
     crewState === "UNREGISTERED" ||
@@ -76,11 +71,8 @@ export function CrewNav({ session, profile }: NavProps) {
       clearSessionState();
     }
 
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    await router.invalidate();
-    navigate({ to: "/signin", replace: true });
+    // Delegate the rest of the sign-out flow to the shared hook.
+    await baseSignOut();
   };
 
   return (
@@ -181,7 +173,7 @@ export function CrewNav({ session, profile }: NavProps) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[var(--color-text-tertiary)] bg-gradient-to-br from-[var(--glass-bg)] to-transparent">
-                        {profile?.handle?.substring(0, 2).toUpperCase() || "??"}
+                        {getAvatarInitials(profile?.handle)}
                       </div>
                     )}
                   </button>

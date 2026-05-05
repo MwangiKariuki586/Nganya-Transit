@@ -12,7 +12,9 @@ import { crewLiveService } from "@/features/crew-live/services/crew-live-service
 import InlineSpinner from "@/components/ui/InlineSpinner";
 import AvatarRing, { computeCompleteness } from "@/components/ui/AvatarRing";
 import MediaLightbox from "@/components/ui/MediaLightbox";
+import { UploadProgressBar } from "@/components/ui/UploadProgressBar";
 import { ProfileGallery } from "@/modules/crew/components/ProfileGallery";
+import { getAvatarInitials } from "@/lib/formatters";
 import { User, Check, ChevronLeft, ImagePlus, Pencil, X } from "lucide-react";
 
 export function CrewProfileScreen() {
@@ -244,14 +246,10 @@ export function CrewProfileScreen() {
 
   return (
     <div className="pb-10 md:pb-16">
-      {media.isUploading && (
-        <div className="fixed left-0 right-0 z-[var(--z-nav)] h-0.5 bg-black/20 top-0 md:top-[var(--top-nav-height)]">
-          <div
-            className="h-full bg-[var(--color-accent)] transition-[width] duration-150 ease-out"
-            style={{ width: `${media.uploadProgress}%` }}
-          />
-        </div>
-      )}
+      <UploadProgressBar
+        isUploading={media.isUploading}
+        progress={media.uploadProgress}
+      />
 
       {/* ── Cover photo ─────────────────────────────────────────────────── */}
       <div
@@ -425,8 +423,7 @@ export function CrewProfileScreen() {
                       </>
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xl font-bold text-[var(--color-text-primary)]">
-                        {displayData.handle?.substring(0, 2).toUpperCase() ||
-                          "??"}
+                        {getAvatarInitials(displayData.handle)}
                       </div>
                     )}
                     {

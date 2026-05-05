@@ -1,21 +1,9 @@
-/**
- * CrewBottomNav — Mobile-only bottom navigation for the Crew module.
- *
- * Tab order: Live · History/Register · Alerts · Profile(avatar)
- */
-
 import { useState } from "react";
 import { Radio, History, Shield, Bell, LogIn } from "lucide-react";
-import {
-  Link,
-  useMatches,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { Link, useMatches } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
-import { clearAuthSessionCookie } from "@/shared/auth/session-cookie";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getAvatarInitials } from "@/lib/formatters";
 import { ProfileDropdown } from "@/components/navigation/ProfileDropdown";
 import { useCrewBootstrap } from "@/modules/crew/context/CrewBootstrapContext";
 import { getCrewStatusState } from "@/modules/crew/services/route-access";
@@ -28,36 +16,27 @@ interface NavProps {
 
 export default function CrewBottomNav({ session, profile }: NavProps) {
   const matches = useMatches();
-  const navigate = useNavigate();
-  const router = useRouter();
   const currentPath = matches[matches.length - 1]?.fullPath ?? "/crew/live";
   const { snapshot } = useCrewBootstrap();
   const crewState = getCrewStatusState(snapshot);
   const unreadCount = useCrewNotificationCount();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  const handleSignOut = useSignOut({
+    redirectTo: "/",
+    clearSearch: {
+      q: undefined,
+      corridor: undefined,
+      vibe: undefined,
+      recent: undefined,
+    },
+  });
+
   const showRegisterEntry =
     crewState === "UNREGISTERED" ||
     crewState === "PENDING_APPROVAL" ||
     crewState === "NEEDS_INFO" ||
     crewState === "REJECTED";
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    clearAuthSessionCookie();
-    useAuthStore.getState().invalidateRole();
-    await router.invalidate();
-    navigate({
-      to: "/",
-      search: {
-        q: undefined,
-        corridor: undefined,
-        vibe: undefined,
-        recent: undefined,
-      },
-      replace: true,
-    });
-  };
 
   const primaryTabs = [
     {
@@ -160,7 +139,7 @@ export default function CrewBottomNav({ session, profile }: NavProps) {
                     />
                   ) : (
                     <div className="w-full h-full bg-[var(--glass-bg)] flex items-center justify-center text-[9px] font-bold">
-                      {profile?.handle?.substring(0, 2).toUpperCase() || "U"}
+                      {getAvatarInitials(profile?.handle, "U")}
                     </div>
                   )}
                 </div>

@@ -21,7 +21,9 @@ export function CrewRouteFrame({
     <CrewBootstrapProvider initialSnapshot={initialSnapshot}>
       <div className="flex min-h-screen flex-col bg-[var(--color-bg-base)]">
         <CrewNav session={session} profile={profile} />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
         <CrewFooter />
         <CrewBottomNav session={session} profile={profile} />
       </div>
