@@ -641,7 +641,6 @@ export default function HomeScreen({
         <h1 className="text-h1">Plan fast, catch faster</h1>
         <p className="text-body text-[var(--color-text-secondary)] max-w-2xl">
           Choose terminal route, pickup stage, and optionally your nganya.
-          Everything below syncs to your selected route.
         </p>
       </section>
 
