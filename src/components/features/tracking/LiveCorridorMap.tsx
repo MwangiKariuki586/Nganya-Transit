@@ -454,6 +454,12 @@ export default function LiveCorridorMap({
   // True when the map has pins but none are live or estimated
   const onlyStaleAvailable =
     visiblePins.length > 0 && liveCount === 0 && estimatedCount === 0;
+  const hasRouteEta =
+    !!routeEtaSeconds &&
+    Number.isFinite(routeEtaSeconds) &&
+    routeSignalType !== "STALE" &&
+    routeSignalType !== "EXPIRED" &&
+    !onlyStaleAvailable;
 
   return (
     <div
@@ -658,14 +664,12 @@ export default function LiveCorridorMap({
             </div>
           </div>
         )}
-        {routeEtaSeconds && Number.isFinite(routeEtaSeconds) ? (
+        {hasRouteEta ? (
           <div className="pointer-events-none absolute left-3 top-3 z-[6] rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm flex items-center gap-2">
             <span>
-              {routeSignalType === "STALE"
-                ? `~${Math.max(1, Math.round(routeEtaSeconds / 60))} min old estimate`
-                : routeSignalType === "ESTIMATED"
-                  ? `~${Math.max(1, Math.round(routeEtaSeconds / 60))} min estimate`
-                  : `ETA ${Math.max(1, Math.round(routeEtaSeconds / 60))} min`}
+              {routeSignalType === "ESTIMATED"
+                ? `~${Math.max(1, Math.round(routeEtaSeconds / 60))} min estimate`
+                : `ETA ${Math.max(1, Math.round(routeEtaSeconds / 60))} min`}
             </span>
             {routeDistanceMeters && Number.isFinite(routeDistanceMeters) ? (
               <>

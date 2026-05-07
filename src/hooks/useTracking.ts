@@ -33,15 +33,15 @@ import {
 import {
   getTrackingSignalState,
 } from '@/lib/tracking-signal'
+import { computeCatchability as computeSharedCatchability } from '@/lib/tracking-catchability'
 import {
   TRACKING_THRESHOLDS,
   type TrackingPayload,
   type TrackingPosition,
   type TrackingSignalType,
-  type CatchabilityResult,
   type FeedbackState,
 } from '@/lib/types/tracking'
-import type { ConfidenceLevel, JourneyResult } from '@/lib/types/journey'
+import type { JourneyResult } from '@/lib/types/journey'
 import {
   useCorridorLiveBroadcast,
   type LiveLocationBroadcastPayload,
@@ -409,7 +409,7 @@ export function useTracking({
   // ── Catchability ───────────────────────────────────────────────────────────
   const catchability = useMemo(
     () =>
-      computeCatchability({
+      computeSharedCatchability({
         etaMinutes,
         walkTimeMinutes,
         signalType,

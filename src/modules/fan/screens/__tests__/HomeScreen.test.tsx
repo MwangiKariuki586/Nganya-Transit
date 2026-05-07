@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomeScreen from "@/modules/fan/screens/HomeScreen";
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
@@ -14,6 +14,9 @@ const {
   mockFetchStagePosition,
   mockFetchNganyaPosition,
   mockFetchOsrmRoute,
+  mockSupabaseChannel,
+  mockSupabaseRemoveChannel,
+  mockScrollIntoView,
   cardRenderLog,
 } = vi.hoisted(() => ({
   mockRouterNavigate: vi.fn(),
@@ -26,6 +29,9 @@ const {
   mockFetchStagePosition: vi.fn(),
   mockFetchNganyaPosition: vi.fn(),
   mockFetchOsrmRoute: vi.fn(),
+  mockSupabaseChannel: vi.fn(),
+  mockSupabaseRemoveChannel: vi.fn(),
+  mockScrollIntoView: vi.fn(),
   cardRenderLog: [] as Array<Record<string, unknown>>,
 }));
 
@@ -153,6 +159,13 @@ vi.mock("@/lib/queries/tracking", () => ({
 
 vi.mock("@/lib/osrm", () => ({
   fetchOsrmRoute: mockFetchOsrmRoute,
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    channel: mockSupabaseChannel,
+    removeChannel: mockSupabaseRemoveChannel,
+  },
 }));
 
 vi.mock("@/lib/queries/follows", () => ({
@@ -358,6 +371,9 @@ describe("HomeScreen", () => {
     mockFetchStagePosition.mockReset();
     mockFetchNganyaPosition.mockReset();
     mockFetchOsrmRoute.mockReset();
+    mockSupabaseChannel.mockReset();
+    mockSupabaseRemoveChannel.mockReset();
+    mockScrollIntoView.mockReset();
     mockSearchNganyaJourney.mockResolvedValue([]);
     mockFetchStagePosition.mockResolvedValue({ lat: -1.2, lng: 36.9 });
     mockFetchNganyaPosition.mockResolvedValue({ lat: -1.25, lng: 36.95 });
@@ -369,6 +385,23 @@ describe("HomeScreen", () => {
       durationSeconds: 240,
       distanceMeters: 3500,
     });
+    mockSupabaseChannel.mockImplementation(() => {
+      const chain = {
+        on: vi.fn(() => chain),
+        subscribe: vi.fn(() => chain),
+      };
+      return chain;
+    });
+    if (!window.HTMLElement.prototype.scrollIntoView) {
+      Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        writable: true,
+        value: vi.fn(),
+      });
+    }
+    vi
+      .spyOn(window.HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(mockScrollIntoView);
     vi.stubGlobal("scrollTo", vi.fn());
   });
 
@@ -512,6 +545,239 @@ describe("HomeScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("planner-route:none")).toBeTruthy();
       expect(screen.getByText("map-corridor:corridor-1")).toBeTruthy();
+    });
+  });
+
+  it("smooth scrolls to the ride watch section when find my ride is submitted", async () => {
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+    mockSearchNganyaJourney.mockResolvedValue([
+      {
+        nganya_id: "nganya-1",
+        nganya_name: "Matwana Express",
+        corridor_id: "corridor-1",
+        corridor_name: "Thika Road",
+        tags: ["NEW_BUILD"],
+        eta_minutes: 6,
+        confidence_level: "HIGH",
+        source: "LIVE",
+        last_seen_at: "2026-05-01T11:59:40.000Z",
+      },
+    ]);
+
+    renderHome({ activeCorridor: "corridor-1" });
+
+    expect(
+      screen.getByText("Ride watch").closest("section")?.getAttribute("style"),
+    ).toContain("scroll-margin-top: calc(var(--top-nav-height) + 16px)");
+
+    fireEvent.click(screen.getByText("planner-search"));
+
+    await waitFor(() => {
+      expect(mockScrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  });
+
+  it("shows the connected ride-watch panel and lets the user watch a recommended ride on the existing map", async () => {
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+    mockSearchNganyaJourney.mockResolvedValue([
+      {
+        nganya_id: "nganya-1",
+        nganya_name: "Matwana Express",
+        corridor_id: "corridor-1",
+        corridor_name: "Thika Road",
+        tags: ["NEW_BUILD"],
+        eta_minutes: 6,
+        confidence_level: "HIGH",
+        source: "LIVE",
+        last_seen_at: "2026-05-01T11:59:40.000Z",
+      },
+      {
+        nganya_id: "nganya-3",
+        nganya_name: "CBD Runner",
+        corridor_id: "corridor-1",
+        corridor_name: "Thika Road",
+        tags: [],
+        eta_minutes: 8,
+        confidence_level: "MEDIUM",
+        source: "SIGHTING",
+        last_seen_at: "2026-05-01T11:57:00.000Z",
+      },
+    ]);
+
+    renderHome({ activeCorridor: "corridor-1" });
+
+    await waitFor(() => {
+      expect(screen.getByText("Ride watch")).toBeTruthy();
+      expect(screen.getByText("Best ride now")).toBeTruthy();
+      expect(screen.getAllByText("Matwana Express").length).toBeGreaterThan(0);
+      expect(screen.getByText("Backup rides")).toBeTruthy();
+    });
+
+    expect(screen.getByText("map-corridor:corridor-1").closest("section")?.getAttribute("style")).toContain(
+      "scroll-margin-top: calc(var(--top-nav-height) + 16px)",
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Watch on map" })[0]);
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith(
+        "Watching Matwana Express for your pickup.",
+        "info",
+      );
+      expect(mockScrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      });
+      expect(screen.getByText("Watched ride")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Refresh on map" })).toBeTruthy();
+      expect(screen.getByText("route-line:2")).toBeTruthy();
+      expect(screen.getByText("route-eta:240")).toBeTruthy();
+      expect(screen.getByText("route-distance:3500")).toBeTruthy();
+    });
+  });
+
+  it("prompts the user to switch or keep watching when the watched ride turns risky", async () => {
+    vi.useRealTimers();
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+    mockSearchNganyaJourney
+      .mockResolvedValueOnce([
+        {
+          nganya_id: "nganya-1",
+          nganya_name: "Matwana Express",
+          corridor_id: "corridor-1",
+          corridor_name: "Thika Road",
+          tags: ["NEW_BUILD"],
+          eta_minutes: 6,
+          confidence_level: "HIGH",
+          source: "LIVE",
+          last_seen_at: "2026-05-01T11:59:40.000Z",
+        },
+        {
+          nganya_id: "nganya-3",
+          nganya_name: "CBD Runner",
+          corridor_id: "corridor-1",
+          corridor_name: "Thika Road",
+          tags: [],
+          eta_minutes: 7,
+          confidence_level: "MEDIUM",
+          source: "LIVE",
+          last_seen_at: "2026-05-01T11:59:10.000Z",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          nganya_id: "nganya-1",
+          nganya_name: "Matwana Express",
+          corridor_id: "corridor-1",
+          corridor_name: "Thika Road",
+          tags: ["NEW_BUILD"],
+          eta_minutes: 2,
+          confidence_level: "HIGH",
+          source: "LIVE",
+          last_seen_at: "2026-05-01T11:59:40.000Z",
+        },
+        {
+          nganya_id: "nganya-3",
+          nganya_name: "CBD Runner",
+          corridor_id: "corridor-1",
+          corridor_name: "Thika Road",
+          tags: [],
+          eta_minutes: 6,
+          confidence_level: "HIGH",
+          source: "LIVE",
+          last_seen_at: "2026-05-01T11:59:40.000Z",
+        },
+      ]);
+
+    renderHome({ activeCorridor: "corridor-1" });
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: "Watch on map" }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Watch on map" })[0]);
+    const plannerChannel = mockSupabaseChannel.mock.results[0]?.value;
+    const liveSessionRefresh = plannerChannel?.on?.mock?.calls?.[0]?.[2];
+    expect(typeof liveSessionRefresh).toBe("function");
+    await act(async () => {
+      liveSessionRefresh();
+      await new Promise((resolve) => setTimeout(resolve, 1700));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Your watched ride is stale now.")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Switch to CBD Runner" }),
+      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Keep watching" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch to CBD Runner" }));
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith("Switched to CBD Runner.", "success");
+      expect(screen.getByText("Watching CBD Runner for Muthaiga.")).toBeTruthy();
+    });
+  });
+
+  it("sends unauthenticated alert actions to sign-in from the planner panel", async () => {
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+    mockSearchNganyaJourney.mockResolvedValue([
+      {
+        nganya_id: "nganya-1",
+        nganya_name: "Matwana Express",
+        corridor_id: "corridor-1",
+        corridor_name: "Thika Road",
+        tags: ["NEW_BUILD"],
+        eta_minutes: 5,
+        confidence_level: "HIGH",
+        source: "LIVE",
+        last_seen_at: "2026-05-01T11:59:40.000Z",
+      },
+    ]);
+    mockFollowNganya.mockRejectedValueOnce({
+      code: "AUTH_REQUIRED",
+      message: "Sign in to continue.",
+      retryable: false,
+    });
+
+    renderHome({ activeCorridor: "corridor-1" });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Follow route alerts" }),
+      ).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Follow route alerts" }));
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith(
+        "Sign in to keep ride alerts on.",
+        "info",
+      );
+      expect(mockRouterNavigate).toHaveBeenCalledWith({ to: "/signin" });
     });
   });
 

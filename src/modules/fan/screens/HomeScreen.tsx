@@ -4,16 +4,19 @@ import { useToast } from "@/components/ui/ToastContainer";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Chip from "@/components/ui/Chip";
+import CatchabilityBadge from "@/components/ui/CatchabilityBadge";
 import LiveBadge from "@/components/ui/LiveBadge";
 import SearchInput from "@/components/ui/SearchInput";
 import Skeleton from "@/components/ui/Skeleton";
+import TrackingSignalBadge from "@/components/ui/TrackingSignalBadge";
 import {
   formatDirectionLabel,
   formatRelativeTime,
   toNganyaSlug,
 } from "@/lib/formatters";
+import { getTrackingSignalState } from "@/lib/tracking-signal";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
-import { Clock, TrendingUp, ChevronRight } from "lucide-react";
+import { Clock, TrendingUp, ChevronRight, BellRing, ShieldAlert } from "lucide-react";
 import WhereToCard, {
   type PlannerFiltersValue,
   type RideSearchPayload,
@@ -22,18 +25,25 @@ import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2
 import LiveCorridorMap from "@/components/features/tracking/LiveCorridorMap";
 import type { JourneyResult } from "@/lib/types/journey";
 import { searchNganyaJourney } from "@/lib/queries/discover";
+import { supabase } from "@/lib/supabase";
 import {
   fetchNganyaPosition,
   fetchStagePosition,
 } from "@/lib/queries/tracking";
 import { fetchOsrmRoute } from "@/lib/osrm";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
+import { toAppError } from "@/shared/errors/app-error";
 import {
   applyPlannerSeed,
   canTrackWithPlannerContext,
   getPlannerCorridorId,
   reconcilePlannerContext,
 } from "@/modules/fan/services/planner-storage";
+import {
+  getPlannerAssistStatus,
+  sortPlannerRideOptions,
+  type PlannerRideOption,
+} from "@/modules/fan/services/planner-assist";
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
 import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
 import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
@@ -79,6 +89,12 @@ interface BrowseCardActionItem {
   corridorId: string | null;
   corridorName: string;
   isLive: boolean;
+}
+
+interface PlannerRiskPrompt {
+  key: string;
+  reason: "risky" | "stale" | "missing";
+  alternative: PlannerRideOption | null;
 }
 
 const getDirectionLabel = formatDirectionLabel;
@@ -267,12 +283,27 @@ export default function HomeScreen({
   const plannerRouteAbortRef = useRef<AbortController | null>(null);
   const plannerRouteKeyRef = useRef<string | null>(null);
   const [plannerRouteLoading, setPlannerRouteLoading] = useState(false);
+  const plannerRealtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [trackingRow, setTrackingRow] =
     useState<AggregatedRecentSightingRow | null>(null);
   const [trackingNganya, setTrackingNganya] =
     useState<BrowseCardActionItem | null>(null);
   const [plannerSeed, setPlannerSeed] = useState(0);
   const [recentFilter, setRecentFilter] = useState<RecentSightingFilter>("ALL");
+  const [rideWatchScrollToken, setRideWatchScrollToken] = useState(0);
+  const [watchedRideId, setWatchedRideId] = useState<string | null>(null);
+  const [plannerRiskPrompt, setPlannerRiskPrompt] =
+    useState<PlannerRiskPrompt | null>(null);
+  const [dismissedRiskKey, setDismissedRiskKey] = useState<string | null>(null);
+  const [plannerAlertIds, setPlannerAlertIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const plannerMapSectionRef = useRef<HTMLElement>(null);
+  const rideWatchSectionRef = useRef<HTMLElement>(null);
+  const plannerMapScrollMargin = "calc(var(--top-nav-height) + 16px)";
+  const rideWatchScrollMargin = "calc(var(--top-nav-height) + 16px)";
   const {
     search,
     activeCorridor: _dataCorridor,
@@ -294,6 +325,23 @@ export default function HomeScreen({
       await router.invalidate();
     } catch {
       showErrorToast("Failed to update follow.");
+    }
+  };
+
+  const turnOnPlannerAlerts = async (ride: PlannerRideOption) => {
+    try {
+      await followNganya(ride.nganya_id);
+      setPlannerAlertIds((current) => new Set(current).add(ride.nganya_id));
+      addToast(`Alerts on for ${ride.nganya_name}.`, "success");
+      await router.invalidate();
+    } catch (error) {
+      const appError = toAppError(error);
+      if (appError.code === "AUTH_REQUIRED") {
+        addToast("Sign in to keep ride alerts on.", "info");
+        router.navigate({ to: "/signin" });
+        return;
+      }
+      showErrorToast("Failed to turn on ride alerts.");
     }
   };
 
@@ -444,20 +492,19 @@ export default function HomeScreen({
 
   const plannerJourneyKeyRef = useRef<string | null>(null);
   const plannerJourneySeqRef = useRef(0);
-
-  useEffect(() => {
+  const loadPlannerJourneyResults = (
+    key: string,
+    options?: { preserveExisting?: boolean },
+  ) => {
     if (!plannerCorridorId || !plannerStageId) {
       setPlannerResults([]);
       return;
     }
 
-    const key = plannerJourneyKey;
-    if (!key) return;
-
-    // Clear results on route/stage change to avoid filtering against the wrong corridor.
     const prevKey = plannerJourneyKeyRef.current;
     plannerJourneyKeyRef.current = key;
     if (
+      !options?.preserveExisting &&
       prevKey &&
       prevKey.split(":").slice(0, 2).join(":") !==
         key.split(":").slice(0, 2).join(":")
@@ -491,6 +538,18 @@ export default function HomeScreen({
         if (plannerJourneyKeyRef.current !== key) return;
         setPlannerResults([]);
       });
+  };
+
+  useEffect(() => {
+    if (!plannerCorridorId || !plannerStageId) {
+      setPlannerResults([]);
+      return;
+    }
+
+    const key = plannerJourneyKey;
+    if (!key) return;
+
+    loadPlannerJourneyResults(key);
   }, [
     plannerCorridorId,
     plannerStageId,
@@ -498,6 +557,151 @@ export default function HomeScreen({
     plannerContext.preferredNganya?.id,
     plannerJourneyKey,
   ]);
+
+  useEffect(() => {
+    if (!plannerJourneyKey || !plannerCorridorId) return;
+
+    const scheduleRefresh = () => {
+      if (plannerRealtimeTimerRef.current) {
+        clearTimeout(plannerRealtimeTimerRef.current);
+      }
+      plannerRealtimeTimerRef.current = setTimeout(() => {
+        loadPlannerJourneyResults(plannerJourneyKey, { preserveExisting: true });
+      }, 1500);
+    };
+
+    const channel = supabase
+      .channel(`home_planner_${plannerCorridorId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "live_sessions",
+          filter: `corridor_id=eq.${plannerCorridorId}`,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "sightings",
+          filter: `corridor_id=eq.${plannerCorridorId}`,
+        },
+        scheduleRefresh,
+      )
+      .subscribe();
+
+    return () => {
+      if (plannerRealtimeTimerRef.current) {
+        clearTimeout(plannerRealtimeTimerRef.current);
+        plannerRealtimeTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [plannerJourneyKey, plannerCorridorId]);
+
+  const plannerRideOptions = useMemo(
+    () => sortPlannerRideOptions(plannerResults),
+    [plannerResults],
+  );
+
+  const watchedRide = useMemo(
+    () =>
+      watchedRideId
+        ? plannerRideOptions.find((option) => option.nganya_id === watchedRideId) ||
+          null
+        : null,
+    [plannerRideOptions, watchedRideId],
+  );
+
+  const recommendedRide = useMemo(
+    () => watchedRide || plannerRideOptions[0] || null,
+    [plannerRideOptions, watchedRide],
+  );
+
+  const backupRides = useMemo(
+    () =>
+      plannerRideOptions.filter(
+        (option) => option.nganya_id !== recommendedRide?.nganya_id,
+      ),
+    [plannerRideOptions, recommendedRide?.nganya_id],
+  );
+
+  const plannerAssistStatus = useMemo(
+    () => getPlannerAssistStatus(plannerRideOptions, watchedRideId),
+    [plannerRideOptions, watchedRideId],
+  );
+
+  const plannerRouteSignalType = useMemo(() => {
+    if (!plannerTracking) return null;
+
+    const trackedRide = plannerRideOptions.find(
+      (option) => option.nganya_id === plannerTracking.nganya_id,
+    );
+    if (trackedRide) return trackedRide.signalType;
+
+    if (plannerTracking.last_seen_at) {
+      return getTrackingSignalState(
+        plannerTracking.source,
+        plannerTracking.last_seen_at,
+      );
+    }
+
+    return plannerTracking.source === "LIVE" ? "LIVE" : "ESTIMATED";
+  }, [plannerRideOptions, plannerTracking]);
+
+  useEffect(() => {
+    if (!watchedRideId) {
+      setPlannerRiskPrompt(null);
+      return;
+    }
+
+    const alternative = backupRides[0] || null;
+    const nextPrompt = !watchedRide
+      ? {
+          key: `${watchedRideId}:missing:${alternative?.nganya_id || "none"}`,
+          reason: "missing" as const,
+          alternative,
+        }
+      : watchedRide.catchability.status === "STALE_UNCERTAIN"
+        ? {
+            key: `${watchedRide.nganya_id}:stale:${alternative?.nganya_id || "none"}`,
+            reason: "stale" as const,
+            alternative,
+          }
+        : watchedRide.catchability.status !== "CATCHABLE"
+          ? {
+              key: `${watchedRide.nganya_id}:risky:${alternative?.nganya_id || "none"}`,
+              reason: "risky" as const,
+              alternative,
+            }
+          : null;
+
+    if (!nextPrompt) {
+      setPlannerRiskPrompt(null);
+      return;
+    }
+
+    if (dismissedRiskKey === nextPrompt.key) return;
+    setPlannerRiskPrompt(nextPrompt);
+  }, [backupRides, dismissedRiskKey, watchedRide, watchedRideId]);
+
+  useEffect(() => {
+    if (!rideWatchScrollToken || !plannerJourneyKey) return;
+    if (!rideWatchSectionRef.current) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      rideWatchSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [plannerJourneyKey, rideWatchScrollToken]);
 
   const featuredNganya =
     filteredNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
@@ -566,7 +770,10 @@ export default function HomeScreen({
   const handlePlannerSearch = (_payload: RideSearchPayload) => {
     // Map is driven by the controlled planner filters; "Find my ride" is a submit action only.
     // We still clear any route overlays when user submits a new search.
+    setRideWatchScrollToken((current) => current + 1);
     setPlannerTracking(null);
+    setPlannerRiskPrompt(null);
+    setDismissedRiskKey(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
     setPlannerRouteDistanceMeters(null);
@@ -579,6 +786,9 @@ export default function HomeScreen({
     setPlannerContext((current) => reconcilePlannerContext(current, next));
 
     // Any filter change invalidates any currently tracked nganya/route overlay.
+    setWatchedRideId(null);
+    setPlannerRiskPrompt(null);
+    setDismissedRiskKey(null);
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
@@ -591,7 +801,10 @@ export default function HomeScreen({
   const handlePlannerClear = () => {
     clearPlannerContext();
     setPlannerSeed((current) => current + 1);
+    setWatchedRideId(null);
     setPlannerResults([]);
+    setPlannerRiskPrompt(null);
+    setDismissedRiskKey(null);
     setPlannerTracking(null);
     setPlannerRouteLine(null);
     setPlannerRouteEtaSeconds(null);
@@ -634,6 +847,114 @@ export default function HomeScreen({
     handlePlanRideForRecentRow(row);
   };
 
+  const trackPlannerRideOnMap = async (ride: JourneyResult) => {
+    if (!plannerContext.fromStage?.id) return;
+    if (!mapCorridorId) return;
+
+    setPlannerTracking(ride);
+    setPlannerRouteLoading(true);
+
+    const stageId = plannerContext.fromStage.id;
+    const [stagePos, nganyaPos] = await Promise.all([
+      fetchStagePosition(stageId),
+      fetchNganyaPosition(ride.nganya_id),
+    ]);
+
+    if (!stagePos || !nganyaPos) {
+      setPlannerRouteLine(null);
+      setPlannerRouteEtaSeconds(null);
+      setPlannerRouteDistanceMeters(null);
+      setPlannerRouteLoading(false);
+      return;
+    }
+
+    const key = `${ride.nganya_id}:${stageId}:${nganyaPos.lng.toFixed(5)},${nganyaPos.lat.toFixed(5)}:${stagePos.lng.toFixed(5)},${stagePos.lat.toFixed(5)}`;
+    if (plannerRouteKeyRef.current === key) {
+      setPlannerRouteLoading(false);
+      return;
+    }
+    plannerRouteKeyRef.current = key;
+
+    plannerRouteAbortRef.current?.abort();
+    const controller = new AbortController();
+    plannerRouteAbortRef.current = controller;
+
+    try {
+      const route = await fetchOsrmRoute({
+        from: nganyaPos,
+        to: stagePos,
+        signal: controller.signal,
+      });
+
+      if (!Number.isFinite(route.durationSeconds)) {
+        throw new Error("OSRM route missing duration");
+      }
+
+      setPlannerRouteLine({ coordinates: route.coordinates });
+      setPlannerRouteEtaSeconds(route.durationSeconds);
+      setPlannerRouteDistanceMeters(
+        Number.isFinite(route.distanceMeters) ? route.distanceMeters : null,
+      );
+    } catch (err) {
+      if ((err as any)?.name === "AbortError") return;
+
+      setPlannerRouteLine({
+        coordinates: [
+          [nganyaPos.lng, nganyaPos.lat],
+          [stagePos.lng, stagePos.lat],
+        ],
+      });
+      setPlannerRouteDistanceMeters(null);
+
+      const etaMin = Number.isFinite(ride.eta_minutes)
+        ? Math.max(1, Math.round(ride.eta_minutes))
+        : null;
+      setPlannerRouteEtaSeconds(etaMin !== null ? etaMin * 60 : null);
+    } finally {
+      setPlannerRouteLoading(false);
+    }
+  };
+
+  const scrollToPlannerMap = () => {
+    window.requestAnimationFrame(() => {
+      plannerMapSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
+  const watchPlannerRide = (ride: PlannerRideOption) => {
+    const isAlreadyWatched = watchedRideId === ride.nganya_id;
+    setWatchedRideId(ride.nganya_id);
+    setPlannerRiskPrompt(null);
+    setDismissedRiskKey(null);
+    scrollToPlannerMap();
+    void trackPlannerRideOnMap(ride);
+    addToast(
+      isAlreadyWatched
+        ? `Updated ${ride.nganya_name} on the map.`
+        : `Watching ${ride.nganya_name} for your pickup.`,
+      "info",
+    );
+  };
+
+  const switchToPlannerRide = (ride: PlannerRideOption) => {
+    setWatchedRideId(ride.nganya_id);
+    setPlannerRiskPrompt(null);
+    setDismissedRiskKey(null);
+    scrollToPlannerMap();
+    void trackPlannerRideOnMap(ride);
+    addToast(`Switched to ${ride.nganya_name}.`, "success");
+  };
+
+  const keepWatchingCurrentRide = () => {
+    if (!plannerRiskPrompt) return;
+    setDismissedRiskKey(plannerRiskPrompt.key);
+    setPlannerRiskPrompt(null);
+    addToast("Still watching your current ride.", "info");
+  };
+
   return (
     <div className="page-container py-8 md:py-10 space-y-10 md:space-y-12">
       <section className="space-y-2">
@@ -644,7 +965,11 @@ export default function HomeScreen({
         </p>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 md:gap-6 lg:grid-cols-12 lg:items-stretch">
+      <section
+        ref={plannerMapSectionRef}
+        className="grid grid-cols-1 gap-5 md:gap-6 lg:grid-cols-12 lg:items-stretch"
+        style={{ scrollMarginTop: plannerMapScrollMargin }}
+      >
         <div className="space-y-3 lg:col-span-4 lg:sticky lg:top-[84px] lg:self-start">
           <WhereToCard
             key={plannerSeed}
@@ -671,80 +996,7 @@ export default function HomeScreen({
                     ? (plannerContext.preferredNganya?.id ?? null)
                     : null)
                 }
-                onTrackNganya={async (j) => {
-                  if (!plannerContext.fromStage?.id) return;
-                  if (!mapCorridorId) return;
-
-                  setPlannerTracking(j);
-                  setPlannerRouteLoading(true);
-
-                  // Resolve positions for OSRM (nganya + selected stage).
-                  const stageId = plannerContext.fromStage.id;
-                  const [stagePos, nganyaPos] = await Promise.all([
-                    fetchStagePosition(stageId),
-                    fetchNganyaPosition(j.nganya_id),
-                  ]);
-
-                  if (!stagePos || !nganyaPos) {
-                    setPlannerRouteLine(null);
-                    setPlannerRouteEtaSeconds(null);
-                    setPlannerRouteDistanceMeters(null);
-                    setPlannerRouteLoading(false);
-                    return;
-                  }
-
-                  const key = `${j.nganya_id}:${stageId}:${nganyaPos.lng.toFixed(5)},${nganyaPos.lat.toFixed(5)}:${stagePos.lng.toFixed(5)},${stagePos.lat.toFixed(5)}`;
-                  if (plannerRouteKeyRef.current === key) {
-                    setPlannerRouteLoading(false);
-                    return;
-                  }
-                  plannerRouteKeyRef.current = key;
-
-                  plannerRouteAbortRef.current?.abort();
-                  const controller = new AbortController();
-                  plannerRouteAbortRef.current = controller;
-
-                  try {
-                    const route = await fetchOsrmRoute({
-                      from: nganyaPos,
-                      to: stagePos,
-                      signal: controller.signal,
-                    });
-
-                    if (!Number.isFinite(route.durationSeconds)) {
-                      throw new Error("OSRM route missing duration");
-                    }
-
-                    setPlannerRouteLine({ coordinates: route.coordinates });
-                    setPlannerRouteEtaSeconds(route.durationSeconds);
-                    setPlannerRouteDistanceMeters(
-                      Number.isFinite(route.distanceMeters)
-                        ? route.distanceMeters
-                        : null,
-                    );
-                  } catch (err) {
-                    // Abort is expected on rapid marker switching — don't clear loading.
-                    if ((err as any)?.name === "AbortError") return;
-
-                    // Fallback: straight line + existing ETA if we have it.
-                    setPlannerRouteLine({
-                      coordinates: [
-                        [nganyaPos.lng, nganyaPos.lat],
-                        [stagePos.lng, stagePos.lat],
-                      ],
-                    });
-                    setPlannerRouteDistanceMeters(null);
-
-                    const etaMin = Number.isFinite(j.eta_minutes)
-                      ? Math.max(1, Math.round(j.eta_minutes))
-                      : null;
-                    setPlannerRouteEtaSeconds(
-                      etaMin !== null ? etaMin * 60 : null,
-                    );
-                  } finally {
-                    setPlannerRouteLoading(false);
-                  }
-                }}
+                onTrackNganya={(j) => void trackPlannerRideOnMap(j)}
                 fillRowHeight
                 showCaption={false}
                 showNoCorridorOverlay={false}
@@ -752,6 +1004,7 @@ export default function HomeScreen({
                 routeLine={plannerRouteLine}
                 routeEtaSeconds={plannerRouteEtaSeconds}
                 routeDistanceMeters={plannerRouteDistanceMeters}
+                routeSignalType={plannerRouteSignalType}
                 isRouting={plannerRouteLoading}
                 className="h-full min-h-[320px] lg:min-h-0"
               />
@@ -759,6 +1012,225 @@ export default function HomeScreen({
           </div>
         </div>
       </section>
+
+      {plannerJourneyKey ? (
+        <section
+          ref={rideWatchSectionRef}
+          className="space-y-4"
+          style={{ scrollMarginTop: rideWatchScrollMargin }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-h3">Ride watch</h2>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                {plannerAssistStatus === "no_matches"
+                  ? "Nothing reliable is lining up for this pickup yet."
+                  : watchedRide
+                    ? `Watching ${watchedRide.nganya_name} for ${plannerContext.fromStage?.name}.`
+                    : "Pick one ride to watch or keep backups ready."}
+              </p>
+            </div>
+            {plannerRideOptions.length > 0 ? (
+              <span className="rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-1 text-xs text-[var(--color-text-tertiary)]">
+                {plannerRideOptions.length} match
+                {plannerRideOptions.length === 1 ? "" : "es"}
+              </span>
+            ) : null}
+          </div>
+
+          {plannerRiskPrompt ? (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-warning)]/30 bg-[var(--color-warning-soft)]/15 p-4">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-5 w-5 text-[var(--color-warning)]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    {plannerRiskPrompt.reason === "missing"
+                      ? "Your watched ride dropped out of the live results."
+                      : plannerRiskPrompt.reason === "stale"
+                        ? "Your watched ride is stale now."
+                        : "Your watched ride is getting risky."}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    {plannerRiskPrompt.alternative
+                      ? `Switch to ${plannerRiskPrompt.alternative.nganya_name} or keep waiting for your current ride.`
+                      : "Keep waiting if you want, but you should not rely on this ride alone."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {plannerRiskPrompt.alternative ? (
+                      <Button
+                        size="sm"
+                        onClick={() => switchToPlannerRide(plannerRiskPrompt.alternative!)}
+                      >
+                        Switch to {plannerRiskPrompt.alternative.nganya_name}
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={keepWatchingCurrentRide}
+                    >
+                      Keep watching
+                    </Button>
+                    {recommendedRide &&
+                    !(followedIds.has(recommendedRide.nganya_id) ||
+                      plannerAlertIds.has(recommendedRide.nganya_id)) ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void turnOnPlannerAlerts(recommendedRide)}
+                      >
+                        Turn on alerts
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {recommendedRide ? (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[var(--color-accent-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-accent)]">
+                      {watchedRide ? "Watched ride" : "Best ride now"}
+                    </span>
+                    <TrackingSignalBadge
+                      signalType={recommendedRide.signalType}
+                      freshnessSeconds={recommendedRide.freshnessSeconds ?? undefined}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xl font-semibold text-[var(--color-text-primary)]">
+                      {recommendedRide.nganya_name}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                      {recommendedRide.corridor_name} · ~{recommendedRide.eta_minutes} min to{" "}
+                      {plannerContext.fromStage?.name}
+                    </p>
+                  </div>
+                  <CatchabilityBadge
+                    status={recommendedRide.catchability.status}
+                    label={recommendedRide.catchability.label}
+                    subtext={recommendedRide.catchability.subtext}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 md:min-w-[220px]">
+                  <Button onClick={() => watchPlannerRide(recommendedRide)}>
+                    {watchedRide?.nganya_id === recommendedRide.nganya_id
+                      ? "Refresh on map"
+                      : "Watch on map"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      followedIds.has(recommendedRide.nganya_id) ||
+                      plannerAlertIds.has(recommendedRide.nganya_id)
+                        ? addToast(`Alerts already on for ${recommendedRide.nganya_name}.`, "info")
+                        : void turnOnPlannerAlerts(recommendedRide)
+                    }
+                  >
+                    <BellRing className="h-4 w-4" />
+                    {followedIds.has(recommendedRide.nganya_id) ||
+                    plannerAlertIds.has(recommendedRide.nganya_id)
+                      ? "Alerts on"
+                      : "Follow route alerts"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {backupRides.length > 0 ? (
+            <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+                    Backup rides
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+                    Keep one ready in case your watched ride slows down or drops out.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {backupRides.slice(0, 3).map((ride) => (
+                  <div
+                    key={ride.nganya_id}
+                    className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-card)]/50 p-3 md:grid-cols-[minmax(0,1fr)_auto]"
+                  >
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                          {ride.nganya_name}
+                        </p>
+                        <TrackingSignalBadge
+                          signalType={ride.signalType}
+                          freshnessSeconds={ride.freshnessSeconds ?? undefined}
+                        />
+                      </div>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        ~{ride.eta_minutes} min on {ride.corridor_name}
+                      </p>
+                      <CatchabilityBadge
+                        status={ride.catchability.status}
+                        label={ride.catchability.label}
+                        subtext={ride.catchability.subtext}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => switchToPlannerRide(ride)}
+                      >
+                        Watch on map
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {plannerAssistStatus === "no_matches" ? (
+            <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
+              <p>No strong ride matches yet for this stage.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    recentSightingsRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    })
+                  }
+                >
+                  Check recent sightings
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    router.navigate({
+                      to: "/discover",
+                      search: {
+                        corridor: plannerCorridorId || undefined,
+                      } as any,
+                    })
+                  }
+                >
+                  Find similar rides
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* <section>
         <div className="flex items-center justify-between mb-4">
@@ -900,9 +1372,17 @@ export default function HomeScreen({
                       : "bg-[var(--color-text-tertiary)]";
 
                 return (
-                  <button
+                  <div
                     key={row.key}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleRecentRowAction(row)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleRecentRowAction(row);
+                      }
+                    }}
                     className="grid w-full grid-cols-[12px_minmax(0,1.2fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-3 text-left transition-colors hover:border-[var(--glass-border-hover)]"
                   >
                     <span
@@ -950,7 +1430,7 @@ export default function HomeScreen({
                         {actionLabel}
                       </Button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
           </div>
