@@ -5,7 +5,11 @@ import {
   getCurrentAuthUser,
   getCurrentUserProfile,
 } from "@/lib/queries/profile";
-import { getCorridorSightings, getMySightings } from "@/lib/queries/sightings";
+import {
+  getCorridorSightings,
+  getHomepageRecentSightings,
+  getMySightings,
+} from "@/lib/queries/sightings";
 import { getStableClientSession } from "@/shared/auth/client-session";
 
 // ── Shared data loaded once at the fan layout level ─────────────────
@@ -122,11 +126,7 @@ export async function loadFanHomeRouteData(
 
   const recentSightings = activeCorridor
     ? await getCorridorSightings(activeCorridor)
-    : (
-        await Promise.all(
-          corridors.map((corridor: any) => getCorridorSightings(corridor.id)),
-        )
-      ).flat();
+    : await getHomepageRecentSightings(80, { includeConfidence: false });
 
   return {
     search,

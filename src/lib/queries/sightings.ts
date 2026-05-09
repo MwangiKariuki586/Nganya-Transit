@@ -31,9 +31,19 @@ async function attachSightingConfidence<T extends { id: string }>(
   }));
 }
 
-export async function getCorridorSightings(corridorId: string, limit = 50) {
-  const { data, error } = await supabase
-    .from("sightings")
+interface SightingQueryOptions {
+  corridorId?: string;
+  limit?: number;
+  includeConfidence?: boolean;
+}
+
+async function getRecentSightingsBase(
+  query: ReturnType<typeof supabase.from>,
+  options: SightingQueryOptions = {},
+) {
+  const { corridorId, limit = 50, includeConfidence = true } = options;
+
+  let sightingsQuery = query
     .select(
       `
       *, 
@@ -42,12 +52,39 @@ export async function getCorridorSightings(corridorId: string, limit = 50) {
       user:v_public_profiles!sightings_user_id_fkey(handle, avatar_url)
     `,
     )
-    .eq("corridor_id", corridorId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .order("created_at", { ascending: false });
+
+  if (corridorId) {
+    sightingsQuery = sightingsQuery.eq("corridor_id", corridorId);
+  }
+
+  const { data, error } = await sightingsQuery.limit(limit);
 
   if (error) throw error;
+  if (!includeConfidence) return data || [];
   return attachSightingConfidence(data);
+}
+
+export async function getCorridorSightings(
+  corridorId: string,
+  limit = 50,
+  options: Pick<SightingQueryOptions, "includeConfidence"> = {},
+) {
+  return getRecentSightingsBase(supabase.from("sightings"), {
+    ...options,
+    corridorId,
+    limit,
+  });
+}
+
+export async function getHomepageRecentSightings(
+  limit = 80,
+  options: Pick<SightingQueryOptions, "includeConfidence"> = {},
+) {
+  return getRecentSightingsBase(supabase.from("sightings"), {
+    ...options,
+    limit,
+  });
 }
 
 export async function getMySightings(limit = 50) {

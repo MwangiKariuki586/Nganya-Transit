@@ -314,16 +314,44 @@ export default function HomeScreen({
     recentSightings,
     followedIds,
   } = data;
+  const [localFollowedIds, setLocalFollowedIds] = useState<Set<string>>(
+    () => new Set(followedIds),
+  );
+
+  useEffect(() => {
+    setLocalFollowedIds(new Set(followedIds));
+  }, [followedIds]);
+
+  const isFollowingNganya = (nganyaId: string) => localFollowedIds.has(nganyaId);
 
   const toggleFollow = async (id: string) => {
+    const wasFollowing = isFollowingNganya(id);
+    setLocalFollowedIds((current) => {
+      const next = new Set(current);
+      if (wasFollowing) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+
     try {
-      if (followedIds.has(id)) {
+      if (wasFollowing) {
         await unfollowNganya(id);
       } else {
         await followNganya(id);
       }
-      await router.invalidate();
     } catch {
+      setLocalFollowedIds((current) => {
+        const next = new Set(current);
+        if (wasFollowing) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+        return next;
+      });
       showErrorToast("Failed to update follow.");
     }
   };
@@ -332,8 +360,8 @@ export default function HomeScreen({
     try {
       await followNganya(ride.nganya_id);
       setPlannerAlertIds((current) => new Set(current).add(ride.nganya_id));
+      setLocalFollowedIds((current) => new Set(current).add(ride.nganya_id));
       addToast(`Alerts on for ${ride.nganya_name}.`, "success");
-      await router.invalidate();
     } catch (error) {
       const appError = toAppError(error);
       if (appError.code === "AUTH_REQUIRED") {
@@ -559,7 +587,14 @@ export default function HomeScreen({
   ]);
 
   useEffect(() => {
-    if (!plannerJourneyKey || !plannerCorridorId) return;
+    if (
+      !plannerJourneyKey ||
+      !plannerCorridorId ||
+      !plannerContext.fromStage ||
+      !plannerContext.toPlace
+    ) {
+      return;
+    }
 
     const scheduleRefresh = () => {
       if (plannerRealtimeTimerRef.current) {
@@ -601,7 +636,12 @@ export default function HomeScreen({
       }
       supabase.removeChannel(channel);
     };
-  }, [plannerJourneyKey, plannerCorridorId]);
+  }, [
+    plannerJourneyKey,
+    plannerCorridorId,
+    plannerContext.fromStage,
+    plannerContext.toPlace,
+  ]);
 
   const plannerRideOptions = useMemo(
     () => sortPlannerRideOptions(plannerResults),
@@ -984,7 +1024,7 @@ export default function HomeScreen({
           <div className="h-full rounded-[var(--radius-xl)]">
             <div className="h-full overflow-hidden rounded-[var(--radius-xl)]">
               <LiveCorridorMap
-                isActive
+                isActive={Boolean(mapCorridorId)}
                 corridorId={mapCorridorId}
                 corridorName={mapCorridorName}
                 pickupStage={plannerContext.fromStage}
@@ -1072,7 +1112,7 @@ export default function HomeScreen({
                       Keep watching
                     </Button>
                     {recommendedRide &&
-                    !(followedIds.has(recommendedRide.nganya_id) ||
+                    !(isFollowingNganya(recommendedRide.nganya_id) ||
                       plannerAlertIds.has(recommendedRide.nganya_id)) ? (
                       <Button
                         variant="ghost"
@@ -1126,14 +1166,14 @@ export default function HomeScreen({
                   <Button
                     variant="ghost"
                     onClick={() =>
-                      followedIds.has(recommendedRide.nganya_id) ||
+                      isFollowingNganya(recommendedRide.nganya_id) ||
                       plannerAlertIds.has(recommendedRide.nganya_id)
                         ? addToast(`Alerts already on for ${recommendedRide.nganya_name}.`, "info")
                         : void turnOnPlannerAlerts(recommendedRide)
                     }
                   >
                     <BellRing className="h-4 w-4" />
-                    {followedIds.has(recommendedRide.nganya_id) ||
+                    {isFollowingNganya(recommendedRide.nganya_id) ||
                     plannerAlertIds.has(recommendedRide.nganya_id)
                       ? "Alerts on"
                       : "Follow route alerts"}
@@ -1258,7 +1298,7 @@ export default function HomeScreen({
                   <Card
                     nganya={cardData as any}
                     variant="standard"
-                    isFollowing={followedIds.has(cardData.id)}
+                    isFollowing={isFollowingNganya(cardData.id)}
                     onFollow={toggleFollow}
                     onCardClick={() => handleBrowseCardAction(cardData)}
                     primaryAction={{
@@ -1270,7 +1310,7 @@ export default function HomeScreen({
                       onClick: () => handleBrowseCardAction(cardData),
                     }}
                     secondaryAction={{
-                      label: followedIds.has(cardData.id)
+                      label: isFollowingNganya(cardData.id)
                         ? "Following"
                         : "Follow",
                       onClick: () => void toggleFollow(cardData.id),
@@ -1489,7 +1529,7 @@ export default function HomeScreen({
             <Card
               nganya={mapSupabaseToCardProps(featuredNganya) as any}
               variant="feature"
-              isFollowing={followedIds.has(featuredNganya.id)}
+              isFollowing={isFollowingNganya(featuredNganya.id)}
               onFollow={toggleFollow}
             />
           </div>
@@ -1497,7 +1537,7 @@ export default function HomeScreen({
             <Card
               nganya={mapSupabaseToCardProps(featuredNganya) as any}
               variant="standard"
-              isFollowing={followedIds.has(featuredNganya.id)}
+              isFollowing={isFollowingNganya(featuredNganya.id)}
               onFollow={toggleFollow}
             />
           </div>
@@ -1544,7 +1584,7 @@ export default function HomeScreen({
                       key={cardData.id}
                       nganya={cardData as any}
                       variant="standard"
-                      isFollowing={followedIds.has(cardData.id)}
+                      isFollowing={isFollowingNganya(cardData.id)}
                       onFollow={toggleFollow}
                       onCardClick={() => handleBrowseCardAction(cardData)}
                       primaryAction={{
@@ -1556,7 +1596,7 @@ export default function HomeScreen({
                         onClick: () => handleBrowseCardAction(cardData),
                       }}
                       secondaryAction={{
-                        label: followedIds.has(cardData.id)
+                        label: isFollowingNganya(cardData.id)
                           ? "Following"
                           : "Follow",
                         onClick: () => void toggleFollow(cardData.id),

@@ -166,7 +166,9 @@ export default function LiveCorridorMap({
   const [mapReady, setMapReady] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { coords: userCoords } = useGeolocationStream();
+  const { coords: userCoords } = useGeolocationStream({
+    enabled: isActive && Boolean(corridorId),
+  });
 
   const loadPins = useCallback(async () => {
     if (!corridorId) {

@@ -35,6 +35,10 @@ export interface UseGeolocationStreamReturn {
   requestPermission: () => void
 }
 
+export interface UseGeolocationStreamOptions {
+  enabled?: boolean
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 /** Fan tracking watch options — battery-friendly, still responsive */
@@ -46,7 +50,10 @@ const WATCH_OPTIONS: PositionOptions = {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useGeolocationStream(): UseGeolocationStreamReturn {
+export function useGeolocationStream(
+  options: UseGeolocationStreamOptions = {},
+): UseGeolocationStreamReturn {
+  const { enabled = true } = options
   const [coords, setCoords] = useState<StreamCoords | null>(null)
   const [permissionStatus, setPermissionStatus] = useState<GeoPermission>('prompt')
   const [error, setError] = useState<string | null>(null)
@@ -97,13 +104,21 @@ export function useGeolocationStream(): UseGeolocationStreamReturn {
 
   // Check existing permission and auto-start if already granted
   useEffect(() => {
+    if (!enabled) {
+      stopWatch()
+      setCoords(null)
+      setError(null)
+      setPermissionStatus('prompt')
+      return
+    }
+
     const cleanup = watchPermission((status) => {
       setPermissionStatus(status)
       if (status === 'granted') startWatch()
       if (status === 'denied') stopWatch()
     })
     return cleanup
-  }, [startWatch, stopWatch])
+  }, [enabled, startWatch, stopWatch])
 
   // Cleanup watch on unmount
   useEffect(() => {
@@ -111,9 +126,10 @@ export function useGeolocationStream(): UseGeolocationStreamReturn {
   }, [stopWatch])
 
   const requestPermission = useCallback(() => {
+    if (!enabled) return
     // Calling startWatch will trigger the browser permission prompt on first call
     startWatch()
-  }, [startWatch])
+  }, [enabled, startWatch])
 
   return { coords, permissionStatus, error, requestPermission }
 }
