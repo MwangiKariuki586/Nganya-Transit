@@ -14,6 +14,7 @@ import { updateCrewProfileServerFn } from "@/shared/server-fns/crew-profile";
 import { replaceAvatar } from "@/lib/storage/profile-media";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { useToast } from "@/components/ui/ToastContainer";
+import { PulseLoader } from "@/components/ui/loading";
 import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
 import { compressImage } from "@/lib/utils/image-compress";
 import { vibeTagColors } from "@/lib/mockData";
@@ -198,9 +199,10 @@ export default function NganyaDetailScreen() {
 
   if (isLoading) {
     return (
-      <div className="page-container py-16 flex justify-center">
-        <div className="animate-pulse w-8 h-8 rounded-full bg-[var(--color-accent)]" />
-      </div>
+      <PulseLoader
+        containerClassName="page-container py-16"
+        dotClassName="h-8 w-8"
+      />
     );
   }
 

@@ -121,31 +121,32 @@ vi.mock("@/components/features/SearchResultsOverlayV2", () => ({
 
 vi.mock("@/components/features/tracking/LiveCorridorMap", () => ({
   __esModule: true,
-  default: (props: any) => (
-    <div>
-      <div>{`map-corridor:${props.corridorId ?? "none"}`}</div>
-      <div>{`map-results:${props.journeyResults.length}`}</div>
-      <div>{`route-line:${props.routeLine?.coordinates?.length ?? 0}`}</div>
-      <div>{`route-eta:${props.routeEtaSeconds ?? "none"}`}</div>
-      <div>{`route-distance:${props.routeDistanceMeters ?? "none"}`}</div>
-      <div>{`is-routing:${String(props.isRouting)}`}</div>
-      <button
-        onClick={() =>
-          props.onTrackNganya(
-            props.journeyResults[0] ?? {
-              nganya_id: "nganya-1",
-              nganya_name: "Matwana Express",
-              corridor_id: "corridor-1",
-              corridor_name: "Thika Road",
-              eta_minutes: 5,
-            },
-          )
-        }
-      >
-        map-track
-      </button>
-    </div>
-  ),
+  default: (props: any) =>
+    props.isActive ? (
+      <div>
+        <div>{`map-corridor:${props.corridorId ?? "none"}`}</div>
+        <div>{`map-results:${props.journeyResults.length}`}</div>
+        <div>{`route-line:${props.routeLine?.coordinates?.length ?? 0}`}</div>
+        <div>{`route-eta:${props.routeEtaSeconds ?? "none"}`}</div>
+        <div>{`route-distance:${props.routeDistanceMeters ?? "none"}`}</div>
+        <div>{`is-routing:${String(props.isRouting)}`}</div>
+        <button
+          onClick={() =>
+            props.onTrackNganya(
+              props.journeyResults[0] ?? {
+                nganya_id: "nganya-1",
+                nganya_name: "Matwana Express",
+                corridor_id: "corridor-1",
+                corridor_name: "Thika Road",
+                eta_minutes: 5,
+              },
+            )
+          }
+        >
+          map-track
+        </button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/lib/queries/discover", () => ({
@@ -413,6 +414,7 @@ describe("HomeScreen", () => {
     const { onCorridorChange } = renderHome();
 
     expect(screen.getByText("Plan fast, catch faster")).toBeTruthy();
+    expect(screen.getByText("map-corridor:none")).toBeTruthy();
     expect(screen.getByText("Recently Spotted")).toBeTruthy();
     expect(screen.queryByText("Live on this route")).toBeNull();
     expect(screen.queryByText("feature:Matwana Express")).toBeNull();

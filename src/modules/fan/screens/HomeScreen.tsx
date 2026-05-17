@@ -1056,7 +1056,7 @@ export default function HomeScreen({
           <div className="h-full rounded-[var(--radius-xl)]">
             <div className="h-full overflow-hidden rounded-[var(--radius-xl)]">
               <LiveCorridorMap
-                isActive={Boolean(mapCorridorId)}
+                isActive
                 corridorId={mapCorridorId}
                 corridorName={mapCorridorName}
                 pickupStage={plannerContext.fromStage}

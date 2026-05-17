@@ -27,6 +27,7 @@ import {
 } from "@/lib/tracking-signal";
 import { useGeolocationStream } from "@/hooks/useGeolocationStream";
 import { NganyaMarker, StageMarker, UserMarker } from "./TrackingMapMarkers";
+import { PulseLoader } from "@/components/ui/loading";
 import type { JourneyResult } from "@/lib/types/journey";
 import type {
   TrackingPosition,
@@ -602,7 +603,6 @@ export default function LiveCorridorMap({
           </Map>
         </div>
 
-        {/* ── Initial map tile load ─────────────────────────────────────── */}
         {!mapReady && (
           <div
             className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
@@ -610,26 +610,12 @@ export default function LiveCorridorMap({
             aria-label="Map loading"
             aria-live="polite"
           >
-            {/* Animated map-pin skeleton */}
-            <div className="relative flex items-center justify-center">
-              <span
-                className="absolute w-14 h-14 rounded-full animate-ping"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  opacity: 0.12,
-                }}
-              />
-              <span
-                className="relative w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: "var(--color-accent)" }}
-              />
-            </div>
-            <p
-              className="text-xs font-medium"
-              style={{ color: "var(--color-text-tertiary)" }}
-            >
-              Loading map…
-            </p>
+            <PulseLoader
+              label="Loading map..."
+              containerClassName="flex-col gap-3"
+              dotClassName="h-8 w-8"
+              labelClassName="text-xs font-medium text-[var(--color-text-tertiary)]"
+            />
           </div>
         )}
 

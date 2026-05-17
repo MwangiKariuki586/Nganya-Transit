@@ -14,7 +14,7 @@ import InlineTrackingCard from "./tracking/InlineTrackingCard";
 import { searchNganyaJourney } from "../../lib/queries/discover";
 import { supabase } from "../../lib/supabase";
 import { MapPin, Map, Zap } from "lucide-react";
-import { InlineTableLoader } from "../ui/loading";
+import { InlineTableLoader, PulseLoader } from "../ui/loading";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import type { JourneyResult } from "../../lib/types/journey";
 
@@ -276,10 +276,12 @@ export default function SearchResultsOverlayV2({
       {!inline && isRefetching ? <InlineTableLoader /> : null}
 
       {!inline && isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-4 text-xs text-[var(--color-text-tertiary)]">
-          <div className="animate-pulse w-6 h-6 rounded-full bg-[var(--color-accent)]" />
-          Updating trip data…
-        </div>
+        <PulseLoader
+          label="Updating trip data..."
+          containerClassName="py-4"
+          dotClassName="h-6 w-6"
+          labelClassName="text-xs text-[var(--color-text-tertiary)]"
+        />
       ) : null}
     </div>
   );
