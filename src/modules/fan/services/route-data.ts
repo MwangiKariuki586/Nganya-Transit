@@ -15,6 +15,7 @@ import {
   getMySightings,
 } from "@/lib/queries/sightings";
 import { getStableClientSession } from "@/shared/auth/client-session";
+import { enrichNganyaImageFields } from "@/modules/fan/lib/nganya-card";
 
 // ── Shared data loaded once at the fan layout level ─────────────────
 
@@ -128,6 +129,13 @@ export async function loadFanHomeRouteData(
     getOptionalFollows(),
   ]);
 
+  const nganyasById = new Map(
+    nganyas.map((nganya: any) => [nganya.id || nganya.nganya_id, nganya]),
+  );
+  const enrichedLiveNganyas = liveNganyas.map((live: any) =>
+    enrichNganyaImageFields(live, nganyasById),
+  );
+
   const recentSightings = activeCorridor
     ? await getCorridorSightings(activeCorridor)
     : await getHomepageRecentSightings(80, { includeConfidence: false });
@@ -138,7 +146,7 @@ export async function loadFanHomeRouteData(
     activeVibe,
     corridors,
     nganyas,
-    liveNganyas,
+    liveNganyas: enrichedLiveNganyas,
     recentSightings,
     followedIds: toFollowedIds(follows),
   };
@@ -167,14 +175,9 @@ export async function loadDiscoverRouteData(
   // liveNganyas rows come from v_live_now which has no nganya_media / crew_nganyas joins,
   // so we merge each live row with its matching allNganyas entry to get the image fields.
   const allNganyasById = new Map(allNganyas.map((n: any) => [n.id, n]));
-  const featuredLive = liveNganyas.slice(0, 6).map((live: any) => {
-    const nganyaId = live.nganya_id || live.id;
-    const full = allNganyasById.get(nganyaId);
-    if (!full) return live;
-    // Spread full nganya fields first (has image relations), then overlay live session
-    // fields (nganya_id, status, last_ping_at, etc.) so isLive detection still works.
-    return { ...full, ...live, nganya_media: full.nganya_media, crew_nganyas: full.crew_nganyas };
-  });
+  const featuredLive = liveNganyas
+    .slice(0, 6)
+    .map((live: any) => enrichNganyaImageFields(live, allNganyasById));
 
   return {
     corridors: corridorSummaries,

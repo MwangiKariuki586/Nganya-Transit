@@ -15,7 +15,6 @@ import {
   toNganyaSlug,
 } from "@/lib/formatters";
 import { getTrackingSignalState } from "@/lib/tracking-signal";
-import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { Clock, TrendingUp, ChevronRight, BellRing, ShieldAlert } from "lucide-react";
 import WhereToCard, {
   type PlannerFiltersValue,
@@ -47,6 +46,10 @@ import {
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
 import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
 import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
+import {
+  enrichNganyaImageFields,
+  mapNganyaRecordToCardData,
+} from "@/modules/fan/lib/nganya-card";
 
 interface HomeScreenProps {
   data: FanHomeRouteData;
@@ -775,35 +778,21 @@ export default function HomeScreen({
     [featuredLiveNganya, filteredLiveNganyas],
   );
 
-  const mapSupabaseToCardProps = (dbNganya: any) => {
-    if (!dbNganya) return null;
-    const normalizedId = dbNganya.nganya_id || dbNganya.id;
-    const isLive =
-      filteredLiveNganyas.some((ln) => ln.nganya_id === normalizedId) ||
-      dbNganya.status === "LIVE";
+  const fullHomepageNganyasById = useMemo(
+    () =>
+      new Map(
+        nganyas
+          .map((nganya) => [nganya.id || nganya.nganya_id, nganya] as const)
+          .filter(([id]) => Boolean(id)),
+      ),
+    [nganyas],
+  );
 
-    return {
-      id: normalizedId,
-      slug:
-        dbNganya.slug ||
-        dbNganya.nganya_slug ||
-        toNganyaSlug(dbNganya.nganya_name || dbNganya.name),
-      name: dbNganya.nganya_name || dbNganya.name,
-      corridorId: dbNganya.corridor_id || dbNganya.nganyas?.corridor_id || null,
-      corridorName:
-        dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
-      corridor:
-        dbNganya.corridor_name || dbNganya.corridors?.name || "Unknown Route",
-      vibeTags: dbNganya.vibeTags || dbNganya.tags || [],
-      imageUrl: pickPrimaryNganyaImageUrl(dbNganya) ?? "",
-      isLive,
-      isNewBuild: dbNganya.tags?.includes("NEW_BUILD") || dbNganya.is_new_build,
-      isVerified: dbNganya.is_verified,
-      followers: dbNganya.follower_count || 0,
-      sightingsToday: dbNganya.sighting_count_today || 0,
-      lastSeen: dbNganya.last_seen || "Recently",
-    };
-  };
+  const mapSupabaseToCardProps = (dbNganya: any) =>
+    mapNganyaRecordToCardData(
+      enrichNganyaImageFields(dbNganya, fullHomepageNganyasById),
+      { liveNganyas: filteredLiveNganyas },
+    );
 
   const featuredLiveCardData = featuredLiveNganya
     ? mapSupabaseToCardProps(featuredLiveNganya)

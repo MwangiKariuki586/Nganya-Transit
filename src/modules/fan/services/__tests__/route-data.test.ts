@@ -76,7 +76,7 @@ describe("fan route data", () => {
     expect(result.corridors[0].liveCount).toBe(1);
     expect(result.allNganyas).toHaveLength(1);
     expect(result.featuredLive).toHaveLength(1);
-    expect(result.liveNganyas).toBe(sharedLiveNganyas);
+    expect(result.liveNganyas).toStrictEqual(sharedLiveNganyas);
     expect(result.followedIds.has("n-1")).toBe(true);
     expect(result.totalCount).toBe(1);
   });
@@ -103,12 +103,55 @@ describe("fan route data", () => {
 
     expect(result.activeCorridor).toBeNull();
     expect(result.corridors).toBe(sharedCorridors);
-    expect(result.liveNganyas).toBe(sharedLiveNganyas);
+    expect(result.liveNganyas).toStrictEqual(sharedLiveNganyas);
     expect(searchHomepageNganyas).toHaveBeenCalledWith("", undefined);
     expect(getHomepageRecentSightings).toHaveBeenCalledWith(80, {
       includeConfidence: false,
     });
     expect(getCorridorSightings).not.toHaveBeenCalled();
+  });
+
+  it("enriches home live nganyas with full image relations from homepage nganyas", async () => {
+    searchHomepageNganyas.mockResolvedValue([
+      {
+        id: "n-1",
+        name: "Alcapone",
+        corridor_id: "corr-1",
+        nganya_media: [
+          { media_url: "https://example.com/gallery.jpg", media_type: "image" },
+        ],
+      },
+    ]);
+    getHomepageRecentSightings.mockResolvedValue([]);
+    getMyFollows.mockResolvedValue([]);
+    getStableClientSession.mockResolvedValue(null);
+
+    const { loadFanHomeRouteData } = await import(
+      "@/modules/fan/services/route-data"
+    );
+
+    const result = await loadFanHomeRouteData(
+      {},
+      {
+        corridors: [{ id: "corr-1", name: "Kasarani" }],
+        liveNganyas: [
+          {
+            id: "live-1",
+            nganya_id: "n-1",
+            nganya_name: "Alcapone",
+            corridor_id: "corr-1",
+            profile_photo_url: "https://example.com/live.jpg",
+          },
+        ],
+      },
+    );
+
+    expect(result.liveNganyas[0]?.nganya_media?.[0]?.media_url).toBe(
+      "https://example.com/gallery.jpg",
+    );
+    expect(result.liveNganyas[0]?.profile_photo_url).toBe(
+      "https://example.com/live.jpg",
+    );
   });
 
   it("loads shared data with corridors and live nganyas", async () => {

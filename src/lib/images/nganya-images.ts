@@ -56,6 +56,7 @@ export function pickPrimaryNganyaImageUrl(nganya: {
   crew_nganyas?: Array<{ profiles?: { avatar_url?: string | null } | { avatar_url?: string | null }[] | null } | null> | null
   nganya_media?: Array<{ media_url?: string | null }> | null
   image_url?: string | null
+  profile_photo_url?: string | null
 } | null | undefined): string | null {
   if (!nganya) {
     return null
@@ -68,7 +69,12 @@ export function pickPrimaryNganyaImageUrl(nganya: {
       return p.avatar_url
     }
   }
-  return nganya.nganya_media?.[0]?.media_url || nganya.image_url || null
+  return (
+    nganya.nganya_media?.[0]?.media_url ||
+    nganya.image_url ||
+    nganya.profile_photo_url ||
+    null
+  )
 }
 
 export function resolveNganyaImageUrl(

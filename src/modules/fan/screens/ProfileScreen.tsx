@@ -20,7 +20,6 @@ import {
   formatHandle,
   formatMonthYear,
   getInitials,
-  toNganyaSlug,
 } from "@/lib/formatters";
 import {
   getSignalStrength,
@@ -34,7 +33,7 @@ import { useProfileMediaUpload } from "@/hooks/useProfileMediaUpload";
 import InlineSpinner from "@/components/ui/InlineSpinner";
 import { UploadProgressBar } from "@/components/ui/UploadProgressBar";
 import type { ProfileRouteData } from "@/modules/fan/services/route-data";
-import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
+import { mapNganyaRecordToCardData } from "@/modules/fan/lib/nganya-card";
 
 interface ProfileScreenProps {
   data: ProfileRouteData;
@@ -180,31 +179,14 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     const activitySignal = getNganyaActivitySignal(
       liveNganyas.filter((l: any) => l.nganya_id === nganyaId),
     );
-    return {
-      id: nganyaId,
-      slug:
-        nganyaData.slug ||
-        nganyaData.nganya_slug ||
-        toNganyaSlug(nganyaData.nganya_name || nganyaData.name),
-      name: nganyaData.nganya_name || nganyaData.name,
-      corridor:
-        nganyaData.corridor_name ||
-        nganyaData.corridors?.name ||
-        "Unknown Route",
-      vibeTags: nganyaData.vibeTags || nganyaData.tags || [],
-      imageUrl: pickPrimaryNganyaImageUrl(nganyaData) ?? "",
-      isLive,
-      isNewBuild:
-        nganyaData.tags?.includes("NEW_BUILD") || nganyaData.is_new_build,
-      isVerified: nganyaData.is_verified,
-      followers: nganyaData.follower_count || 0,
-      sightingsToday: nganyaData.sighting_count_today || 0,
+    return mapNganyaRecordToCardData(nganyaData, {
+      liveNganyas,
       lastSeen: activitySignal.isFresh
         ? activitySignal.label
         : isLive
           ? "Live now"
           : activitySignal.label,
-    };
+    });
   };
 
   if (!authUser) return null;

@@ -1009,6 +1009,14 @@ describe("HomeScreen", () => {
     expect(screen.getByText("Live on this route")).toBeTruthy();
     expect(screen.queryByText("Recently Spotted")).toBeNull();
     expect(screen.getByText("feature:Matwana Express")).toBeTruthy();
+    const featuredCardEntry = cardRenderLog.find(
+      (entry: any) =>
+        entry.variant === "feature" &&
+        entry.nganya?.name === "Matwana Express",
+    ) as any;
+    expect(featuredCardEntry?.nganya?.imageUrl).toBe(
+      "https://example.com/1.jpg",
+    );
 
     const liveRouteSection = screen.getByText("Live on this route").closest("section");
     const routeGrid = (liveRouteSection as HTMLElement).querySelector(".grid-cards");

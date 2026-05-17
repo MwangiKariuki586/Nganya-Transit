@@ -4,9 +4,6 @@ import { toNganyaSlug } from '../formatters'
 const NGANYA_IMAGE_SELECT =
   '*, corridors(name), nganya_media(media_url, media_type), crew_nganyas(profiles(avatar_url))'
 
-const NGANYA_HOMEPAGE_SELECT =
-  'id, name, corridor_id, created_at, tags, is_verified, corridors(name), nganya_media(media_url, media_type)'
-
 function dedupeNganyas<T extends { id: string; nganya_media?: any[]; crew_nganyas?: any[] }>(
   rows: T[] | null,
 ) {
@@ -72,7 +69,7 @@ export async function searchHomepageNganyas(
     corridorId?: string,
     limit = 36,
 ) {
-    let query = supabase.from('nganyas').select(NGANYA_HOMEPAGE_SELECT)
+    let query = supabase.from('nganyas').select(NGANYA_IMAGE_SELECT)
 
     if (corridorId) {
         query = query.eq('corridor_id', corridorId)
