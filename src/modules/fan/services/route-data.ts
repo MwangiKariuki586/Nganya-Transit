@@ -1,4 +1,8 @@
-import { getCorridors, searchNganyas } from "@/lib/queries/discover";
+import {
+  getCorridors,
+  searchHomepageNganyas,
+  searchNganyas,
+} from "@/lib/queries/discover";
 import { getMyFollows } from "@/lib/queries/follows";
 import { getLiveNow } from "@/lib/queries/live";
 import {
@@ -120,7 +124,7 @@ export async function loadFanHomeRouteData(
   const activeVibe = input.vibe || null;
 
   const [nganyas, follows] = await Promise.all([
-    searchNganyas(search, activeCorridor || undefined),
+    searchHomepageNganyas(search, activeCorridor || undefined),
     getOptionalFollows(),
   ]);
 

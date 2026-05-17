@@ -396,6 +396,12 @@ export default function HomeScreen({
     [liveNganyas, activeCorridor],
   );
 
+  const hasSelectedRouteLiveNganyas =
+    Boolean(activeCorridor) && filteredLiveNganyas.length > 0;
+
+  const shouldShowRecentSightings =
+    !activeCorridor || filteredLiveNganyas.length === 0;
+
   const filteredRecentSightings = useMemo(() => {
     if (!activeCorridor) return recentSightings;
     const routeName = (activeCorridorName || "").toLowerCase();
@@ -441,6 +447,19 @@ export default function HomeScreen({
     }
     return aggregatedRecentSightings;
   }, [aggregatedRecentSightings, recentFilter]);
+
+  const onRouteRecentCount = useMemo(
+    () => aggregatedRecentSightings.filter((row) => row.onRoute).length,
+    [aggregatedRecentSightings],
+  );
+
+  const highActivityRecentCount = useMemo(
+    () =>
+      aggregatedRecentSightings.filter(
+        (row) => row.sightingsCountRecent >= 2 || row.distinctUsersCount >= 2,
+      ).length,
+    [aggregatedRecentSightings],
+  );
 
   const recentSightingsRef = useRef<HTMLElement>(null);
 
@@ -743,19 +762,28 @@ export default function HomeScreen({
     return () => window.cancelAnimationFrame(frame);
   }, [plannerJourneyKey, rideWatchScrollToken]);
 
-  const featuredNganya =
-    filteredNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
-    filteredNganyas[0] ??
-    nganyas[0];
+  const featuredLiveNganya =
+    filteredLiveNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
+    filteredLiveNganyas[0] ??
+    null;
+
+  const consolidatedLiveRouteCards = useMemo(
+    () =>
+      filteredLiveNganyas.filter(
+        (n) => n.nganya_id !== featuredLiveNganya?.nganya_id,
+      ),
+    [featuredLiveNganya, filteredLiveNganyas],
+  );
 
   const mapSupabaseToCardProps = (dbNganya: any) => {
     if (!dbNganya) return null;
+    const normalizedId = dbNganya.nganya_id || dbNganya.id;
     const isLive =
-      filteredLiveNganyas.some((ln) => ln.nganya_id === dbNganya.id) ||
+      filteredLiveNganyas.some((ln) => ln.nganya_id === normalizedId) ||
       dbNganya.status === "LIVE";
 
     return {
-      id: dbNganya.nganya_id || dbNganya.id,
+      id: normalizedId,
       slug:
         dbNganya.slug ||
         dbNganya.nganya_slug ||
@@ -776,6 +804,10 @@ export default function HomeScreen({
       lastSeen: dbNganya.last_seen || "Recently",
     };
   };
+
+  const featuredLiveCardData = featuredLiveNganya
+    ? mapSupabaseToCardProps(featuredLiveNganya)
+    : null;
 
   const handlePlanRideForNganya = (item: BrowseCardActionItem) => {
     setPlannerContext((current) =>
@@ -1053,7 +1085,7 @@ export default function HomeScreen({
         </div>
       </section>
 
-      {plannerJourneyKey ? (
+      {plannerJourneyKey && plannerAssistStatus !== "no_matches" ? (
         <section
           ref={rideWatchSectionRef}
           className="space-y-4"
@@ -1063,11 +1095,9 @@ export default function HomeScreen({
             <div>
               <h2 className="text-h3">Ride watch</h2>
               <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {plannerAssistStatus === "no_matches"
-                  ? "Nothing reliable is lining up for this pickup yet."
-                  : watchedRide
-                    ? `Watching ${watchedRide.nganya_name} for ${plannerContext.fromStage?.name}.`
-                    : "Pick one ride to watch or keep backups ready."}
+                {watchedRide
+                  ? `Watching ${watchedRide.nganya_name} for ${plannerContext.fromStage?.name}.`
+                  : "Pick one ride to watch or keep backups ready."}
               </p>
             </div>
             {plannerRideOptions.length > 0 ? (
@@ -1146,8 +1176,8 @@ export default function HomeScreen({
                       {recommendedRide.nganya_name}
                     </p>
                     <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                      {recommendedRide.corridor_name} · ~{recommendedRide.eta_minutes} min to{" "}
-                      {plannerContext.fromStage?.name}
+                      {recommendedRide.corridor_name} to {plannerContext.fromStage?.name}, about{" "}
+                      {recommendedRide.eta_minutes} min away
                     </p>
                   </div>
                   <CatchabilityBadge
@@ -1236,39 +1266,6 @@ export default function HomeScreen({
             </div>
           ) : null}
 
-          {plannerAssistStatus === "no_matches" ? (
-            <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
-              <p>No strong ride matches yet for this stage.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    recentSightingsRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    })
-                  }
-                >
-                  Check recent sightings
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    router.navigate({
-                      to: "/discover",
-                      search: {
-                        corridor: plannerCorridorId || undefined,
-                      } as any,
-                    })
-                  }
-                >
-                  Find similar rides
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
@@ -1329,7 +1326,8 @@ export default function HomeScreen({
         )}
       </section> */}
 
-      <section ref={recentSightingsRef}>
+      {shouldShowRecentSightings ? (
+        <section ref={recentSightingsRef}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-h3">Recently Spotted</h2>
@@ -1339,40 +1337,42 @@ export default function HomeScreen({
                 : "Fresh route signals, grouped for quick decisions"}
             </p>
           </div>
-          <button
-            onClick={() =>
-              router.navigate({
-                to: "/",
-                search: (current: any) => ({
-                  ...current,
-                  recent: showAllRecent ? undefined : "all",
-                }),
-              })
-            }
-            className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
-          >
-            {showAllRecent ? "Show less" : "See all"}{" "}
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {filteredAggregatedRecentSightings.length > 0 ? (
+            <button
+              onClick={() =>
+                router.navigate({
+                  to: "/",
+                  search: (current: any) => ({
+                    ...current,
+                    recent: showAllRecent ? undefined : "all",
+                  }),
+                })
+              }
+              className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] transition-colors cursor-pointer hover:text-[var(--color-accent)]"
+            >
+              {showAllRecent ? "Show less" : "See all"}{" "}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : null}
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Chip
-            label="All"
+            label={`All (${recentSummaryCount})`}
             variant="route"
             isActive={recentFilter === "ALL"}
             onClick={() => setRecentFilter("ALL")}
           />
           {activeCorridor ? (
             <Chip
-              label="On your route"
+              label={`On your route (${onRouteRecentCount})`}
               variant="route"
               isActive={recentFilter === "ON_ROUTE"}
               onClick={() => setRecentFilter("ON_ROUTE")}
             />
           ) : null}
           <Chip
-            label="High activity"
+            label={`High activity (${highActivityRecentCount})`}
             variant="route"
             isActive={recentFilter === "HIGH_ACTIVITY"}
             onClick={() => setRecentFilter("HIGH_ACTIVITY")}
@@ -1445,7 +1445,7 @@ export default function HomeScreen({
                       <div className="mt-1 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
                         <span>{row.signalLabel}</span>
                         {row.sightingsCountRecent > 1 ? (
-                          <span>• {row.sightingsCountRecent} sightings</span>
+                          <span>{row.sightingsCountRecent} sightings</span>
                         ) : null}
                       </div>
                     </div>
@@ -1475,19 +1475,30 @@ export default function HomeScreen({
               })}
           </div>
         ) : (
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
-            <p className="mt-1">No recent sightings</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-3"
-              onClick={() => router.navigate({ to: "/spot" })}
-            >
-              Be the first to spot
-            </Button>
+          <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line)] bg-[var(--color-bg-card)]/35 p-4 md:p-5">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div className="space-y-2">
+                <p className="text-sm text-[var(--color-text-primary)]">
+                  {recentFilter === "ON_ROUTE"
+                    ? "No fresh sightings on your route"
+                    : recentFilter === "HIGH_ACTIVITY"
+                      ? "No high-activity sightings right now"
+                      : "No recent sightings yet"}
+                </p>
+              
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.navigate({ to: "/spot" })}
+              >
+                Be the first to spot
+              </Button>
+            </div>
           </div>
         )}
-      </section>
+        </section>
+      ) : null}
 
       {trackingRow && plannerContext.toPlace && plannerContext.fromStage ? (
         <SearchResultsOverlayV2
@@ -1517,66 +1528,83 @@ export default function HomeScreen({
         />
       ) : null}
 
-      {featuredNganya && (
+      {hasSelectedRouteLiveNganyas && featuredLiveCardData ? (
         <section>
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-[var(--color-green)]" />
-            <span className="text-tag text-[var(--color-green)]">
-              Featured on this route
-            </span>
-          </div>
-          <div className="hidden md:block">
-            <Card
-              nganya={mapSupabaseToCardProps(featuredNganya) as any}
-              variant="feature"
-              isFollowing={isFollowingNganya(featuredNganya.id)}
-              onFollow={toggleFollow}
-            />
-          </div>
-          <div className="md:hidden">
-            <Card
-              nganya={mapSupabaseToCardProps(featuredNganya) as any}
-              variant="standard"
-              isFollowing={isFollowingNganya(featuredNganya.id)}
-              onFollow={toggleFollow}
-            />
-          </div>
-        </section>
-      )}
-
-      <section>
-        {(() => {
-          // Nganyas on the active corridor, sorted newest-first, capped at 3.
-          // Falls back to all nganyas when no corridor is selected.
-          const routeNganyas = [...nganyas]
-            .filter((n) => !mapCorridorId || n.corridor_id === mapCorridorId)
-            .sort(
-              (a, b) =>
-                new Date(b.created_at || 0).getTime() -
-                new Date(a.created_at || 0).getTime(),
-            )
-            .slice(0, 3);
-
-          if (routeNganyas.length === 0) return null;
-
-          return (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-h3">More on this route</h2>
-                <a
-                  href={
-                    mapCorridorId
-                      ? `/discover?corridorId=${encodeURIComponent(mapCorridorId)}`
-                      : "/discover"
-                  }
-                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline shrink-0"
-                >
-                  View all
-                </a>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-[var(--color-green)]" />
+              <div>
+                <h2 className="text-h3">Live on this route</h2>
+                <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+                  {filteredLiveNganyas.length} live nganya
+                  {filteredLiveNganyas.length === 1 ? "" : "s"} lining up on{" "}
+                  {activeCorridorName || "your route"}.
+                </p>
               </div>
+            </div>
+            <a
+              href={`/discover?corridorId=${encodeURIComponent(activeCorridor!)}`}
+              className="shrink-0 text-xs font-semibold text-[var(--color-accent)] hover:underline"
+            >
+              View all
+            </a>
+          </div>
 
+          <div className="space-y-6">
+            <div className="hidden md:block">
+              <Card
+                nganya={featuredLiveCardData as any}
+                variant="feature"
+                isFollowing={isFollowingNganya(featuredLiveCardData.id)}
+                onFollow={toggleFollow}
+                onCardClick={() => handleBrowseCardAction(featuredLiveCardData as any)}
+                primaryAction={{
+                  label: canTrackWithPlannerContext(
+                    plannerContext,
+                    featuredLiveCardData as any,
+                  )
+                    ? "Track"
+                    : "Plan ride",
+                  onClick: () => handleBrowseCardAction(featuredLiveCardData as any),
+                }}
+                secondaryAction={{
+                  label: isFollowingNganya(featuredLiveCardData.id)
+                    ? "Following"
+                    : "Follow",
+                  onClick: () => void toggleFollow(featuredLiveCardData.id),
+                  variant: "secondary",
+                }}
+              />
+            </div>
+            <div className="md:hidden">
+              <Card
+                nganya={featuredLiveCardData as any}
+                variant="standard"
+                isFollowing={isFollowingNganya(featuredLiveCardData.id)}
+                onFollow={toggleFollow}
+                onCardClick={() => handleBrowseCardAction(featuredLiveCardData as any)}
+                primaryAction={{
+                  label: canTrackWithPlannerContext(
+                    plannerContext,
+                    featuredLiveCardData as any,
+                  )
+                    ? "Track"
+                    : "Plan ride",
+                  onClick: () => handleBrowseCardAction(featuredLiveCardData as any),
+                }}
+                secondaryAction={{
+                  label: isFollowingNganya(featuredLiveCardData.id)
+                    ? "Following"
+                    : "Follow",
+                  onClick: () => void toggleFollow(featuredLiveCardData.id),
+                  variant: "secondary",
+                }}
+              />
+            </div>
+
+            {consolidatedLiveRouteCards.length > 0 ? (
               <div className="grid-cards">
-                {routeNganyas.map((n) => {
+                {consolidatedLiveRouteCards.map((n) => {
                   const cardData = mapSupabaseToCardProps(n);
                   if (!cardData) return null;
                   return (
@@ -1606,10 +1634,10 @@ export default function HomeScreen({
                   );
                 })}
               </div>
-            </>
-          );
-        })()}
-      </section>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

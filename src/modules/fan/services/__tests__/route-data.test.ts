@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCorridors = vi.fn();
 const searchNganyas = vi.fn();
+const searchHomepageNganyas = vi.fn();
 const getLiveNow = vi.fn();
 const getMyFollows = vi.fn();
 const getStableClientSession = vi.fn();
 const getCorridorSightings = vi.fn();
+const getHomepageRecentSightings = vi.fn();
 
 vi.mock("@/lib/queries/discover", () => ({
   getCorridors,
+  searchHomepageNganyas,
   searchNganyas,
 }));
 
@@ -26,6 +29,7 @@ vi.mock("@/shared/auth/client-session", () => ({
 
 vi.mock("@/lib/queries/sightings", () => ({
   getCorridorSightings,
+  getHomepageRecentSightings,
   getMySightings: vi.fn(),
   postSighting: vi.fn(),
 }));
@@ -40,10 +44,12 @@ describe("fan route data", () => {
   beforeEach(() => {
     getCorridors.mockReset();
     searchNganyas.mockReset();
+    searchHomepageNganyas.mockReset();
     getLiveNow.mockReset();
     getMyFollows.mockReset();
     getStableClientSession.mockReset();
     getCorridorSightings.mockReset();
+    getHomepageRecentSightings.mockReset();
   });
 
   it("loads discover catalogue data with corridor summaries and full nganya list", async () => {
@@ -82,8 +88,8 @@ describe("fan route data", () => {
     ];
     const sharedLiveNganyas: any[] = [];
 
-    searchNganyas.mockResolvedValue([]);
-    getCorridorSightings.mockResolvedValue([]);
+    searchHomepageNganyas.mockResolvedValue([]);
+    getHomepageRecentSightings.mockResolvedValue([]);
     getMyFollows.mockResolvedValue([]);
     getStableClientSession.mockResolvedValue(null);
 
@@ -98,6 +104,11 @@ describe("fan route data", () => {
     expect(result.activeCorridor).toBeNull();
     expect(result.corridors).toBe(sharedCorridors);
     expect(result.liveNganyas).toBe(sharedLiveNganyas);
+    expect(searchHomepageNganyas).toHaveBeenCalledWith("", undefined);
+    expect(getHomepageRecentSightings).toHaveBeenCalledWith(80, {
+      includeConfidence: false,
+    });
+    expect(getCorridorSightings).not.toHaveBeenCalled();
   });
 
   it("loads shared data with corridors and live nganyas", async () => {

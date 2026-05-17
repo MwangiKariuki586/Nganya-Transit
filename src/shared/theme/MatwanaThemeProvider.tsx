@@ -45,13 +45,14 @@ export function applyMatwanaColorwayTheme(
 }
 
 export function MatwanaThemeProvider({ children }: { children: ReactNode }) {
-  const [colorway, setColorwayState] =
-    useState<MatwanaColorwayKey>(MATWANA_DEFAULT_COLORWAY);
+  const [colorway, setColorwayState] = useState<MatwanaColorwayKey>(() =>
+    readStoredColorway(),
+  );
 
   useEffect(() => {
-    const next = readStoredColorway();
-    setColorwayState(next);
-    applyMatwanaColorwayTheme(document.documentElement, next);
+    // Re-apply on mount in case the inline script ran before stylesheets loaded
+    // and any cascade reset the custom properties.
+    applyMatwanaColorwayTheme(document.documentElement, colorway);
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== MATWANA_COLORWAY_STORAGE_KEY) return;
@@ -103,4 +104,3 @@ export function useMatwanaTheme() {
 
   return context;
 }
-

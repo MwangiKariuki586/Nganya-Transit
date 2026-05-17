@@ -153,3 +153,19 @@ export function getMatwanaThemeCssVariables(
   };
 }
 
+/**
+ * A static lookup table of pre-computed CSS variables for every colorway.
+ * Serialised into the inline <script> in __root.tsx so the browser can apply
+ * the correct theme synchronously — before the first paint — without running
+ * any colour-math at runtime.
+ *
+ * Exported as a plain object literal so it can be JSON.stringify'd at build
+ * time and embedded directly in the script tag.
+ */
+export const MATWANA_COLORWAY_STATIC_MAP: Record<
+  MatwanaColorwayKey,
+  MatwanaThemeCssVariables
+> = Object.fromEntries(
+  MATWANA_COLORWAY_KEYS.map((key) => [key, getMatwanaThemeCssVariables(key)]),
+) as Record<MatwanaColorwayKey, MatwanaThemeCssVariables>;
+

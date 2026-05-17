@@ -414,16 +414,12 @@ describe("HomeScreen", () => {
 
     expect(screen.getByText("Plan fast, catch faster")).toBeTruthy();
     expect(screen.getByText("Recently Spotted")).toBeTruthy();
-    expect(screen.getByText("Featured on this route")).toBeTruthy();
-    expect(screen.getByText("More on this route")).toBeTruthy();
-    expect(screen.getByText("feature:Matwana Express")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "View all" }).getAttribute("href")).toBe(
-      "/discover",
-    );
-    expect(screen.queryByText("On your route")).toBeNull();
+    expect(screen.queryByText("Live on this route")).toBeNull();
+    expect(screen.queryByText("feature:Matwana Express")).toBeNull();
+    expect(screen.queryByText(/^On your route/)).toBeNull();
     expect(screen.getByText("2 nganyas spotted in the last 15 min")).toBeTruthy();
 
-    fireEvent.click(screen.getByText("High activity"));
+    fireEvent.click(screen.getByText(/^High activity/));
     expect(screen.getByText("Matwana Express")).toBeTruthy();
     expect(screen.queryByText("Ngong Star")).toBeNull();
 
@@ -434,6 +430,7 @@ describe("HomeScreen", () => {
     renderHome(
       { activeCorridor: "corridor-1" },
       {
+        liveNganyas: [],
         recentSightings: [
           {
             id: "s-only",
@@ -449,7 +446,9 @@ describe("HomeScreen", () => {
       },
     );
 
-    expect(screen.getByText("On your route")).toBeTruthy();
+    expect(screen.getByText("Recently Spotted")).toBeTruthy();
+    expect(screen.queryByText("Live on this route")).toBeNull();
+    expect(screen.getByText(/^On your route/)).toBeTruthy();
     expect(screen.getByText("Ngong Star")).toBeTruthy();
   });
 
@@ -477,7 +476,7 @@ describe("HomeScreen", () => {
   it("routes the empty recent state to the spot flow", () => {
     renderHome({}, { recentSightings: [] });
 
-    expect(screen.getByText("No recent sightings")).toBeTruthy();
+    expect(screen.getByText("No recent sightings yet")).toBeTruthy();
     fireEvent.click(screen.getByText("Be the first to spot"));
     expect(mockRouterNavigate).toHaveBeenCalledWith({ to: "/spot" });
   });
@@ -489,7 +488,10 @@ describe("HomeScreen", () => {
       preference: "ANY",
     });
 
-    const { onCorridorChange } = renderHome({ activeCorridor: "corridor-1" });
+    const { onCorridorChange } = renderHome(
+      { activeCorridor: "corridor-1" },
+      { liveNganyas: [] },
+    );
 
     await waitFor(() => {
       expect(onCorridorChange).toHaveBeenCalledWith("corridor-1");
@@ -500,7 +502,10 @@ describe("HomeScreen", () => {
   });
 
   it("seeds the planner and avoids double firing when the recent row CTA is clicked", async () => {
-    const { onCorridorChange } = renderHome({ activeCorridor: "corridor-1" });
+    const { onCorridorChange } = renderHome(
+      { activeCorridor: "corridor-1" },
+      { liveNganyas: [] },
+    );
 
     fireEvent.click(screen.getAllByRole("button", { name: "Plan ride" })[0]);
 
@@ -570,17 +575,12 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    expect(
-      screen.getByText("Ride watch").closest("section")?.getAttribute("style"),
-    ).toContain("scroll-margin-top: calc(var(--top-nav-height) + 16px)");
-
     fireEvent.click(screen.getByText("planner-search"));
 
     await waitFor(() => {
-      expect(mockScrollIntoView).toHaveBeenCalledWith({
-        behavior: "smooth",
-        block: "start",
-      });
+      expect(
+        screen.getByText("Ride watch").closest("section")?.getAttribute("style"),
+      ).toContain("scroll-margin-top: calc(var(--top-nav-height) + 16px)");
     });
   });
 
@@ -848,7 +848,7 @@ describe("HomeScreen", () => {
     const { rerender } = render(
       <HomeScreen
         data={makeHomeData({ followedIds })}
-        activeCorridor={null}
+        activeCorridor="corridor-1"
         onCorridorChange={vi.fn()}
         onSearchChange={vi.fn()}
         showAllRecent={false}
@@ -858,32 +858,42 @@ describe("HomeScreen", () => {
     fireEvent.click(screen.getAllByText("follow-Matwana Express")[0]);
     await waitFor(() => {
       expect(mockUnfollowNganya).toHaveBeenCalledWith("nganya-1");
-      expect(mockRouterInvalidate).toHaveBeenCalled();
+      expect(mockRouterInvalidate).not.toHaveBeenCalled();
     });
 
     rerender(
       <HomeScreen
         data={makeHomeData({ followedIds: new Set<string>() })}
-        activeCorridor={null}
+        activeCorridor="corridor-1"
         onCorridorChange={vi.fn()}
         onSearchChange={vi.fn()}
         showAllRecent={false}
       />,
     );
 
-    fireEvent.click(screen.getByText("follow-Ngong Star"));
+    fireEvent.click(screen.getAllByText("follow-Matwana Express")[0]);
     await waitFor(() => {
-      expect(mockFollowNganya).toHaveBeenCalledWith("nganya-2");
+      expect(mockFollowNganya).toHaveBeenCalledWith("nganya-1");
     });
 
+    rerender(
+      <HomeScreen
+        data={makeHomeData({ followedIds: new Set<string>() })}
+        activeCorridor="corridor-1"
+        onCorridorChange={vi.fn()}
+        onSearchChange={vi.fn()}
+        showAllRecent={false}
+      />,
+    );
+
     mockFollowNganya.mockRejectedValueOnce(new Error("fail"));
-    fireEvent.click(screen.getByText("follow-Ngong Star"));
+    fireEvent.click(screen.getAllByText("follow-Matwana Express")[0]);
     await waitFor(() => {
       expect(mockShowErrorToast).toHaveBeenCalledWith("Failed to update follow.");
     });
   });
 
-  it("uses new build as the featured card and caps more-on-route cards to three newest items", () => {
+  it("shows one consolidated live-route section and keeps the featured live nganya out of the lower grid", () => {
     renderHome(
       { activeCorridor: "corridor-1" },
       {
@@ -949,19 +959,64 @@ describe("HomeScreen", () => {
             nganya_media: [{ media_url: "https://example.com/2.jpg", media_type: "image" }],
           },
         ],
+        liveNganyas: [
+          {
+            id: "live-1",
+            nganya_id: "nganya-1",
+            nganya_name: "Matwana Express",
+            corridor_id: "corridor-1",
+            corridor_name: "Thika Road",
+            last_ping_at: "2026-05-01T11:58:00.000Z",
+            profile_photo_url: "https://example.com/live.jpg",
+            tags: ["NEW_BUILD"],
+          },
+          {
+            id: "live-5",
+            nganya_id: "nganya-5",
+            nganya_name: "Newest Route",
+            corridor_id: "corridor-1",
+            corridor_name: "Thika Road",
+            last_ping_at: "2026-05-01T11:57:00.000Z",
+            profile_photo_url: "https://example.com/live-5.jpg",
+            tags: [],
+          },
+          {
+            id: "live-3",
+            nganya_id: "nganya-3",
+            nganya_name: "CBD Runner",
+            corridor_id: "corridor-1",
+            corridor_name: "Thika Road",
+            last_ping_at: "2026-05-01T11:55:00.000Z",
+            profile_photo_url: "https://example.com/live-3.jpg",
+            tags: [],
+          },
+          {
+            id: "live-4",
+            nganya_id: "nganya-4",
+            nganya_name: "Route Veteran",
+            corridor_id: "corridor-1",
+            corridor_name: "Thika Road",
+            last_ping_at: "2026-05-01T11:54:00.000Z",
+            profile_photo_url: "https://example.com/live-4.jpg",
+            tags: [],
+          },
+        ],
       },
     );
 
+    expect(screen.getByText("Live on this route")).toBeTruthy();
+    expect(screen.queryByText("Recently Spotted")).toBeNull();
     expect(screen.getByText("feature:Matwana Express")).toBeTruthy();
 
-    const moreRouteSection = screen.getByText("More on this route").closest("section");
-    const routeCardNames = within(moreRouteSection as HTMLElement)
+    const liveRouteSection = screen.getByText("Live on this route").closest("section");
+    const routeGrid = (liveRouteSection as HTMLElement).querySelector(".grid-cards");
+    const routeCardNames = within(routeGrid as HTMLElement)
       .getAllByTestId(/card-standard-/)
       .map((node) => node.textContent);
     expect(routeCardNames.join("|")).toContain("standard:Newest Route");
-    expect(routeCardNames.join("|")).toContain("standard:Matwana Express");
     expect(routeCardNames.join("|")).toContain("standard:CBD Runner");
-    expect(routeCardNames.join("|")).not.toContain("standard:Route Veteran");
+    expect(routeCardNames.join("|")).toContain("standard:Route Veteran");
+    expect(routeCardNames.join("|")).not.toContain("standard:Matwana Express");
     expect(screen.getByRole("link", { name: "View all" }).getAttribute("href")).toBe(
       "/discover?corridorId=corridor-1",
     );
