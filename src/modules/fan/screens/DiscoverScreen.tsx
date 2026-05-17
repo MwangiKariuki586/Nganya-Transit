@@ -36,16 +36,21 @@ function DiscoverScreen({
   const {
     corridors,
     featuredLive,
-    allNganyas,
+    initialNganyas,
     liveNganyas,
     followedIds,
     totalCount,
+    initialHasMore,
+    initialNextOffset,
   } = data;
 
   const { addToast } = useToast();
 
   const catalogue = useDiscoverCatalogue({
-    allNganyas,
+    initialNganyas,
+    initialHasMore,
+    initialNextOffset,
+    totalCount,
     initialFollowedIds: followedIds,
     liveNganyas,
     corridors,

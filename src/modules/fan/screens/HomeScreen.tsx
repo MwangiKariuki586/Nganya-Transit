@@ -1,420 +1,85 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { useToast } from "@/components/ui/ToastContainer";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Chip from "@/components/ui/Chip";
-import CatchabilityBadge from "@/components/ui/CatchabilityBadge";
-import LiveBadge from "@/components/ui/LiveBadge";
-import SearchInput from "@/components/ui/SearchInput";
 import Skeleton from "@/components/ui/Skeleton";
-import TrackingSignalBadge from "@/components/ui/TrackingSignalBadge";
-import {
-  formatDirectionLabel,
-  formatRelativeTime,
-  toNganyaSlug,
-} from "@/lib/formatters";
-import { getTrackingSignalState } from "@/lib/tracking-signal";
-import { Clock, TrendingUp, ChevronRight, BellRing, ShieldAlert } from "lucide-react";
-import WhereToCard, {
-  type PlannerFiltersValue,
-  type RideSearchPayload,
-} from "@/components/features/WhereToCard";
-import SearchResultsOverlayV2 from "@/components/features/SearchResultsOverlayV2";
-import LiveCorridorMap from "@/components/features/tracking/LiveCorridorMap";
-import type { JourneyResult } from "@/lib/types/journey";
-import { searchNganyaJourney } from "@/lib/queries/discover";
-import { supabase } from "@/lib/supabase";
-import {
-  fetchNganyaPosition,
-  fetchStagePosition,
-} from "@/lib/queries/tracking";
-import { fetchOsrmRoute } from "@/lib/osrm";
-import { followNganya, unfollowNganya } from "@/lib/queries/follows";
-import { toAppError } from "@/shared/errors/app-error";
-import {
-  applyPlannerSeed,
-  canTrackWithPlannerContext,
-  getPlannerCorridorId,
-  reconcilePlannerContext,
-} from "@/modules/fan/services/planner-storage";
-import {
-  getPlannerAssistStatus,
-  sortPlannerRideOptions,
-  type PlannerRideOption,
-} from "@/modules/fan/services/planner-assist";
 import type { FanHomeRouteData } from "@/modules/fan/services/route-data";
-import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
-import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
 import {
   enrichNganyaImageFields,
   mapNganyaRecordToCardData,
 } from "@/modules/fan/lib/nganya-card";
+import {
+  aggregateRecentSightings,
+  countHighActivityRecentSightings,
+  countOnRouteRecentSightings,
+  filterAggregatedRecentSightings,
+  filterRecentSightingsByCorridor,
+} from "@/modules/fan/screens/home/home-recent-sightings";
+import { HomeLiveRouteSection } from "@/modules/fan/screens/home/HomeLiveRouteSection";
+import { HomeRecentSightingsSection } from "@/modules/fan/screens/home/HomeRecentSightingsSection";
+import { HomeRideWatchSection } from "@/modules/fan/screens/home/HomeRideWatchSection";
+import type { RecentSightingFilter } from "@/modules/fan/screens/home/home-types";
+import { useHomeFollowActions } from "@/modules/fan/screens/home/useHomeFollowActions";
+import { useHomePlanner } from "@/modules/fan/screens/home/useHomePlanner";
+
+const LazyLiveCorridorMap = lazy(
+  () => import("@/components/features/tracking/LiveCorridorMap"),
+);
+const LazyWhereToCard = lazy(() => import("@/components/features/WhereToCard"));
+const LazySearchResultsOverlay = lazy(
+  () => import("@/components/features/SearchResultsOverlayV2"),
+);
 
 interface HomeScreenProps {
   data: FanHomeRouteData;
   activeCorridor: string | null;
   onCorridorChange: (corridorId: string | null) => void;
-  onSearchChange: (
-    search: string,
-    activeCorridor: string | null,
-    activeVibe: string | null,
-  ) => void;
   showAllRecent: boolean;
-}
-
-type RecentSightingFilter = "ALL" | "ON_ROUTE" | "HIGH_ACTIVITY";
-
-interface AggregatedRecentSightingRow {
-  key: string;
-  nganyaId: string;
-  slug: string;
-  nganyaName: string;
-  corridorId: string | null;
-  corridorName: string;
-  direction: string | null;
-  directionLabel: string | null;
-  stageName: string | null;
-  lastSeenAt: string;
-  lastSeenMinutes: number;
-  sightingsCountRecent: number;
-  distinctUsersCount: number;
-  confidenceLevel: "HIGH" | "MED" | "LOW";
-  signalLabel: string;
-  statusTone: "hot" | "warm" | "stale";
-  onRoute: boolean;
-}
-
-interface BrowseCardActionItem {
-  id: string;
-  slug: string;
-  name: string;
-  corridorId: string | null;
-  corridorName: string;
-  isLive: boolean;
-}
-
-interface PlannerRiskPrompt {
-  key: string;
-  reason: "risky" | "stale" | "missing";
-  alternative: PlannerRideOption | null;
-}
-
-const getDirectionLabel = formatDirectionLabel;
-
-function getMinutesSince(isoDate: string) {
-  return Math.max(
-    0,
-    Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000),
-  );
-}
-
-function getRecencyTone(minutes: number): "hot" | "warm" | "stale" {
-  if (minutes <= 2) return "hot";
-  if (minutes <= 15) return "warm";
-  return "stale";
-}
-
-function getRecencyLabel(minutes: number, isoDate: string) {
-  if (minutes <= 2) return "Just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  return formatRelativeTime(isoDate);
-}
-
-function aggregateRecentSightings(params: {
-  sightings: any[];
-  activeCorridor: string | null;
-  corridors: any[];
-}) {
-  const grouped = new Map<string, AggregatedRecentSightingRow>();
-  const recentUserKeysByGroup = new Map<string, Set<string>>();
-  const corridorNameById = new Map(
-    (params.corridors || []).map((corridor: any) => [
-      corridor.id,
-      corridor.name,
-    ]),
-  );
-
-  for (const sighting of params.sightings) {
-    const nganyaId = sighting.nganya_id || sighting.nganyaId;
-    if (!nganyaId) continue;
-
-    const corridorId = sighting.corridor_id || null;
-    const corridorName =
-      sighting.nganya?.corridors?.name ||
-      (corridorId ? corridorNameById.get(corridorId) : null) ||
-      sighting.corridor_name ||
-      sighting.corridor ||
-      "Route unavailable";
-    const direction = sighting.direction || null;
-    const key = `${nganyaId}:${corridorId || "unknown"}:${direction || "unknown"}`;
-    const lastSeenAt = sighting.created_at;
-    if (!lastSeenAt) continue;
-
-    const lastSeenMinutes = getMinutesSince(lastSeenAt);
-    if (lastSeenMinutes > 15) continue;
-    const authorKey = sighting.user?.handle || sighting.user_id || "anonymous";
-    const existing = grouped.get(key);
-
-    if (!existing) {
-      const sightingsCountRecent = lastSeenMinutes <= 15 ? 1 : 0;
-      const distinctUsersCount = lastSeenMinutes <= 15 ? 1 : 0;
-      const confidenceLevel =
-        lastSeenMinutes <= 2 ? "HIGH" : lastSeenMinutes <= 15 ? "MED" : "LOW";
-      const signalLabel =
-        distinctUsersCount > 1
-          ? `${distinctUsersCount} riders confirmed`
-          : sightingsCountRecent > 1
-            ? `${sightingsCountRecent} sightings`
-            : confidenceLevel === "HIGH"
-              ? "Live signal"
-              : confidenceLevel === "MED"
-                ? "Seen recently"
-                : "Low activity";
-
-      grouped.set(key, {
-        key,
-        nganyaId,
-        slug: toNganyaSlug(
-          sighting.nganya?.name || sighting.nganyaName || "nganya",
-        ),
-        nganyaName:
-          sighting.nganya?.name || sighting.nganyaName || "Unknown nganya",
-        corridorId,
-        corridorName,
-        direction,
-        directionLabel: getDirectionLabel(direction, corridorName),
-        stageName: sighting.stage?.name || null,
-        lastSeenAt,
-        lastSeenMinutes,
-        sightingsCountRecent,
-        distinctUsersCount,
-        confidenceLevel,
-        signalLabel,
-        statusTone: getRecencyTone(lastSeenMinutes),
-        onRoute: Boolean(
-          params.activeCorridor && corridorId === params.activeCorridor,
-        ),
-      });
-      if (lastSeenMinutes <= 15) {
-        recentUserKeysByGroup.set(key, new Set([authorKey]));
-      }
-      continue;
-    }
-
-    const isNewer =
-      new Date(lastSeenAt).getTime() > new Date(existing.lastSeenAt).getTime();
-    const updatedRecentCount =
-      existing.sightingsCountRecent + (lastSeenMinutes <= 15 ? 1 : 0);
-    const recentUserKeys = recentUserKeysByGroup.get(key) || new Set<string>();
-    if (lastSeenMinutes <= 15) {
-      recentUserKeys.add(authorKey);
-      recentUserKeysByGroup.set(key, recentUserKeys);
-    }
-    const distinctUsersCount = recentUserKeys.size;
-
-    const referenceMinutes = isNewer
-      ? lastSeenMinutes
-      : existing.lastSeenMinutes;
-    const confidenceLevel =
-      updatedRecentCount >= 2 || distinctUsersCount >= 2
-        ? "HIGH"
-        : referenceMinutes <= 15
-          ? "MED"
-          : "LOW";
-
-    const signalLabel =
-      distinctUsersCount >= 2
-        ? `${distinctUsersCount} riders confirmed`
-        : updatedRecentCount >= 2
-          ? `${updatedRecentCount} sightings`
-          : confidenceLevel === "HIGH"
-            ? "Just spotted"
-            : confidenceLevel === "MED"
-              ? "Seen recently"
-              : "Low activity";
-
-    grouped.set(key, {
-      ...existing,
-      stageName: isNewer
-        ? sighting.stage?.name || existing.stageName
-        : existing.stageName,
-      lastSeenAt: isNewer ? lastSeenAt : existing.lastSeenAt,
-      lastSeenMinutes: Math.min(existing.lastSeenMinutes, lastSeenMinutes),
-      statusTone: getRecencyTone(
-        Math.min(existing.lastSeenMinutes, lastSeenMinutes),
-      ),
-      sightingsCountRecent: updatedRecentCount,
-      distinctUsersCount,
-      confidenceLevel,
-      signalLabel,
-    });
-  }
-
-  return Array.from(grouped.values()).sort((left, right) => {
-    if (left.onRoute !== right.onRoute) return left.onRoute ? -1 : 1;
-    return (
-      new Date(right.lastSeenAt).getTime() - new Date(left.lastSeenAt).getTime()
-    );
-  });
 }
 
 export default function HomeScreen({
   data,
   activeCorridor,
   onCorridorChange,
-  onSearchChange,
   showAllRecent,
 }: HomeScreenProps) {
   const router = useRouter();
-  const { showErrorToast, addToast } = useToast();
-  const { plannerContext, setPlannerContext, clearPlannerContext } =
-    usePlannerFilters();
-  const [plannerResults, setPlannerResults] = useState<JourneyResult[]>([]);
-  const [plannerTracking, setPlannerTracking] = useState<JourneyResult | null>(
-    null,
-  );
-  const [plannerRouteLine, setPlannerRouteLine] = useState<{
-    coordinates: [number, number][];
-  } | null>(null);
-  const [plannerRouteEtaSeconds, setPlannerRouteEtaSeconds] = useState<
-    number | null
-  >(null);
-  const [plannerRouteDistanceMeters, setPlannerRouteDistanceMeters] = useState<
-    number | null
-  >(null);
-  const plannerRouteAbortRef = useRef<AbortController | null>(null);
-  const plannerRouteKeyRef = useRef<string | null>(null);
-  const [plannerRouteLoading, setPlannerRouteLoading] = useState(false);
-  const plannerRealtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const [trackingRow, setTrackingRow] =
-    useState<AggregatedRecentSightingRow | null>(null);
-  const [trackingNganya, setTrackingNganya] =
-    useState<BrowseCardActionItem | null>(null);
-  const [plannerSeed, setPlannerSeed] = useState(0);
   const [recentFilter, setRecentFilter] = useState<RecentSightingFilter>("ALL");
-  const [rideWatchScrollToken, setRideWatchScrollToken] = useState(0);
-  const [watchedRideId, setWatchedRideId] = useState<string | null>(null);
-  const [plannerRiskPrompt, setPlannerRiskPrompt] =
-    useState<PlannerRiskPrompt | null>(null);
-  const [dismissedRiskKey, setDismissedRiskKey] = useState<string | null>(null);
-  const [plannerAlertIds, setPlannerAlertIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const plannerMapSectionRef = useRef<HTMLElement>(null);
-  const rideWatchSectionRef = useRef<HTMLElement>(null);
-  const plannerMapScrollMargin = "calc(var(--top-nav-height) + 16px)";
-  const rideWatchScrollMargin = "calc(var(--top-nav-height) + 16px)";
   const {
-    search,
-    activeCorridor: _dataCorridor,
-    activeVibe,
     corridors,
     nganyas,
     liveNganyas,
     recentSightings,
     followedIds,
   } = data;
-  const [localFollowedIds, setLocalFollowedIds] = useState<Set<string>>(
-    () => new Set(followedIds),
-  );
 
-  useEffect(() => {
-    setLocalFollowedIds(new Set(followedIds));
-  }, [followedIds]);
+  const {
+    plannerAlertIds,
+    handlePlannerAlertAction,
+    isFollowingNganya,
+    toggleFollow,
+  } = useHomeFollowActions(followedIds);
 
-  const isFollowingNganya = (nganyaId: string) => localFollowedIds.has(nganyaId);
-
-  const toggleFollow = async (id: string) => {
-    const wasFollowing = isFollowingNganya(id);
-    setLocalFollowedIds((current) => {
-      const next = new Set(current);
-      if (wasFollowing) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-
-    try {
-      if (wasFollowing) {
-        await unfollowNganya(id);
-      } else {
-        await followNganya(id);
-      }
-    } catch {
-      setLocalFollowedIds((current) => {
-        const next = new Set(current);
-        if (wasFollowing) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-        return next;
-      });
-      showErrorToast("Failed to update follow.");
-    }
-  };
-
-  const turnOnPlannerAlerts = async (ride: PlannerRideOption) => {
-    try {
-      await followNganya(ride.nganya_id);
-      setPlannerAlertIds((current) => new Set(current).add(ride.nganya_id));
-      setLocalFollowedIds((current) => new Set(current).add(ride.nganya_id));
-      addToast(`Alerts on for ${ride.nganya_name}.`, "success");
-    } catch (error) {
-      const appError = toAppError(error);
-      if (appError.code === "AUTH_REQUIRED") {
-        addToast("Sign in to keep ride alerts on.", "info");
-        router.navigate({ to: "/signin" });
-        return;
-      }
-      showErrorToast("Failed to turn on ride alerts.");
-    }
-  };
-
-  const activeCorridorName = useMemo(
-    () => corridors.find((c) => c.id === activeCorridor)?.name || null,
-    [corridors, activeCorridor],
-  );
-
-  const filteredNganyas = useMemo(() => {
-    return nganyas.filter((n) => {
-      const matchesCorridor =
-        !activeCorridor || n.corridor_id === activeCorridor;
-      const matchesVibe =
-        !activeVibe || (n.tags && n.tags.includes(activeVibe));
-      return matchesCorridor && matchesVibe;
-    });
-  }, [nganyas, activeCorridor, activeVibe]);
-
-  const filteredLiveNganyas = useMemo(
-    () =>
-      activeCorridor
-        ? liveNganyas.filter((n) => n.corridor_id === activeCorridor)
-        : liveNganyas,
-    [liveNganyas, activeCorridor],
-  );
+  const planner = useHomePlanner({
+    activeCorridor,
+    corridors,
+    liveNganyas,
+    onCorridorChange,
+  });
 
   const hasSelectedRouteLiveNganyas =
-    Boolean(activeCorridor) && filteredLiveNganyas.length > 0;
+    Boolean(activeCorridor) && planner.filteredLiveNganyas.length > 0;
 
   const shouldShowRecentSightings =
-    !activeCorridor || filteredLiveNganyas.length === 0;
+    !activeCorridor || planner.filteredLiveNganyas.length === 0;
 
-  const filteredRecentSightings = useMemo(() => {
-    if (!activeCorridor) return recentSightings;
-    const routeName = (activeCorridorName || "").toLowerCase();
-    return recentSightings.filter((s: any) => {
-      if (s.corridor_id) return s.corridor_id === activeCorridor;
-      const label = (s.corridor || s.corridor_name || "").toLowerCase();
-      if (!routeName) return false;
-      return label.includes(routeName) || routeName.includes(label);
-    });
-  }, [recentSightings, activeCorridor, activeCorridorName]);
+  const filteredRecentSightings = useMemo(
+    () =>
+      filterRecentSightingsByCorridor({
+        recentSightings,
+        activeCorridor,
+        activeCorridorName: planner.activeCorridorName,
+      }),
+    [recentSightings, activeCorridor, planner.activeCorridorName],
+  );
 
   const recentSightingsSource = useMemo(
     () =>
@@ -434,348 +99,32 @@ export default function HomeScreen({
     [recentSightingsSource, activeCorridor, corridors],
   );
 
-  const recentSummaryCount = useMemo(
-    () => aggregatedRecentSightings.length,
-    [aggregatedRecentSightings],
+  const filteredAggregatedRecentSightings = useMemo(
+    () => filterAggregatedRecentSightings(aggregatedRecentSightings, recentFilter),
+    [aggregatedRecentSightings, recentFilter],
   );
 
-  const filteredAggregatedRecentSightings = useMemo(() => {
-    if (recentFilter === "ON_ROUTE") {
-      return aggregatedRecentSightings.filter((row) => row.onRoute);
-    }
-    if (recentFilter === "HIGH_ACTIVITY") {
-      return aggregatedRecentSightings.filter(
-        (row) => row.sightingsCountRecent >= 2 || row.distinctUsersCount >= 2,
-      );
-    }
-    return aggregatedRecentSightings;
-  }, [aggregatedRecentSightings, recentFilter]);
-
+  const recentSummaryCount = aggregatedRecentSightings.length;
   const onRouteRecentCount = useMemo(
-    () => aggregatedRecentSightings.filter((row) => row.onRoute).length,
+    () => countOnRouteRecentSightings(aggregatedRecentSightings),
     [aggregatedRecentSightings],
   );
-
   const highActivityRecentCount = useMemo(
-    () =>
-      aggregatedRecentSightings.filter(
-        (row) => row.sightingsCountRecent >= 2 || row.distinctUsersCount >= 2,
-      ).length,
+    () => countHighActivityRecentSightings(aggregatedRecentSightings),
     [aggregatedRecentSightings],
   );
-
-  const recentSightingsRef = useRef<HTMLElement>(null);
-
-  const mapCorridorId = useMemo(
-    () =>
-      plannerContext.toPlace?.corridor_id ||
-      plannerContext.toPlace?.id ||
-      activeCorridor,
-    [plannerContext.toPlace, activeCorridor],
-  );
-
-  const mapCorridorName = useMemo(() => {
-    if (!mapCorridorId) return "Route";
-    return (
-      corridors.find((c) => c.id === mapCorridorId)?.name ||
-      plannerContext.toPlace?.name ||
-      activeCorridorName ||
-      "Route"
-    );
-  }, [
-    mapCorridorId,
-    corridors,
-    plannerContext.toPlace?.name,
-    activeCorridorName,
-  ]);
-
-  const mapJourneyResults = useMemo((): JourneyResult[] => {
-    if (plannerResults.length > 0) return plannerResults;
-
-    const cid = mapCorridorId ?? "";
-    const cname = mapCorridorName;
-    return filteredLiveNganyas.map((n) => ({
-      nganya_id: n.nganya_id || n.id,
-      nganya_name: n.nganya_name || n.name || "Unknown",
-      corridor_id: n.corridor_id || cid,
-      corridor_name: n.corridor_name || n.corridors?.name || cname,
-      tags: n.tags ?? null,
-      eta_minutes: 5,
-      confidence_level: "HIGH",
-      source: "LIVE",
-      last_seen_at: n.last_ping_at ?? null,
-      profile_photo_url: n.profile_photo_url ?? null,
-    }));
-  }, [filteredLiveNganyas, mapCorridorId, mapCorridorName, plannerResults]);
-
-  const visibleNganyaIds = useMemo(
-    () => deriveVisibleNganyaIds(plannerContext, plannerResults),
-    [plannerContext, plannerResults],
-  );
-
-  const plannerCorridorId = useMemo(
-    () => getPlannerCorridorId(plannerContext),
-    [plannerContext],
-  );
-
-  const plannerStageId = plannerContext.fromStage?.id || null;
-
-  useEffect(() => {
-    // Planner route becomes the global active corridor while it's set.
-    if (!plannerCorridorId) return;
-    onCorridorChange(plannerCorridorId);
-  }, [plannerCorridorId, onCorridorChange]);
-
-  const plannerJourneyKey = useMemo(() => {
-    if (!plannerCorridorId || !plannerStageId) return null;
-    const preferredId =
-      plannerContext.preference === "SPECIFIC"
-        ? plannerContext.preferredNganya?.id || ""
-        : "";
-    return `${plannerCorridorId}:${plannerStageId}:${plannerContext.preference}:${preferredId}`;
-  }, [
-    plannerCorridorId,
-    plannerStageId,
-    plannerContext.preference,
-    plannerContext.preferredNganya?.id,
-  ]);
-
-  const plannerJourneyKeyRef = useRef<string | null>(null);
-  const plannerJourneySeqRef = useRef(0);
-  const loadPlannerJourneyResults = (
-    key: string,
-    options?: { preserveExisting?: boolean },
-  ) => {
-    if (!plannerCorridorId || !plannerStageId) {
-      setPlannerResults([]);
-      return;
-    }
-
-    const prevKey = plannerJourneyKeyRef.current;
-    plannerJourneyKeyRef.current = key;
-    if (
-      !options?.preserveExisting &&
-      prevKey &&
-      prevKey.split(":").slice(0, 2).join(":") !==
-        key.split(":").slice(0, 2).join(":")
-    ) {
-      setPlannerResults([]);
-    }
-
-    const seq = ++plannerJourneySeqRef.current;
-    const preferredNganyaId =
-      plannerContext.preference === "SPECIFIC"
-        ? plannerContext.preferredNganya?.id || null
-        : null;
-
-    const vibeTags =
-      plannerContext.preference === "NEWEST" ? ["NEW_BUILD"] : null;
-
-    searchNganyaJourney({
-      corridorId: plannerCorridorId,
-      pickupStageId: plannerStageId,
-      preferredNganyaId,
-      vibeTags,
-      maxResults: 24,
-    })
-      .then((data) => {
-        if (plannerJourneySeqRef.current !== seq) return;
-        if (plannerJourneyKeyRef.current !== key) return;
-        setPlannerResults((data || []) as JourneyResult[]);
-      })
-      .catch(() => {
-        if (plannerJourneySeqRef.current !== seq) return;
-        if (plannerJourneyKeyRef.current !== key) return;
-        setPlannerResults([]);
-      });
-  };
-
-  useEffect(() => {
-    if (!plannerCorridorId || !plannerStageId) {
-      setPlannerResults([]);
-      return;
-    }
-
-    const key = plannerJourneyKey;
-    if (!key) return;
-
-    loadPlannerJourneyResults(key);
-  }, [
-    plannerCorridorId,
-    plannerStageId,
-    plannerContext.preference,
-    plannerContext.preferredNganya?.id,
-    plannerJourneyKey,
-  ]);
-
-  useEffect(() => {
-    if (
-      !plannerJourneyKey ||
-      !plannerCorridorId ||
-      !plannerContext.fromStage ||
-      !plannerContext.toPlace
-    ) {
-      return;
-    }
-
-    const scheduleRefresh = () => {
-      if (plannerRealtimeTimerRef.current) {
-        clearTimeout(plannerRealtimeTimerRef.current);
-      }
-      plannerRealtimeTimerRef.current = setTimeout(() => {
-        loadPlannerJourneyResults(plannerJourneyKey, { preserveExisting: true });
-      }, 1500);
-    };
-
-    const channel = supabase
-      .channel(`home_planner_${plannerCorridorId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "live_sessions",
-          filter: `corridor_id=eq.${plannerCorridorId}`,
-        },
-        scheduleRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "sightings",
-          filter: `corridor_id=eq.${plannerCorridorId}`,
-        },
-        scheduleRefresh,
-      )
-      .subscribe();
-
-    return () => {
-      if (plannerRealtimeTimerRef.current) {
-        clearTimeout(plannerRealtimeTimerRef.current);
-        plannerRealtimeTimerRef.current = null;
-      }
-      supabase.removeChannel(channel);
-    };
-  }, [
-    plannerJourneyKey,
-    plannerCorridorId,
-    plannerContext.fromStage,
-    plannerContext.toPlace,
-  ]);
-
-  const plannerRideOptions = useMemo(
-    () => sortPlannerRideOptions(plannerResults),
-    [plannerResults],
-  );
-
-  const watchedRide = useMemo(
-    () =>
-      watchedRideId
-        ? plannerRideOptions.find((option) => option.nganya_id === watchedRideId) ||
-          null
-        : null,
-    [plannerRideOptions, watchedRideId],
-  );
-
-  const recommendedRide = useMemo(
-    () => watchedRide || plannerRideOptions[0] || null,
-    [plannerRideOptions, watchedRide],
-  );
-
-  const backupRides = useMemo(
-    () =>
-      plannerRideOptions.filter(
-        (option) => option.nganya_id !== recommendedRide?.nganya_id,
-      ),
-    [plannerRideOptions, recommendedRide?.nganya_id],
-  );
-
-  const plannerAssistStatus = useMemo(
-    () => getPlannerAssistStatus(plannerRideOptions, watchedRideId),
-    [plannerRideOptions, watchedRideId],
-  );
-
-  const plannerRouteSignalType = useMemo(() => {
-    if (!plannerTracking) return null;
-
-    const trackedRide = plannerRideOptions.find(
-      (option) => option.nganya_id === plannerTracking.nganya_id,
-    );
-    if (trackedRide) return trackedRide.signalType;
-
-    if (plannerTracking.last_seen_at) {
-      return getTrackingSignalState(
-        plannerTracking.source,
-        plannerTracking.last_seen_at,
-      );
-    }
-
-    return plannerTracking.source === "LIVE" ? "LIVE" : "ESTIMATED";
-  }, [plannerRideOptions, plannerTracking]);
-
-  useEffect(() => {
-    if (!watchedRideId) {
-      setPlannerRiskPrompt(null);
-      return;
-    }
-
-    const alternative = backupRides[0] || null;
-    const nextPrompt = !watchedRide
-      ? {
-          key: `${watchedRideId}:missing:${alternative?.nganya_id || "none"}`,
-          reason: "missing" as const,
-          alternative,
-        }
-      : watchedRide.catchability.status === "STALE_UNCERTAIN"
-        ? {
-            key: `${watchedRide.nganya_id}:stale:${alternative?.nganya_id || "none"}`,
-            reason: "stale" as const,
-            alternative,
-          }
-        : watchedRide.catchability.status !== "CATCHABLE"
-          ? {
-              key: `${watchedRide.nganya_id}:risky:${alternative?.nganya_id || "none"}`,
-              reason: "risky" as const,
-              alternative,
-            }
-          : null;
-
-    if (!nextPrompt) {
-      setPlannerRiskPrompt(null);
-      return;
-    }
-
-    if (dismissedRiskKey === nextPrompt.key) return;
-    setPlannerRiskPrompt(nextPrompt);
-  }, [backupRides, dismissedRiskKey, watchedRide, watchedRideId]);
-
-  useEffect(() => {
-    if (!rideWatchScrollToken || !plannerJourneyKey) return;
-    if (!rideWatchSectionRef.current) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      rideWatchSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [plannerJourneyKey, rideWatchScrollToken]);
 
   const featuredLiveNganya =
-    filteredLiveNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
-    filteredLiveNganyas[0] ??
+    planner.filteredLiveNganyas.find((n) => n.tags?.includes("NEW_BUILD")) ??
+    planner.filteredLiveNganyas[0] ??
     null;
 
   const consolidatedLiveRouteCards = useMemo(
     () =>
-      filteredLiveNganyas.filter(
+      planner.filteredLiveNganyas.filter(
         (n) => n.nganya_id !== featuredLiveNganya?.nganya_id,
       ),
-    [featuredLiveNganya, filteredLiveNganyas],
+    [featuredLiveNganya, planner.filteredLiveNganyas],
   );
 
   const fullHomepageNganyasById = useMemo(
@@ -791,230 +140,12 @@ export default function HomeScreen({
   const mapSupabaseToCardProps = (dbNganya: any) =>
     mapNganyaRecordToCardData(
       enrichNganyaImageFields(dbNganya, fullHomepageNganyasById),
-      { liveNganyas: filteredLiveNganyas },
+      { liveNganyas: planner.filteredLiveNganyas },
     );
 
   const featuredLiveCardData = featuredLiveNganya
     ? mapSupabaseToCardProps(featuredLiveNganya)
     : null;
-
-  const handlePlanRideForNganya = (item: BrowseCardActionItem) => {
-    setPlannerContext((current) =>
-      applyPlannerSeed(
-        current,
-        {
-          id: item.id,
-          name: item.name,
-          corridorId: item.corridorId,
-          corridorName: item.corridorName,
-        },
-        { clearStageOnRouteChange: true },
-      ),
-    );
-    setPlannerSeed((current) => current + 1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    addToast(
-      `Route set to ${item.corridorName}. Pick your pickup stage to plan with ${item.name}.`,
-      "info",
-    );
-  };
-
-  const handleBrowseCardAction = (item: BrowseCardActionItem) => {
-    if (item.isLive && canTrackWithPlannerContext(plannerContext, item)) {
-      setTrackingNganya(item);
-      return;
-    }
-
-    handlePlanRideForNganya(item);
-  };
-
-  const handlePlannerSearch = (_payload: RideSearchPayload) => {
-    // Map is driven by the controlled planner filters; "Find my ride" is a submit action only.
-    // We still clear any route overlays when user submits a new search.
-    setRideWatchScrollToken((current) => current + 1);
-    setPlannerTracking(null);
-    setPlannerRiskPrompt(null);
-    setDismissedRiskKey(null);
-    setPlannerRouteLine(null);
-    setPlannerRouteEtaSeconds(null);
-    setPlannerRouteDistanceMeters(null);
-    plannerRouteAbortRef.current?.abort();
-    plannerRouteAbortRef.current = null;
-    plannerRouteKeyRef.current = null;
-  };
-
-  const handlePlannerChange = (next: PlannerFiltersValue) => {
-    setPlannerContext((current) => reconcilePlannerContext(current, next));
-
-    // Any filter change invalidates any currently tracked nganya/route overlay.
-    setWatchedRideId(null);
-    setPlannerRiskPrompt(null);
-    setDismissedRiskKey(null);
-    setPlannerTracking(null);
-    setPlannerRouteLine(null);
-    setPlannerRouteEtaSeconds(null);
-    setPlannerRouteDistanceMeters(null);
-    plannerRouteAbortRef.current?.abort();
-    plannerRouteAbortRef.current = null;
-    plannerRouteKeyRef.current = null;
-  };
-
-  const handlePlannerClear = () => {
-    clearPlannerContext();
-    setPlannerSeed((current) => current + 1);
-    setWatchedRideId(null);
-    setPlannerResults([]);
-    setPlannerRiskPrompt(null);
-    setDismissedRiskKey(null);
-    setPlannerTracking(null);
-    setPlannerRouteLine(null);
-    setPlannerRouteEtaSeconds(null);
-    setPlannerRouteDistanceMeters(null);
-    plannerRouteAbortRef.current?.abort();
-    plannerRouteAbortRef.current = null;
-    plannerRouteKeyRef.current = null;
-  };
-
-  const handlePlanRideForRecentRow = (row: AggregatedRecentSightingRow) => {
-    setPlannerContext((current) =>
-      applyPlannerSeed(
-        current,
-        {
-          id: row.nganyaId,
-          name: row.nganyaName,
-          corridorId: row.corridorId,
-          corridorName: row.corridorName,
-        },
-        { clearStageOnRouteChange: true },
-      ),
-    );
-    setPlannerSeed((current) => current + 1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    addToast(
-      `Route set to ${row.corridorName}. Pick your pickup stage to plan with ${row.nganyaName}.`,
-      "info",
-    );
-  };
-
-  const handleRecentRowAction = (row: AggregatedRecentSightingRow) => {
-    if (
-      row.lastSeenMinutes <= 15 &&
-      canTrackWithPlannerContext(plannerContext, row)
-    ) {
-      setTrackingRow(row);
-      return;
-    }
-
-    handlePlanRideForRecentRow(row);
-  };
-
-  const trackPlannerRideOnMap = async (ride: JourneyResult) => {
-    if (!plannerContext.fromStage?.id) return;
-    if (!mapCorridorId) return;
-
-    setPlannerTracking(ride);
-    setPlannerRouteLoading(true);
-
-    const stageId = plannerContext.fromStage.id;
-    const [stagePos, nganyaPos] = await Promise.all([
-      fetchStagePosition(stageId),
-      fetchNganyaPosition(ride.nganya_id),
-    ]);
-
-    if (!stagePos || !nganyaPos) {
-      setPlannerRouteLine(null);
-      setPlannerRouteEtaSeconds(null);
-      setPlannerRouteDistanceMeters(null);
-      setPlannerRouteLoading(false);
-      return;
-    }
-
-    const key = `${ride.nganya_id}:${stageId}:${nganyaPos.lng.toFixed(5)},${nganyaPos.lat.toFixed(5)}:${stagePos.lng.toFixed(5)},${stagePos.lat.toFixed(5)}`;
-    if (plannerRouteKeyRef.current === key) {
-      setPlannerRouteLoading(false);
-      return;
-    }
-    plannerRouteKeyRef.current = key;
-
-    plannerRouteAbortRef.current?.abort();
-    const controller = new AbortController();
-    plannerRouteAbortRef.current = controller;
-
-    try {
-      const route = await fetchOsrmRoute({
-        from: nganyaPos,
-        to: stagePos,
-        signal: controller.signal,
-      });
-
-      if (!Number.isFinite(route.durationSeconds)) {
-        throw new Error("OSRM route missing duration");
-      }
-
-      setPlannerRouteLine({ coordinates: route.coordinates });
-      setPlannerRouteEtaSeconds(route.durationSeconds);
-      setPlannerRouteDistanceMeters(
-        Number.isFinite(route.distanceMeters) ? route.distanceMeters : null,
-      );
-    } catch (err) {
-      if ((err as any)?.name === "AbortError") return;
-
-      setPlannerRouteLine({
-        coordinates: [
-          [nganyaPos.lng, nganyaPos.lat],
-          [stagePos.lng, stagePos.lat],
-        ],
-      });
-      setPlannerRouteDistanceMeters(null);
-
-      const etaMin = Number.isFinite(ride.eta_minutes)
-        ? Math.max(1, Math.round(ride.eta_minutes))
-        : null;
-      setPlannerRouteEtaSeconds(etaMin !== null ? etaMin * 60 : null);
-    } finally {
-      setPlannerRouteLoading(false);
-    }
-  };
-
-  const scrollToPlannerMap = () => {
-    window.requestAnimationFrame(() => {
-      plannerMapSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  };
-
-  const watchPlannerRide = (ride: PlannerRideOption) => {
-    const isAlreadyWatched = watchedRideId === ride.nganya_id;
-    setWatchedRideId(ride.nganya_id);
-    setPlannerRiskPrompt(null);
-    setDismissedRiskKey(null);
-    scrollToPlannerMap();
-    void trackPlannerRideOnMap(ride);
-    addToast(
-      isAlreadyWatched
-        ? `Updated ${ride.nganya_name} on the map.`
-        : `Watching ${ride.nganya_name} for your pickup.`,
-      "info",
-    );
-  };
-
-  const switchToPlannerRide = (ride: PlannerRideOption) => {
-    setWatchedRideId(ride.nganya_id);
-    setPlannerRiskPrompt(null);
-    setDismissedRiskKey(null);
-    scrollToPlannerMap();
-    void trackPlannerRideOnMap(ride);
-    addToast(`Switched to ${ride.nganya_name}.`, "success");
-  };
-
-  const keepWatchingCurrentRide = () => {
-    if (!plannerRiskPrompt) return;
-    setDismissedRiskKey(plannerRiskPrompt.key);
-    setPlannerRiskPrompt(null);
-    addToast("Still watching your current ride.", "info");
-  };
 
   return (
     <div className="page-container py-8 md:py-10 space-y-10 md:space-y-12">
@@ -1027,605 +158,162 @@ export default function HomeScreen({
       </section>
 
       <section
-        ref={plannerMapSectionRef}
+        ref={planner.plannerMapSectionRef}
         className="grid grid-cols-1 gap-5 md:gap-6 lg:grid-cols-12 lg:items-stretch"
-        style={{ scrollMarginTop: plannerMapScrollMargin }}
+        style={{ scrollMarginTop: planner.plannerMapScrollMargin }}
       >
         <div className="space-y-3 lg:col-span-4 lg:sticky lg:top-[84px] lg:self-start">
-          <WhereToCard
-            key={plannerSeed}
-            value={plannerContext}
-            onChange={handlePlannerChange}
-            onSearch={handlePlannerSearch}
-            onClear={handlePlannerClear}
-          />
+          <Suspense
+            fallback={
+              <div className="rounded-[var(--radius-xl)] bg-[var(--glass-bg)] p-4">
+                <Skeleton className="h-[320px] rounded-[var(--radius-xl)]" />
+              </div>
+            }
+          >
+            <LazyWhereToCard
+              key={planner.plannerSeed}
+              value={planner.plannerContext}
+              onChange={planner.handlePlannerChange}
+              onSearch={planner.handlePlannerSearch}
+              onClear={planner.handlePlannerClear}
+            />
+          </Suspense>
         </div>
 
         <div className="min-h-[320px] lg:col-span-8 lg:min-h-0 lg:self-stretch">
           <div className="h-full rounded-[var(--radius-xl)]">
             <div className="h-full overflow-hidden rounded-[var(--radius-xl)]">
-              <LiveCorridorMap
-                isActive
-                corridorId={mapCorridorId}
-                corridorName={mapCorridorName}
-                pickupStage={plannerContext.fromStage}
-                journeyResults={mapJourneyResults}
-                visibleNganyaIds={visibleNganyaIds}
-                highlightNganyaId={
-                  plannerTracking?.nganya_id ??
-                  (plannerContext.preference === "SPECIFIC"
-                    ? (plannerContext.preferredNganya?.id ?? null)
-                    : null)
+              <Suspense
+                fallback={
+                  <div className="flex h-full min-h-[320px] items-center justify-center rounded-[var(--radius-xl)] bg-[var(--glass-bg)] text-xs text-[var(--color-text-tertiary)]">
+                    Loading live map...
+                  </div>
                 }
-                onTrackNganya={(j) => void trackPlannerRideOnMap(j)}
-                fillRowHeight
-                showCaption={false}
-                showNoCorridorOverlay={false}
-                flushBottom={!!plannerTracking}
-                routeLine={plannerRouteLine}
-                routeEtaSeconds={plannerRouteEtaSeconds}
-                routeDistanceMeters={plannerRouteDistanceMeters}
-                routeSignalType={plannerRouteSignalType}
-                isRouting={plannerRouteLoading}
-                className="h-full min-h-[320px] lg:min-h-0"
-              />
+              >
+                <LazyLiveCorridorMap
+                  isActive
+                  corridorId={planner.mapCorridorId}
+                  corridorName={planner.mapCorridorName}
+                  pickupStage={planner.plannerContext.fromStage}
+                  journeyResults={planner.mapJourneyResults}
+                  visibleNganyaIds={planner.visibleNganyaIds}
+                  highlightNganyaId={
+                    planner.plannerTracking?.nganya_id ??
+                    (planner.plannerContext.preference === "SPECIFIC"
+                      ? (planner.plannerContext.preferredNganya?.id ?? null)
+                      : null)
+                  }
+                  onTrackNganya={(journey) => void planner.trackPlannerRideOnMap(journey)}
+                  fillRowHeight
+                  showCaption={false}
+                  showNoCorridorOverlay={false}
+                  flushBottom={!!planner.plannerTracking}
+                  routeLine={planner.plannerRouteLine}
+                  routeEtaSeconds={planner.plannerRouteEtaSeconds}
+                  routeDistanceMeters={planner.plannerRouteDistanceMeters}
+                  routeSignalType={planner.plannerRouteSignalType}
+                  isRouting={planner.plannerRouteLoading}
+                  className="h-full min-h-[320px] lg:min-h-0"
+                />
+              </Suspense>
             </div>
           </div>
         </div>
       </section>
 
-      {plannerJourneyKey && plannerAssistStatus !== "no_matches" ? (
-        <section
-          ref={rideWatchSectionRef}
-          className="space-y-4"
-          style={{ scrollMarginTop: rideWatchScrollMargin }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-h3">Ride watch</h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {watchedRide
-                  ? `Watching ${watchedRide.nganya_name} for ${plannerContext.fromStage?.name}.`
-                  : "Pick one ride to watch or keep backups ready."}
-              </p>
-            </div>
-            {plannerRideOptions.length > 0 ? (
-              <span className="rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-1 text-xs text-[var(--color-text-tertiary)]">
-                {plannerRideOptions.length} match
-                {plannerRideOptions.length === 1 ? "" : "es"}
-              </span>
-            ) : null}
-          </div>
-
-          {plannerRiskPrompt ? (
-            <div className="rounded-[var(--radius-lg)] border border-[var(--color-warning)]/30 bg-[var(--color-warning-soft)]/15 p-4">
-              <div className="flex items-start gap-3">
-                <ShieldAlert className="mt-0.5 h-5 w-5 text-[var(--color-warning)]" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {plannerRiskPrompt.reason === "missing"
-                      ? "Your watched ride dropped out of the live results."
-                      : plannerRiskPrompt.reason === "stale"
-                        ? "Your watched ride is stale now."
-                        : "Your watched ride is getting risky."}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    {plannerRiskPrompt.alternative
-                      ? `Switch to ${plannerRiskPrompt.alternative.nganya_name} or keep waiting for your current ride.`
-                      : "Keep waiting if you want, but you should not rely on this ride alone."}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {plannerRiskPrompt.alternative ? (
-                      <Button
-                        size="sm"
-                        onClick={() => switchToPlannerRide(plannerRiskPrompt.alternative!)}
-                      >
-                        Switch to {plannerRiskPrompt.alternative.nganya_name}
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={keepWatchingCurrentRide}
-                    >
-                      Keep watching
-                    </Button>
-                    {recommendedRide &&
-                    !(isFollowingNganya(recommendedRide.nganya_id) ||
-                      plannerAlertIds.has(recommendedRide.nganya_id)) ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void turnOnPlannerAlerts(recommendedRide)}
-                      >
-                        Turn on alerts
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {recommendedRide ? (
-            <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0 space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[var(--color-accent-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-accent)]">
-                      {watchedRide ? "Watched ride" : "Best ride now"}
-                    </span>
-                    <TrackingSignalBadge
-                      signalType={recommendedRide.signalType}
-                      freshnessSeconds={recommendedRide.freshnessSeconds ?? undefined}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xl font-semibold text-[var(--color-text-primary)]">
-                      {recommendedRide.nganya_name}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                      {recommendedRide.corridor_name} to {plannerContext.fromStage?.name}, about{" "}
-                      {recommendedRide.eta_minutes} min away
-                    </p>
-                  </div>
-                  <CatchabilityBadge
-                    status={recommendedRide.catchability.status}
-                    label={recommendedRide.catchability.label}
-                    subtext={recommendedRide.catchability.subtext}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2 md:min-w-[220px]">
-                  <Button onClick={() => watchPlannerRide(recommendedRide)}>
-                    {watchedRide?.nganya_id === recommendedRide.nganya_id
-                      ? "Refresh on map"
-                      : "Watch on map"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      isFollowingNganya(recommendedRide.nganya_id) ||
-                      plannerAlertIds.has(recommendedRide.nganya_id)
-                        ? addToast(`Alerts already on for ${recommendedRide.nganya_name}.`, "info")
-                        : void turnOnPlannerAlerts(recommendedRide)
-                    }
-                  >
-                    <BellRing className="h-4 w-4" />
-                    {isFollowingNganya(recommendedRide.nganya_id) ||
-                    plannerAlertIds.has(recommendedRide.nganya_id)
-                      ? "Alerts on"
-                      : "Follow route alerts"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {backupRides.length > 0 ? (
-            <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-                    Backup rides
-                  </h3>
-                  <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-                    Keep one ready in case your watched ride slows down or drops out.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {backupRides.slice(0, 3).map((ride) => (
-                  <div
-                    key={ride.nganya_id}
-                    className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--color-bg-card)]/50 p-3 md:grid-cols-[minmax(0,1fr)_auto]"
-                  >
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                          {ride.nganya_name}
-                        </p>
-                        <TrackingSignalBadge
-                          signalType={ride.signalType}
-                          freshnessSeconds={ride.freshnessSeconds ?? undefined}
-                        />
-                      </div>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
-                        ~{ride.eta_minutes} min on {ride.corridor_name}
-                      </p>
-                      <CatchabilityBadge
-                        status={ride.catchability.status}
-                        label={ride.catchability.label}
-                        subtext={ride.catchability.subtext}
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => switchToPlannerRide(ride)}
-                      >
-                        Watch on map
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-        </section>
-      ) : null}
-
-      {/* <section>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <LiveBadge />
-            <span className="text-h4 text-[var(--color-text-primary)]">
-              {filteredLiveNganyas.length} on the road
-            </span>
-          </div>
-          <button className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer">
-            See all <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {filteredLiveNganyas.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto scroll-hidden pb-2 -mx-5 px-5 md:-mx-8 md:px-8">
-            {filteredLiveNganyas.map((n) => {
-              const cardData = mapSupabaseToCardProps(n);
-              if (!cardData) return null;
-              return (
-                <div
-                  key={cardData.id}
-                  className="shrink-0 w-[260px] md:w-[300px]"
-                >
-                  <Card
-                    nganya={cardData as any}
-                    variant="standard"
-                    isFollowing={isFollowingNganya(cardData.id)}
-                    onFollow={toggleFollow}
-                    onCardClick={() => handleBrowseCardAction(cardData)}
-                    primaryAction={{
-                      label:
-                        cardData.isLive &&
-                        canTrackWithPlannerContext(plannerContext, cardData)
-                          ? "Track"
-                          : "Plan ride",
-                      onClick: () => handleBrowseCardAction(cardData),
-                    }}
-                    secondaryAction={{
-                      label: isFollowingNganya(cardData.id)
-                        ? "Following"
-                        : "Follow",
-                      onClick: () => void toggleFollow(cardData.id),
-                      variant: "secondary",
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-text-secondary)]">
-            No live sessions on this route. Check recently spotted below for
-            actionable alternatives.
-          </div>
-        )}
-      </section> */}
+      <HomeRideWatchSection
+        rideWatchSectionRef={planner.rideWatchSectionRef}
+        rideWatchScrollMargin={planner.rideWatchScrollMargin}
+        plannerJourneyKey={planner.plannerJourneyKey}
+        plannerAssistStatus={planner.plannerAssistStatus}
+        plannerRideOptions={planner.plannerRideOptions}
+        watchedRide={planner.watchedRide}
+        recommendedRide={planner.recommendedRide}
+        backupRides={planner.backupRides}
+        plannerRiskPrompt={planner.plannerRiskPrompt}
+        fromStageName={planner.plannerContext.fromStage?.name}
+        isFollowingNganya={isFollowingNganya}
+        plannerAlertIds={plannerAlertIds}
+        onSwitchRide={planner.switchToPlannerRide}
+        onKeepWatching={planner.keepWatchingCurrentRide}
+        onPlannerAlertAction={handlePlannerAlertAction}
+        onWatchRide={planner.watchPlannerRide}
+      />
 
       {shouldShowRecentSightings ? (
-        <section ref={recentSightingsRef}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-h3">Recently Spotted</h2>
-            <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-              {recentSummaryCount > 0
-                ? `${recentSummaryCount} nganyas spotted in the last 15 min`
-                : "Fresh route signals, grouped for quick decisions"}
-            </p>
-          </div>
-          {filteredAggregatedRecentSightings.length > 0 ? (
-            <button
-              onClick={() =>
-                router.navigate({
-                  to: "/",
-                  search: (current: any) => ({
-                    ...current,
-                    recent: showAllRecent ? undefined : "all",
-                  }),
-                })
-              }
-              className="flex items-center gap-1 text-sm text-[var(--color-text-tertiary)] transition-colors cursor-pointer hover:text-[var(--color-accent)]"
-            >
-              {showAllRecent ? "Show less" : "See all"}{" "}
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Chip
-            label={`All (${recentSummaryCount})`}
-            variant="route"
-            isActive={recentFilter === "ALL"}
-            onClick={() => setRecentFilter("ALL")}
-          />
-          {activeCorridor ? (
-            <Chip
-              label={`On your route (${onRouteRecentCount})`}
-              variant="route"
-              isActive={recentFilter === "ON_ROUTE"}
-              onClick={() => setRecentFilter("ON_ROUTE")}
-            />
-          ) : null}
-          <Chip
-            label={`High activity (${highActivityRecentCount})`}
-            variant="route"
-            isActive={recentFilter === "HIGH_ACTIVITY"}
-            onClick={() => setRecentFilter("HIGH_ACTIVITY")}
-          />
-        </div>
-
-        {filteredAggregatedRecentSightings.length > 0 ? (
-          <div className="space-y-2">
-            {filteredAggregatedRecentSightings
-              .slice(
-                0,
-                showAllRecent ? filteredAggregatedRecentSightings.length : 5,
-              )
-              .map((row) => {
-                const recencyLabel = getRecencyLabel(
-                  row.lastSeenMinutes,
-                  row.lastSeenAt,
-                );
-                const isFresh = row.lastSeenMinutes <= 15;
-                const canTrackRow = canTrackWithPlannerContext(
-                  plannerContext,
-                  row,
-                );
-                const actionLabel =
-                  isFresh && canTrackRow ? "Track" : "Plan ride";
-                const primaryContext = row.directionLabel
-                  ? `${row.stageName || row.corridorName} ${row.directionLabel}`
-                  : row.stageName || row.corridorName;
-                const secondaryContext = row.onRoute
-                  ? `${row.corridorName}`
-                  : row.corridorName;
-                const toneClasses =
-                  row.statusTone === "hot"
-                    ? "bg-[var(--color-accent)]"
-                    : row.statusTone === "warm"
-                      ? "bg-[var(--color-warning)]"
-                      : "bg-[var(--color-text-tertiary)]";
-
-                return (
-                  <div
-                    key={row.key}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleRecentRowAction(row)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        handleRecentRowAction(row);
-                      }
-                    }}
-                    className="grid w-full grid-cols-[12px_minmax(0,1.2fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-3 text-left transition-colors hover:border-[var(--glass-border-hover)]"
-                  >
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${toneClasses}`}
-                    />
-
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                        {row.nganyaName}
-                      </div>
-                      <div className="mt-1 truncate text-xs text-[var(--color-text-secondary)]">
-                        {primaryContext}
-                      </div>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="truncate text-xs text-[var(--color-text-secondary)]">
-                        {secondaryContext}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-                        <span>{row.signalLabel}</span>
-                        {row.sightingsCountRecent > 1 ? (
-                          <span>{row.sightingsCountRecent} sightings</span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 justify-self-end">
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-1 text-xs text-[var(--color-text-tertiary)]">
-                          <Clock className="h-3 w-3" />
-                          {recencyLabel}
-                        </div>
-                      </div>
-                      <Button
-                        variant={
-                          isFresh && canTrackRow ? "primary" : "secondary"
-                        }
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleRecentRowAction(row);
-                        }}
-                      >
-                        {actionLabel}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line)] bg-[var(--color-bg-card)]/35 p-4 md:p-5">
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div className="space-y-2">
-                <p className="text-sm text-[var(--color-text-primary)]">
-                  {recentFilter === "ON_ROUTE"
-                    ? "No fresh sightings on your route"
-                    : recentFilter === "HIGH_ACTIVITY"
-                      ? "No high-activity sightings right now"
-                      : "No recent sightings yet"}
-                </p>
-              
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.navigate({ to: "/spot" })}
-              >
-                Be the first to spot
-              </Button>
-            </div>
-          </div>
-        )}
-        </section>
-      ) : null}
-
-      {trackingRow && plannerContext.toPlace && plannerContext.fromStage ? (
-        <SearchResultsOverlayV2
-          isOpen
-          onClose={() => setTrackingRow(null)}
-          fromStage={plannerContext.fromStage}
-          toPlace={plannerContext.toPlace}
-          preference="SPECIFIC"
-          preferredNganya={{
-            id: trackingRow.nganyaId,
-            name: trackingRow.nganyaName,
-          }}
+        <HomeRecentSightingsSection
+          activeCorridor={activeCorridor}
+          plannerContext={planner.plannerContext}
+          recentFilter={recentFilter}
+          recentSummaryCount={recentSummaryCount}
+          onRouteRecentCount={onRouteRecentCount}
+          highActivityRecentCount={highActivityRecentCount}
+          filteredAggregatedRecentSightings={filteredAggregatedRecentSightings}
+          showAllRecent={showAllRecent}
+          onSetRecentFilter={setRecentFilter}
+          onRecentRowAction={planner.handleRecentRowAction}
+          onToggleShowAllRecent={() =>
+            router.navigate({
+              to: "/",
+              search: (current: any) => ({
+                ...current,
+                recent: showAllRecent ? undefined : "all",
+              }),
+            })
+          }
+          onNavigateToSpot={() => router.navigate({ to: "/spot" })}
         />
       ) : null}
 
-      {trackingNganya && plannerContext.toPlace && plannerContext.fromStage ? (
-        <SearchResultsOverlayV2
-          isOpen
-          onClose={() => setTrackingNganya(null)}
-          fromStage={plannerContext.fromStage}
-          toPlace={plannerContext.toPlace}
-          preference="SPECIFIC"
-          preferredNganya={{
-            id: trackingNganya.id,
-            name: trackingNganya.name,
-          }}
-        />
+      {planner.trackingRow &&
+      planner.plannerContext.toPlace &&
+      planner.plannerContext.fromStage ? (
+        <Suspense fallback={null}>
+          <LazySearchResultsOverlay
+            isOpen
+            onClose={() => planner.setTrackingRow(null)}
+            fromStage={planner.plannerContext.fromStage}
+            toPlace={planner.plannerContext.toPlace}
+            preference="SPECIFIC"
+            preferredNganya={{
+              id: planner.trackingRow.nganyaId,
+              name: planner.trackingRow.nganyaName,
+            }}
+          />
+        </Suspense>
+      ) : null}
+
+      {planner.trackingNganya &&
+      planner.plannerContext.toPlace &&
+      planner.plannerContext.fromStage ? (
+        <Suspense fallback={null}>
+          <LazySearchResultsOverlay
+            isOpen
+            onClose={() => planner.setTrackingNganya(null)}
+            fromStage={planner.plannerContext.fromStage}
+            toPlace={planner.plannerContext.toPlace}
+            preference="SPECIFIC"
+            preferredNganya={{
+              id: planner.trackingNganya.id,
+              name: planner.trackingNganya.name,
+            }}
+          />
+        </Suspense>
       ) : null}
 
       {hasSelectedRouteLiveNganyas && featuredLiveCardData ? (
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-[var(--color-green)]" />
-              <div>
-                <h2 className="text-h3">Live on this route</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-                  {filteredLiveNganyas.length} live nganya
-                  {filteredLiveNganyas.length === 1 ? "" : "s"} lining up on{" "}
-                  {activeCorridorName || "your route"}.
-                </p>
-              </div>
-            </div>
-            <a
-              href={`/discover?corridorId=${encodeURIComponent(activeCorridor!)}`}
-              className="shrink-0 text-xs font-semibold text-[var(--color-accent)] hover:underline"
-            >
-              View all
-            </a>
-          </div>
-
-          <div className="space-y-6">
-            <div className="hidden md:block">
-              <Card
-                nganya={featuredLiveCardData as any}
-                variant="feature"
-                isFollowing={isFollowingNganya(featuredLiveCardData.id)}
-                onFollow={toggleFollow}
-                onCardClick={() => handleBrowseCardAction(featuredLiveCardData as any)}
-                primaryAction={{
-                  label: canTrackWithPlannerContext(
-                    plannerContext,
-                    featuredLiveCardData as any,
-                  )
-                    ? "Track"
-                    : "Plan ride",
-                  onClick: () => handleBrowseCardAction(featuredLiveCardData as any),
-                }}
-                secondaryAction={{
-                  label: isFollowingNganya(featuredLiveCardData.id)
-                    ? "Following"
-                    : "Follow",
-                  onClick: () => void toggleFollow(featuredLiveCardData.id),
-                  variant: "secondary",
-                }}
-              />
-            </div>
-            <div className="md:hidden">
-              <Card
-                nganya={featuredLiveCardData as any}
-                variant="standard"
-                isFollowing={isFollowingNganya(featuredLiveCardData.id)}
-                onFollow={toggleFollow}
-                onCardClick={() => handleBrowseCardAction(featuredLiveCardData as any)}
-                primaryAction={{
-                  label: canTrackWithPlannerContext(
-                    plannerContext,
-                    featuredLiveCardData as any,
-                  )
-                    ? "Track"
-                    : "Plan ride",
-                  onClick: () => handleBrowseCardAction(featuredLiveCardData as any),
-                }}
-                secondaryAction={{
-                  label: isFollowingNganya(featuredLiveCardData.id)
-                    ? "Following"
-                    : "Follow",
-                  onClick: () => void toggleFollow(featuredLiveCardData.id),
-                  variant: "secondary",
-                }}
-              />
-            </div>
-
-            {consolidatedLiveRouteCards.length > 0 ? (
-              <div className="grid-cards">
-                {consolidatedLiveRouteCards.map((n) => {
-                  const cardData = mapSupabaseToCardProps(n);
-                  if (!cardData) return null;
-                  return (
-                    <Card
-                      key={cardData.id}
-                      nganya={cardData as any}
-                      variant="standard"
-                      isFollowing={isFollowingNganya(cardData.id)}
-                      onFollow={toggleFollow}
-                      onCardClick={() => handleBrowseCardAction(cardData)}
-                      primaryAction={{
-                        label:
-                          cardData.isLive &&
-                          canTrackWithPlannerContext(plannerContext, cardData)
-                            ? "Track"
-                            : "Plan ride",
-                        onClick: () => handleBrowseCardAction(cardData),
-                      }}
-                      secondaryAction={{
-                        label: isFollowingNganya(cardData.id)
-                          ? "Following"
-                          : "Follow",
-                        onClick: () => void toggleFollow(cardData.id),
-                        variant: "secondary",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        </section>
+        <HomeLiveRouteSection
+          activeCorridor={activeCorridor!}
+          activeCorridorName={planner.activeCorridorName}
+          filteredLiveNganyas={planner.filteredLiveNganyas}
+          featuredLiveCardData={featuredLiveCardData}
+          consolidatedLiveRouteCards={consolidatedLiveRouteCards}
+          plannerContext={planner.plannerContext}
+          isFollowingNganya={isFollowingNganya}
+          onToggleFollow={toggleFollow}
+          onBrowseCardAction={planner.handleBrowseCardAction}
+          mapSupabaseToCardProps={mapSupabaseToCardProps}
+        />
       ) : null}
     </div>
   );

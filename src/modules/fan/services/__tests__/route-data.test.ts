@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCorridors = vi.fn();
+const countNganyas = vi.fn();
+const getNganyasByIds = vi.fn();
 const searchNganyas = vi.fn();
 const searchHomepageNganyas = vi.fn();
 const getLiveNow = vi.fn();
@@ -8,8 +10,11 @@ const getMyFollows = vi.fn();
 const getStableClientSession = vi.fn();
 const getCorridorSightings = vi.fn();
 const getHomepageRecentSightings = vi.fn();
+const getMySightings = vi.fn();
 
 vi.mock("@/lib/queries/discover", () => ({
+  countNganyas,
+  getNganyasByIds,
   getCorridors,
   searchHomepageNganyas,
   searchNganyas,
@@ -30,7 +35,7 @@ vi.mock("@/shared/auth/client-session", () => ({
 vi.mock("@/lib/queries/sightings", () => ({
   getCorridorSightings,
   getHomepageRecentSightings,
-  getMySightings: vi.fn(),
+  getMySightings,
   postSighting: vi.fn(),
 }));
 
@@ -43,6 +48,8 @@ vi.mock("@/lib/queries/profile", () => ({
 describe("fan route data", () => {
   beforeEach(() => {
     getCorridors.mockReset();
+    countNganyas.mockReset();
+    getNganyasByIds.mockReset();
     searchNganyas.mockReset();
     searchHomepageNganyas.mockReset();
     getLiveNow.mockReset();
@@ -50,14 +57,19 @@ describe("fan route data", () => {
     getStableClientSession.mockReset();
     getCorridorSightings.mockReset();
     getHomepageRecentSightings.mockReset();
+    getMySightings.mockReset();
   });
 
-  it("loads discover catalogue data with corridor summaries and full nganya list", async () => {
+  it("loads discover catalogue data with a paged initial catalogue", async () => {
     const sharedCorridors = [{ id: "1", name: "CBD" }];
     const sharedLiveNganyas = [{ id: "live-1", corridor_id: "1", nganya_id: "n-1" }];
 
     searchNganyas.mockResolvedValue([
       { id: "n-1", corridor_id: "1", tags: ["NEW_BUILD"], follower_count: 10 },
+    ]);
+    countNganyas.mockResolvedValue(1);
+    getNganyasByIds.mockResolvedValue([
+      { id: "n-1", corridor_id: "1", nganya_media: [{ media_url: "gallery.jpg" }] },
     ]);
     getMyFollows.mockResolvedValue([{ nganya_id: "n-1" }]);
     getStableClientSession.mockResolvedValue({ user: { id: "user-1" } });
@@ -69,16 +81,19 @@ describe("fan route data", () => {
     const shared = { corridors: sharedCorridors, liveNganyas: sharedLiveNganyas };
     const result = await loadDiscoverRouteData(shared);
 
-    expect(searchNganyas).toHaveBeenCalledWith("");
+    expect(searchNganyas).toHaveBeenCalledWith("", undefined, 48);
     expect(result.corridors).toHaveLength(1);
     expect(result.corridors[0].name).toBe("CBD");
     expect(result.corridors[0].nganyaCount).toBe(1);
     expect(result.corridors[0].liveCount).toBe(1);
-    expect(result.allNganyas).toHaveLength(1);
+    expect(result.initialNganyas).toHaveLength(1);
     expect(result.featuredLive).toHaveLength(1);
+    expect(result.featuredLive[0]?.nganya_media?.[0]?.media_url).toBe("gallery.jpg");
     expect(result.liveNganyas).toStrictEqual(sharedLiveNganyas);
     expect(result.followedIds.has("n-1")).toBe(true);
     expect(result.totalCount).toBe(1);
+    expect(result.initialHasMore).toBe(false);
+    expect(result.initialNextOffset).toBe(1);
   });
 
   it("uses shared corridors when loading home route data", async () => {
@@ -168,5 +183,55 @@ describe("fan route data", () => {
     expect(getLiveNow).toHaveBeenCalledOnce();
     expect(shared.corridors).toEqual([{ id: "c1" }]);
     expect(shared.liveNganyas).toEqual([{ id: "l1" }]);
+  });
+
+  it("skips spot route catalogue loading for anonymous users", async () => {
+    getStableClientSession.mockResolvedValue(null);
+
+    const { loadSpotRouteData } = await import(
+      "@/modules/fan/services/route-data"
+    );
+
+    const result = await loadSpotRouteData({
+      corridors: [{ id: "c1", name: "CBD" }],
+      liveNganyas: [{ id: "live-1" }],
+    });
+
+    expect(searchNganyas).not.toHaveBeenCalled();
+    expect(getMySightings).not.toHaveBeenCalled();
+    expect(getHomepageRecentSightings).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      isAuthenticated: false,
+      corridors: [],
+      nganyas: [],
+      liveNganyas: [],
+      recentSightings: [],
+      mySightings: [],
+      followedIds: new Set(),
+    });
+  });
+
+  it("uses one bounded recent-sightings query for authenticated spot route data", async () => {
+    getStableClientSession.mockResolvedValue({ user: { id: "user-1" } });
+    searchNganyas.mockResolvedValue([{ id: "n-1" }]);
+    getMyFollows.mockResolvedValue([{ nganya_id: "n-1" }]);
+    getMySightings.mockResolvedValue([{ id: "mine-1" }]);
+    getHomepageRecentSightings.mockResolvedValue([{ id: "recent-1" }]);
+
+    const { loadSpotRouteData } = await import(
+      "@/modules/fan/services/route-data"
+    );
+
+    const result = await loadSpotRouteData({
+      corridors: [{ id: "c1", name: "CBD" }],
+      liveNganyas: [{ id: "live-1" }],
+    });
+
+    expect(getHomepageRecentSightings).toHaveBeenCalledWith(80, {
+      includeConfidence: false,
+    });
+    expect(getCorridorSightings).not.toHaveBeenCalled();
+    expect(result.recentSightings).toEqual([{ id: "recent-1" }]);
+    expect(result.followedIds.has("n-1")).toBe(true);
   });
 });

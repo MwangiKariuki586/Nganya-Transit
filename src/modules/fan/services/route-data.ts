@@ -1,4 +1,6 @@
 import {
+  countNganyas,
+  getNganyasByIds,
   getCorridors,
   searchHomepageNganyas,
   searchNganyas,
@@ -49,12 +51,14 @@ export interface DiscoverRouteData {
   corridors: DiscoverCorridorSummary[];
   /** Up to 6 live nganyas for the curated strip — sourced from shared liveNganyas. */
   featuredLive: any[];
-  /** Full catalogue (up to 100) for client-side filtering. */
-  allNganyas: any[];
+  /** First server-loaded page for the catalogue. */
+  initialNganyas: any[];
   /** All live nganyas, required for isLive card state. */
   liveNganyas: any[];
   followedIds: Set<string>;
   totalCount: number;
+  initialHasMore: boolean;
+  initialNextOffset: number;
 }
 
 export interface DiscoverCorridorSummary {
@@ -68,6 +72,7 @@ export interface DiscoverCataloguePageData {
   nganyas: any[];
   hasMore: boolean;
   nextOffset: number;
+  totalCount: number;
 }
 
 export interface FollowingRouteData {
@@ -157,35 +162,53 @@ export async function loadDiscoverRouteData(
 ): Promise<DiscoverRouteData> {
   const { corridors, liveNganyas } = shared;
 
-  const [allNganyas, follows] = await Promise.all([
-    searchNganyas(""),
-    getOptionalFollows(),
-  ]);
+  const featuredLiveBase = liveNganyas.slice(0, 6);
+  const featuredLiveIds = featuredLiveBase
+    .map((live: any) => live.nganya_id || live.id)
+    .filter(Boolean);
 
+  const [initialCatalogue, follows, totalCount, featuredNganyas, corridorCounts] =
+    await Promise.all([
+      loadDiscoverCataloguePage({ limit: 12 }),
+      getOptionalFollows(),
+      countNganyas(),
+      getNganyasByIds(featuredLiveIds),
+      Promise.all(
+        corridors.map(async (corridor: any) => ({
+          id: corridor.id,
+          count: await countNganyas(corridor.id),
+        })),
+      ),
+    ]);
+
+  const corridorCountById = new Map(
+    corridorCounts.map((entry) => [entry.id, entry.count]),
+  );
   const corridorSummaries: DiscoverCorridorSummary[] = corridors.map(
     (c: any) => ({
       id: c.id,
       name: c.name,
-      nganyaCount: allNganyas.filter((n: any) => n.corridor_id === c.id).length,
+      nganyaCount: corridorCountById.get(c.id) || 0,
       liveCount: liveNganyas.filter((n: any) => n.corridor_id === c.id).length,
     }),
   );
 
-  // Curated strip: first 6 live nganyas, enriched with image data from allNganyas.
-  // liveNganyas rows come from v_live_now which has no nganya_media / crew_nganyas joins,
-  // so we merge each live row with its matching allNganyas entry to get the image fields.
-  const allNganyasById = new Map(allNganyas.map((n: any) => [n.id, n]));
-  const featuredLive = liveNganyas
-    .slice(0, 6)
-    .map((live: any) => enrichNganyaImageFields(live, allNganyasById));
+  const featuredNganyasById = new Map(
+    featuredNganyas.map((n: any) => [n.id, n]),
+  );
+  const featuredLive = featuredLiveBase.map((live: any) =>
+    enrichNganyaImageFields(live, featuredNganyasById),
+  );
 
   return {
     corridors: corridorSummaries,
     featuredLive,
-    allNganyas,
+    initialNganyas: initialCatalogue.nganyas,
     liveNganyas,
     followedIds: toFollowedIds(follows),
-    totalCount: allNganyas.length,
+    totalCount,
+    initialHasMore: initialCatalogue.hasMore,
+    initialNextOffset: initialCatalogue.nextOffset,
   };
 }
 
@@ -201,12 +224,14 @@ export async function loadDiscoverCataloguePage(input: {
   const search = input.search?.trim() || "";
   const limit = input.limit || 12;
   const offset = input.offset || 0;
+  const fetchLimit = Math.min(Math.max(offset + limit + 24, 48), 240);
 
-  // Fetch generously so client-side filters (vibe, verifiedOnly) don't deplete the page.
+  // This still uses the existing client query surface, but only fetches a bounded
+  // working set for the current page/filter state instead of the full catalogue.
   let nganyas = await searchNganyas(
     search,
     input.corridorId || undefined,
-    200,
+    fetchLimit,
   );
 
   if (input.vibe) {
@@ -247,6 +272,7 @@ export async function loadDiscoverCataloguePage(input: {
     nganyas: page,
     hasMore,
     nextOffset: offset + page.length,
+    totalCount: nganyas.length,
   };
 }
 
@@ -332,24 +358,33 @@ export async function loadProfileRouteData(
 export async function loadSpotRouteData(
   shared: FanSharedData,
 ): Promise<SpotRouteData> {
-  const { corridors, liveNganyas } = shared;
+  const { liveNganyas } = shared;
 
   const session = await getStableClientSession();
+  if (!session?.user?.id) {
+    return {
+      isAuthenticated: false,
+      corridors: [],
+      nganyas: [],
+      liveNganyas: [],
+      recentSightings: [],
+      mySightings: [],
+      followedIds: new Set<string>(),
+    };
+  }
+
   const [nganyas, follows, mySightings] = await Promise.all([
     searchNganyas(""),
     getOptionalFollows(),
-    session?.user?.id ? getMySightings() : Promise.resolve([]),
+    getMySightings(),
   ]);
-
-  const recentSightings = (
-    await Promise.all(
-      corridors.map((corridor: any) => getCorridorSightings(corridor.id)),
-    )
-  ).flat();
+  const recentSightings = await getHomepageRecentSightings(80, {
+    includeConfidence: false,
+  });
 
   return {
-    isAuthenticated: Boolean(session?.user?.id),
-    corridors,
+    isAuthenticated: true,
+    corridors: shared.corridors,
     nganyas,
     liveNganyas,
     recentSightings,

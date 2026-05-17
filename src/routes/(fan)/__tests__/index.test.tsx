@@ -126,7 +126,7 @@ describe("fan home route", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("wires HomeScreen props and search navigation", () => {
+  it("wires HomeScreen props from route state", () => {
     mockRouteUseLoaderData.mockReturnValue({ rows: [] });
     mockRouteUseSearch.mockReturnValue({
       q: "old",
@@ -142,35 +142,7 @@ describe("fan home route", () => {
     expect(props.data).toEqual({ rows: [] });
     expect(props.activeCorridor).toBe("corridor-9");
     expect(props.showAllRecent).toBe(true);
-
-    act(() => {
-      (props.onSearchChange as Function)("fresh", "corridor-2", "NEW_BUILD");
-    });
-
-    expect(mockNavigate).toHaveBeenCalledTimes(1);
-    const firstCall = mockNavigate.mock.calls[0][0];
-    expect(firstCall.to).toBe("/");
-    expect(firstCall.replace).toBe(true);
-    expect(firstCall.search({ keep: "yes", recent: "all" })).toEqual({
-      keep: "yes",
-      recent: "all",
-      q: "fresh",
-      corridor: "corridor-2",
-      vibe: "NEW_BUILD",
-    });
-
-    act(() => {
-      (props.onSearchChange as Function)("", null, null);
-    });
-
-    const clearedCall = mockNavigate.mock.calls[1][0];
-    expect(clearedCall.search({ keep: "yes", recent: "all" })).toEqual({
-      keep: "yes",
-      recent: "all",
-      q: undefined,
-      corridor: undefined,
-      vibe: undefined,
-    });
+    expect(props.onSearchChange).toBeUndefined();
   });
 
   it("updates corridor search state without disturbing unrelated params", () => {

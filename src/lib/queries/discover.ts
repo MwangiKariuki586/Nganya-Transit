@@ -87,6 +87,32 @@ export async function searchHomepageNganyas(
     return dedupeNganyas(data)
 }
 
+export async function countNganyas(corridorId?: string) {
+    let query = supabase
+        .from('nganyas')
+        .select('id', { count: 'exact', head: true })
+
+    if (corridorId) {
+        query = query.eq('corridor_id', corridorId)
+    }
+
+    const { count, error } = await query
+    if (error) throw error
+    return count || 0
+}
+
+export async function getNganyasByIds(ids: string[]) {
+    if (ids.length === 0) return []
+
+    const { data, error } = await supabase
+        .from('nganyas')
+        .select(NGANYA_IMAGE_SELECT)
+        .in('id', ids)
+
+    if (error) throw error
+    return dedupeNganyas(data)
+}
+
 export async function getNganya(id: string) {
     const { data, error } = await supabase
         .from('nganyas')

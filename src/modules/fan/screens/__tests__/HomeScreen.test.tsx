@@ -336,14 +336,12 @@ function renderHome(
   props: Partial<Parameters<typeof HomeScreen>[0]> = {},
   dataOverrides: Partial<FanHomeRouteData> = {},
 ) {
-  const onSearchChange = vi.fn();
   const onCorridorChange = vi.fn();
   const view = render(
     <HomeScreen
       data={makeHomeData(dataOverrides)}
       activeCorridor={null}
       onCorridorChange={onCorridorChange}
-      onSearchChange={onSearchChange}
       showAllRecent={false}
       {...props}
     />,
@@ -351,7 +349,6 @@ function renderHome(
 
   return {
     ...view,
-    onSearchChange,
     onCorridorChange,
   };
 }
@@ -414,7 +411,7 @@ describe("HomeScreen", () => {
     const { onCorridorChange } = renderHome();
 
     expect(screen.getByText("Plan fast, catch faster")).toBeTruthy();
-    expect(screen.getByText("map-corridor:none")).toBeTruthy();
+    expect(await screen.findByText("map-corridor:none")).toBeTruthy();
     expect(screen.getByText("Recently Spotted")).toBeTruthy();
     expect(screen.queryByText("Live on this route")).toBeNull();
     expect(screen.queryByText("feature:Matwana Express")).toBeNull();
@@ -500,7 +497,9 @@ describe("HomeScreen", () => {
     });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Track" })[0]);
-    expect(screen.getByText("overlay:Matwana Express:Thika Road")).toBeTruthy();
+    expect(
+      await screen.findByText("overlay:Matwana Express:Thika Road"),
+    ).toBeTruthy();
   });
 
   it("seeds the planner and avoids double firing when the recent row CTA is clicked", async () => {
@@ -532,23 +531,23 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    fireEvent.click(screen.getByText("map-track"));
+    fireEvent.click(await screen.findByText("map-track"));
     await waitFor(() => {
       expect(screen.getByText("route-line:2")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText("planner-search"));
+    fireEvent.click(await screen.findByText("planner-search"));
     await waitFor(() => {
       expect(screen.getByText("route-line:0")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText("planner-change"));
+    fireEvent.click(await screen.findByText("planner-change"));
     await waitFor(() => {
       expect(screen.getByText("planner-route:Ngong Road")).toBeTruthy();
       expect(screen.getByText("route-line:0")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText("planner-clear"));
+    fireEvent.click(await screen.findByText("planner-clear"));
     await waitFor(() => {
       expect(screen.getByText("planner-route:none")).toBeTruthy();
       expect(screen.getByText("map-corridor:corridor-1")).toBeTruthy();
@@ -577,7 +576,7 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    fireEvent.click(screen.getByText("planner-search"));
+    fireEvent.click(await screen.findByText("planner-search"));
 
     await waitFor(() => {
       expect(
@@ -792,7 +791,7 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    fireEvent.click(screen.getByText("map-track"));
+    fireEvent.click(await screen.findByText("map-track"));
     await waitFor(() => {
       expect(mockFetchOsrmRoute).toHaveBeenCalledTimes(1);
       expect(screen.getByText("route-line:2")).toBeTruthy();
@@ -800,7 +799,7 @@ describe("HomeScreen", () => {
       expect(screen.getByText("route-distance:3500")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText("map-track"));
+    fireEvent.click(await screen.findByText("map-track"));
     await waitFor(() => {
       expect(mockFetchOsrmRoute).toHaveBeenCalledTimes(1);
     });
@@ -816,7 +815,7 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    fireEvent.click(screen.getByText("map-track"));
+    fireEvent.click(await screen.findByText("map-track"));
     await waitFor(() => {
       expect(screen.getByText("route-line:2")).toBeTruthy();
       expect(screen.getByText("route-eta:300")).toBeTruthy();
@@ -834,7 +833,7 @@ describe("HomeScreen", () => {
 
     renderHome({ activeCorridor: "corridor-1" });
 
-    fireEvent.click(screen.getByText("map-track"));
+    fireEvent.click(await screen.findByText("map-track"));
     await waitFor(() => {
       expect(mockFetchOsrmRoute).not.toHaveBeenCalled();
       expect(screen.getByText("route-line:0")).toBeTruthy();
@@ -852,7 +851,6 @@ describe("HomeScreen", () => {
         data={makeHomeData({ followedIds })}
         activeCorridor="corridor-1"
         onCorridorChange={vi.fn()}
-        onSearchChange={vi.fn()}
         showAllRecent={false}
       />,
     );
@@ -868,7 +866,6 @@ describe("HomeScreen", () => {
         data={makeHomeData({ followedIds: new Set<string>() })}
         activeCorridor="corridor-1"
         onCorridorChange={vi.fn()}
-        onSearchChange={vi.fn()}
         showAllRecent={false}
       />,
     );
@@ -883,7 +880,6 @@ describe("HomeScreen", () => {
         data={makeHomeData({ followedIds: new Set<string>() })}
         activeCorridor="corridor-1"
         onCorridorChange={vi.fn()}
-        onSearchChange={vi.fn()}
         showAllRecent={false}
       />,
     );

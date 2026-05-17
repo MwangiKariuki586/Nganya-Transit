@@ -34,18 +34,6 @@ function FanHomeRoute() {
   return (
     <HomeScreen
       data={data}
-      onSearchChange={(q, corridor, vibe) =>
-        navigate({
-          to: '/',
-          search: (current) => ({
-            ...current,
-            q: q || undefined,
-            corridor: corridor || undefined,
-            vibe: vibe || undefined,
-          }),
-          replace: true,
-        })
-      }
       onCorridorChange={(corridorId) =>
         navigate({
           to: '/',
