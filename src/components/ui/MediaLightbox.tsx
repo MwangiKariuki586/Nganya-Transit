@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, ZoomIn } from "lucide-react";
 
 interface MediaLightboxProps {
@@ -38,33 +39,34 @@ export default function MediaLightbox({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/90 backdrop-blur-md z-[var(--z-modal-backdrop)] animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Content */}
-      <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4">
-        {/* Close button */}
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/92 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Media preview"
+    >
+      <div className="absolute inset-0 flex items-center justify-center p-4 md:p-8">
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-strong)] transition-colors z-10"
+          className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/65 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-black/80 md:right-6 md:top-6"
           aria-label="Close preview"
         >
-          <X className="w-5 h-5" />
+          <X className="h-4 w-4" />
         </button>
 
-        {/* Media */}
-        <div className="max-w-5xl w-full max-h-[90vh] animate-scale-in">
+        <div
+          className="flex max-h-full max-w-full items-center justify-center animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
           {type === "video" ? (
             <video
               src={src}
-              className="w-full max-h-[90vh] rounded-lg object-contain"
+              className="block max-h-[calc(100vh-5rem)] max-w-full rounded-xl object-contain shadow-2xl md:max-h-[calc(100vh-7rem)]"
               controls
               autoPlay
               muted
@@ -75,12 +77,13 @@ export default function MediaLightbox({
             <img
               src={src}
               alt={alt}
-              className="w-full max-h-[90vh] rounded-lg object-contain"
+              className="block max-h-[calc(100vh-5rem)] max-w-full rounded-xl object-contain shadow-2xl md:max-h-[calc(100vh-7rem)]"
             />
           )}
         </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }
 
