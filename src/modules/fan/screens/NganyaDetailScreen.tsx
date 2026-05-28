@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import LiveBadge from "@/components/ui/LiveBadge";
 import ConfidenceBadge from "@/components/ui/ConfidenceBadge";
 import { NganyaGallery } from "@/modules/fan/components/NganyaGallery";
+import { FanSection } from "@/modules/fan/components/FanSection";
 import {
   getNganyaCrewGalleryServerFn,
   getNganyaCrewProfileServerFn,
@@ -19,16 +20,52 @@ import { retryWithBackoff, isNetworkError } from "@/lib/utils/retry";
 import { compressImage } from "@/lib/utils/image-compress";
 import { vibeTagColors } from "@/lib/mockData";
 import { getNganyaBySlug, getNganyasByCorridor } from "@/lib/queries/discover";
-import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import { getLiveNow } from "@/lib/queries/live";
 import { getCorridorSightings } from "@/lib/queries/sightings";
+import {
+  mapNganyaRecordToCardData,
+  type FanCardData,
+} from "@/modules/fan/lib/nganya-card";
+import type {
+  FanLiveNganyaRecord,
+  FanMediaRecord,
+  FanNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 import {
   followNganya,
   getMyFollows,
   unfollowNganya,
 } from "@/lib/queries/follows";
-import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
-import { Heart, Bell, Share2, Eye, Camera, ChevronLeft } from "lucide-react";
+import { formatRelativeTime } from "@/lib/formatters";
+import { Heart, Share2, Eye, Camera, ChevronLeft } from "lucide-react";
+
+interface CrewGalleryItem {
+  id: string;
+  media_url: string;
+  media_type?: string | null;
+}
+
+interface CrewProfileRecord {
+  id?: string | null;
+  avatar_url?: string | null;
+  cover_media_url?: string | null;
+  cover_media_type?: "image" | "video" | null;
+}
+
+interface NganyaDetailRecord extends FanNganyaRecord {
+  bio?: string | null;
+  status?: string | null;
+}
+
+interface SightingConfidenceLevelRecord {
+  confidence_level?: "HIGH" | "MEDIUM" | "LOW" | "HIGH_CONFIDENCE" | string | null;
+}
+
+interface NganyaDetailSightingRecord extends FanRecentSightingRecord {
+  media_urls?: string[] | null;
+  confidence?: SightingConfidenceLevelRecord | null;
+}
 
 export default function NganyaDetailScreen() {
   const navigate = useNavigate();
@@ -37,15 +74,14 @@ export default function NganyaDetailScreen() {
   const toast = useToast();
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const [nganya, setNganya] = useState<any>(null);
+  const [nganya, setNganya] = useState<NganyaDetailRecord | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isNotifying, setIsNotifying] = useState(false);
-  const [nganyaSightings, setNganyaSightings] = useState<any[]>([]);
-  const [relatedNganyas, setRelatedNganyas] = useState<any[]>([]);
+  const [nganyaSightings, setNganyaSightings] = useState<NganyaDetailSightingRecord[]>([]);
+  const [relatedNganyas, setRelatedNganyas] = useState<FanNganyaRecord[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [crewGalleryItems, setCrewGalleryItems] = useState<any[]>([]);
-  const [crewProfile, setCrewProfile] = useState<any>(null);
+  const [crewGalleryItems, setCrewGalleryItems] = useState<CrewGalleryItem[]>([]);
+  const [crewProfile, setCrewProfile] = useState<CrewProfileRecord | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
@@ -62,7 +98,7 @@ export default function NganyaDetailScreen() {
     async function loadNganya() {
       setIsLoading(true);
       try {
-        const data = await getNganyaBySlug(slug);
+        const data = (await getNganyaBySlug(slug)) as NganyaDetailRecord | null;
         if (!data) {
           setNganya(null);
           return;
@@ -96,15 +132,15 @@ export default function NganyaDetailScreen() {
 
         setIsLive(
           (liveRes || []).some(
-            (liveNganya) => liveNganya.nganya_id === data.id,
+            (liveNganya: FanLiveNganyaRecord) => liveNganya.nganya_id === data.id,
           ) || data.status === "LIVE",
         );
         setNganyaSightings(
-          (corridorSightings || []).filter(
+          ((corridorSightings || []) as NganyaDetailSightingRecord[]).filter(
             (sighting) => sighting.nganya_id === data.id,
           ),
         );
-        setRelatedNganyas(related || []);
+        setRelatedNganyas((related || []) as FanNganyaRecord[]);
         setIsFollowing(
           (myFollows || []).some((follow) => follow.nganya_id === data.id),
         );
@@ -166,14 +202,16 @@ export default function NganyaDetailScreen() {
 
       URL.revokeObjectURL(preview);
       setAvatarPreviewUrl(result.url);
-      setCrewProfile((prev: any) => ({ ...prev, avatar_url: result.url }));
+      setCrewProfile((prev) => ({ ...prev, avatar_url: result.url }));
       toast.success("Avatar updated!");
-    } catch (err: any) {
+    } catch (err) {
       URL.revokeObjectURL(preview);
       setAvatarPreviewUrl(crewProfile?.avatar_url ?? null);
+      const message =
+        err instanceof Error ? err.message : "Please try again.";
       toast.error(
         "Upload failed",
-        isNetworkError(err) ? "Network error. Please try again." : err.message,
+        isNetworkError(err) ? "Network error. Please try again." : message,
       );
     } finally {
       setIsUploadingAvatar(false);
@@ -239,13 +277,20 @@ export default function NganyaDetailScreen() {
 
   // Merge nganya_media (admin-uploaded at registration) with crew profile_media,
   // deduping by media_url so the same photo never appears twice.
-  const nganyaMedia: any[] = nganya.nganya_media || [];
-  const seenUrls = new Set(nganyaMedia.map((m: any) => m.media_url));
+  const nganyaMedia: FanMediaRecord[] = nganya.nganya_media || [];
+  const seenUrls = new Set(nganyaMedia.map((m) => m.media_url));
   const mergedGallery = [
     ...nganyaMedia,
     ...crewGalleryItems.filter((m) => !seenUrls.has(m.media_url)),
   ];
   const mediaCount = mergedGallery.length;
+  const relatedCards = relatedNganyas
+    .map((relatedNganya) =>
+      mapNganyaRecordToCardData(relatedNganya, {
+        lastSeen: "Recently",
+      }),
+    )
+    .filter(Boolean) as FanCardData[];
 
   return (
     <div className="animate-slide-up">
@@ -421,8 +466,7 @@ export default function NganyaDetailScreen() {
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Profile Details ─────────────────────────────────────────────── */}
-        <section className="mt-8">
-          <h2 className="text-h3 mb-4">Profile Details</h2>
+        <FanSection title="Profile Details" withDivider={false}>
           <div className="space-y-6">
             <div>
               <label className="mb-1.5 block text-caption text-[var(--color-text-tertiary)]">
@@ -459,14 +503,13 @@ export default function NganyaDetailScreen() {
               </p>
             </div>
           </div>
-        </section>
+        </FanSection>
 
         {/* ── Vibes ───────────────────────────────────────────────────────── */}
         {tags.length > 0 && (
           <>
             <div className="mt-8 border-t border-[var(--color-line)]" />
-            <section className="mt-8">
-              <h2 className="text-h3 mb-4">Vibes</h2>
+            <FanSection title="Vibes" withDivider={false}>
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag: string) => (
                   <Chip
@@ -477,30 +520,31 @@ export default function NganyaDetailScreen() {
                   />
                 ))}
               </div>
-            </section>
+            </FanSection>
           </>
         )}
 
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Gallery ─────────────────────────────────────────────────────── */}
-        <section className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-h3">
+        <FanSection
+          withDivider={false}
+          title={
+            <>
               Gallery{" "}
               <span className="text-sm text-[var(--color-text-tertiary)]">
                 ({mediaCount}/30)
               </span>
-            </h2>
-          </div>
+            </>
+          }
+        >
           <NganyaGallery items={mergedGallery} />
-        </section>
+        </FanSection>
 
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Recent Sightings ────────────────────────────────────────────── */}
-        <section className="mt-8">
-          <h2 className="text-h3 mb-4">Recent Sightings</h2>
+        <FanSection title="Recent Sightings" withDivider={false}>
           {nganyaSightings.length > 0 ? (
             <div className="space-y-2">
               {nganyaSightings.slice(0, 5).map((sighting) => (
@@ -515,7 +559,13 @@ export default function NganyaDetailScreen() {
                         {sighting.user?.handle || "Anonymous"}
                       </span>
                       <ConfidenceBadge
-                        level={sighting.confidence?.confidence_level || "HIGH"}
+                        level={
+                          sighting.confidence?.confidence_level === "LOW"
+                            ? "LOW"
+                            : sighting.confidence?.confidence_level === "MEDIUM"
+                              ? "MEDIUM"
+                              : "HIGH"
+                        }
                       />
                     </div>
                     <span className="text-xs text-[var(--color-text-tertiary)]">
@@ -533,41 +583,27 @@ export default function NganyaDetailScreen() {
               No recent sightings yet. Be the first to log one.
             </p>
           )}
-        </section>
+        </FanSection>
 
         {/* ── More from Corridor ──────────────────────────────────────────── */}
-        {relatedNganyas.length > 0 && (
+        {relatedCards.length > 0 && (
           <>
             <div className="mt-8 border-t border-[var(--color-line)]" />
-            <section className="mt-8 pb-10 md:pb-16">
-              <h2 className="text-h3 mb-4">More from {corridorName}</h2>
+            <FanSection
+              title={`More from ${corridorName}`}
+              className="pb-10 md:pb-16"
+              withDivider={false}
+            >
               <div className="grid-cards">
-                {relatedNganyas.map((relatedNganya) => (
+                {relatedCards.map((relatedCard) => (
                   <Card
-                    key={relatedNganya.id}
-                    nganya={{
-                      id: relatedNganya.id,
-                      slug: toNganyaSlug(relatedNganya.name),
-                      name: relatedNganya.name,
-                      corridor: relatedNganya.corridors?.name || corridorName,
-                      vibeTags: relatedNganya.tags || [],
-                      followers: 0,
-                      sightingsToday: 0,
-                      lastSeen: "Recently",
-                      lastSeenMinutes: 0,
-                      confidence: "high",
-                      isLive: false,
-                      isNewBuild: (relatedNganya.tags || []).includes(
-                        "NEW_BUILD",
-                      ),
-                      imageUrl: pickPrimaryNganyaImageUrl(relatedNganya) ?? "",
-                      description: "",
-                    }}
+                    key={relatedCard.id}
+                    nganya={relatedCard}
                     variant="standard"
                   />
                 ))}
               </div>
-            </section>
+            </FanSection>
           </>
         )}
       </div>

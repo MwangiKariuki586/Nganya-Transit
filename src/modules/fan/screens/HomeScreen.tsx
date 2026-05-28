@@ -6,6 +6,7 @@ import {
   enrichNganyaImageFields,
   mapNganyaRecordToCardData,
 } from "@/modules/fan/lib/nganya-card";
+import type { FanLiveNganyaRecord } from "@/modules/fan/lib/fan-data";
 import {
   aggregateRecentSightings,
   countHighActivityRecentSightings,
@@ -132,12 +133,14 @@ export default function HomeScreen({
       new Map(
         nganyas
           .map((nganya) => [nganya.id || nganya.nganya_id, nganya] as const)
-          .filter(([id]) => Boolean(id)),
+          .filter(
+            (entry): entry is [string, FanNganyaRecord] => Boolean(entry[0]),
+          ),
       ),
     [nganyas],
   );
 
-  const mapSupabaseToCardProps = (dbNganya: any) =>
+  const mapSupabaseToCardProps = (dbNganya: FanLiveNganyaRecord) =>
     mapNganyaRecordToCardData(
       enrichNganyaImageFields(dbNganya, fullHomepageNganyasById),
       { liveNganyas: planner.filteredLiveNganyas },
@@ -255,7 +258,7 @@ export default function HomeScreen({
           onToggleShowAllRecent={() =>
             router.navigate({
               to: "/",
-              search: (current: any) => ({
+              search: (current: Record<string, unknown>) => ({
                 ...current,
                 recent: showAllRecent ? undefined : "all",
               }),

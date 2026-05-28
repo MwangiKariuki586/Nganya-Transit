@@ -1,22 +1,37 @@
 import { toNganyaSlug } from "@/lib/formatters";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
+import type { Nganya } from "@/lib/mockData";
+import type {
+  FanFollowRecord,
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+} from "./fan-data";
 
 interface MapNganyaRecordToCardDataOptions {
-  liveNganyas?: any[];
+  liveNganyas?: FanLiveNganyaRecord[];
   lastSeen?: string;
   followers?: number;
   sightingsToday?: number;
 }
 
-export function getNganyaRecordId(record: any): string | null {
+export type FanCardRecord = FanNganyaRecord | FanFollowRecord;
+export type FanCardData = Nganya & {
+  corridorId?: string | null;
+  corridorName?: string | null;
+  isVerified?: boolean;
+};
+
+export function getNganyaRecordId(
+  record: FanCardRecord | null | undefined,
+): string | null {
   if (!record) return null;
-  const source = record.nganyas || record;
+  const source = (record.nganyas || record) as any;
   return source.nganya_id || source.id || null;
 }
 
-export function enrichNganyaImageFields<T extends Record<string, any>>(
+export function enrichNganyaImageFields<T extends FanNganyaRecord>(
   record: T | null | undefined,
-  fullNganyasById?: Map<string, any>,
+  fullNganyasById?: Map<string, FanNganyaRecord>,
 ): T | null | undefined {
   if (!record || !fullNganyasById?.size) return record;
 
@@ -41,12 +56,12 @@ export function enrichNganyaImageFields<T extends Record<string, any>>(
 }
 
 export function mapNganyaRecordToCardData(
-  record: any,
+  record: FanCardRecord | null | undefined,
   options: MapNganyaRecordToCardDataOptions = {},
-) {
+): FanCardData | null {
   if (!record) return null;
 
-  const source = record.nganyas || record;
+  const source = (record.nganyas || record) as any;
   const id = getNganyaRecordId(source);
   if (!id) return null;
 

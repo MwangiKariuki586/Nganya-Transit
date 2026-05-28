@@ -13,13 +13,16 @@ import { mapNganyaToCardProps } from "./discover/discover-domain";
 import { SORT_OPTIONS } from "./discover/discover-types";
 import { useDiscoverCatalogue } from "./discover/useDiscoverCatalogue";
 import type { DiscoverRouteData } from "@/modules/fan/services/route-data";
+import type { FanCardData } from "@/modules/fan/lib/nganya-card";
 import { useToast } from "@/components/ui/ToastContainer";
 import {
-  applyPlannerSeed,
-  canTrackWithPlannerContext,
   readPlannerStorageContext,
-  writePlannerStorageContext,
 } from "@/modules/fan/services/planner-storage";
+import {
+  buildPlannerSeedToastMessage,
+  persistPlannerHandoff,
+  shouldTrackPlannerHandoffTarget,
+} from "@/modules/fan/services/planner-handoff";
 
 const allVibeTags = Object.keys(vibeTagColors);
 
@@ -61,23 +64,19 @@ function DiscoverScreen({
     () =>
       featuredLive
         .map((n) => mapNganyaToCardProps(n, liveNganyas))
-        .filter(Boolean),
+        .filter((c): c is FanCardData => Boolean(c)),
     [featuredLive, liveNganyas],
   );
 
   // ── Plan ride / Track CTA ─────────────────────────────────────────────────
-  const handleCardAction = (cardData: any) => {
+  const handleCardAction = (cardData: FanCardData) => {
     const plannerContext = readPlannerStorageContext();
-    if (
-      cardData.isLive &&
-      canTrackWithPlannerContext(plannerContext, cardData)
-    ) {
+    if (shouldTrackPlannerHandoffTarget(plannerContext, cardData)) {
       // Navigate to home where the tracker lives
       window.location.href = "/";
       return;
     }
-    // Seed the planner and navigate home to the WhereToCard
-    const next = applyPlannerSeed(
+    persistPlannerHandoff(
       plannerContext,
       {
         id: cardData.id,
@@ -87,10 +86,8 @@ function DiscoverScreen({
       },
       { clearStageOnRouteChange: true },
     );
-    // Persist to localStorage so the home page picks it up
-    writePlannerStorageContext(next);
     addToast(
-      `Route set to ${cardData.corridorName}. Pick your pickup stage to plan with ${cardData.name}.`,
+      buildPlannerSeedToastMessage(cardData),
       "info",
     );
     window.location.href = "/";
@@ -210,12 +207,17 @@ function DiscoverScreen({
                 className="shrink-0 w-[260px] md:w-[300px]"
               >
                 <Card
-                  nganya={cardData as any}
+                  nganya={cardData}
                   variant="standard"
                   isFollowing={catalogue.followedIds.has(cardData.id)}
                   onFollow={catalogue.toggleFollow}
                   primaryAction={{
-                    label: "Track",
+                    label: shouldTrackPlannerHandoffTarget(
+                      readPlannerStorageContext(),
+                      cardData,
+                    )
+                      ? "Track"
+                      : "Plan ride",
                     onClick: () => handleCardAction(cardData),
                   }}
                   secondaryAction={{
@@ -328,19 +330,17 @@ function DiscoverScreen({
             {catalogue.items.map((cardData) => (
               <Card
                 key={cardData.id}
-                nganya={cardData as any}
+                nganya={cardData}
                 variant="standard"
                 isFollowing={catalogue.followedIds.has(cardData.id)}
                 onFollow={catalogue.toggleFollow}
                 primaryAction={{
-                  label:
-                    cardData.isLive &&
-                    canTrackWithPlannerContext(
-                      readPlannerStorageContext(),
-                      cardData,
-                    )
-                      ? "Track"
-                      : "Plan ride",
+                  label: shouldTrackPlannerHandoffTarget(
+                    readPlannerStorageContext(),
+                    cardData,
+                  )
+                    ? "Track"
+                    : "Plan ride",
                   onClick: () => handleCardAction(cardData),
                 }}
                 secondaryAction={{

@@ -6,11 +6,24 @@ import {
   unfollowNganya,
   updateFollowAlerts,
 } from "@/lib/queries/follows";
+import { useCorridorRealtimeRefresh } from "@/modules/fan/hooks/useCorridorRealtimeRefresh";
+import type {
+  FanLiveNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 import { supabase } from "@/lib/supabase";
 import {
   canTrackWithPlannerContext,
-  seedPlannerStorage,
 } from "@/modules/fan/services/planner-storage";
+import {
+  buildPlannerStageToastMessage,
+  persistPlannerHandoff,
+} from "@/modules/fan/services/planner-handoff";
+import {
+  applyFollowOverride,
+  clearMutatingId,
+  restoreFollowOverride,
+} from "@/modules/fan/services/follow-optimistic";
 import type { DashboardItem, PlannerContext } from "./following-types";
 import {
   buildDashboardItem,
@@ -18,14 +31,9 @@ import {
   readPlannerContext,
   sortDashboardItems,
 } from "./following-domain";
+import type { FollowingRouteData } from "@/modules/fan/services/route-data";
 
-export function useFollowingDashboard(data: {
-  isAuthenticated: boolean;
-  followedNganyas: any[];
-  nganyas: any[];
-  liveNganyas: any[];
-  recentSightings: any[];
-}) {
+export function useFollowingDashboard(data: FollowingRouteData) {
   const navigate = useNavigate();
   const router = useRouter();
   const { showErrorToast, addToast } = useToast();
@@ -44,17 +52,27 @@ export function useFollowingDashboard(data: {
   useEffect(() => { setPlannerContext(readPlannerContext()); }, []);
   useEffect(() => { return () => { if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current); }; }, []);
 
-  const liveById = useMemo(() => new Map<string, any>((liveNganyas || []).map((i: any) => [i.nganya_id, i])), [liveNganyas]);
+  const liveById = useMemo(
+    () =>
+      new Map<string, FanLiveNganyaRecord>(
+        (liveNganyas || [])
+          .filter((item): item is FanLiveNganyaRecord & { nganya_id: string } => Boolean(item.nganya_id))
+          .map((item) => [item.nganya_id, item]),
+      ),
+    [liveNganyas],
+  );
 
   const recentById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const s of recentSightings || []) { if (!m.has(s.nganya_id)) m.set(s.nganya_id, s); }
+    const m = new Map<string, FanRecentSightingRecord>();
+    for (const s of recentSightings || []) {
+      if (s.nganya_id && !m.has(s.nganya_id)) m.set(s.nganya_id, s);
+    }
     return m;
   }, [recentSightings]);
 
   const followedItems = useMemo(() => {
     const enriched = followedNganyas
-      .map((follow: any) => {
+      .map((follow) => {
         const override = followOverrides[follow.nganya_id] || {};
         if (override.isFollowing === false) return null;
         return buildDashboardItem(follow.nganyas, {
@@ -76,7 +94,10 @@ export function useFollowingDashboard(data: {
 
   const recommendations = useMemo(() => {
     const items = nganyas
-      .filter((n) => !followedIds.has(n.id) && followOverrides[n.id]?.isFollowing !== true)
+      .filter((n) => {
+        const id = n.id || n.nganya_id;
+        return Boolean(id) && !followedIds.has(id) && followOverrides[id]?.isFollowing !== true;
+      })
       .map((c) => buildRecommendation(c, { liveById, recentById, plannerContext, followedItems, followedCorridorCounts }))
       .filter(Boolean) as DashboardItem[];
     return sortDashboardItems(items).slice(0, 4);
@@ -121,54 +142,67 @@ export function useFollowingDashboard(data: {
     }, 250);
   }, [router]);
 
-  // Realtime subscriptions
-  useEffect(() => {
-    if (!isAuthenticated || followedItems.length === 0) return;
-    const corridorIds = Array.from(new Set(followedItems.map((i) => i.corridorId).filter(Boolean))) as string[];
-    if (corridorIds.length === 0) return;
+  const followedCorridorIds = useMemo(
+    () =>
+      Array.from(
+        new Set(followedItems.map((item) => item.corridorId).filter(Boolean)),
+      ) as string[],
+    [followedItems],
+  );
 
-    const channels = corridorIds.map((cId) =>
-      supabase.channel(`following_dashboard_${cId}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "live_sessions", filter: `corridor_id=eq.${cId}` }, () => queueRefresh())
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "sightings", filter: `corridor_id=eq.${cId}` }, () => queueRefresh())
-        .subscribe(),
-    );
-    return () => { channels.forEach((ch) => supabase.removeChannel(ch)); };
-  }, [isAuthenticated, followedItems, queueRefresh]);
+  useCorridorRealtimeRefresh({
+    enabled: isAuthenticated && followedCorridorIds.length > 0,
+    corridorIds: followedCorridorIds,
+    channelPrefix: "following_dashboard",
+    debounceMs: 250,
+    onRefresh: queueRefresh,
+    loadClient: () => Promise.resolve({ supabase }),
+  });
 
   const runMutation = async (id: string, task: () => Promise<void>) => {
     setMutatingIds((c) => ({ ...c, [id]: true }));
     try { await task(); await queueRefresh(); } catch (error) { showErrorToast(error, "Failed to update follow."); throw error; } finally {
-      setMutatingIds((c) => { const n = { ...c }; delete n[id]; return n; });
+      setMutatingIds((c) => clearMutatingId(c, id));
     }
   };
 
   const handleToggleFollow = async (item: DashboardItem, isFollowing: boolean) => {
     const prev = followOverrides[item.id];
-    setFollowOverrides((c) => ({ ...c, [item.id]: { ...c[item.id], isFollowing: !isFollowing } }));
+    setFollowOverrides((c) =>
+      applyFollowOverride(c, item.id, { isFollowing: !isFollowing }),
+    );
     try { await runMutation(item.id, async () => { if (isFollowing) await unfollowNganya(item.id); else await followNganya(item.id); }); } catch {
-      setFollowOverrides((c) => { const n = { ...c }; if (prev) n[item.id] = prev; else delete n[item.id]; return n; });
+      setFollowOverrides((c) => restoreFollowOverride(c, item.id, prev));
     }
   };
 
   const handleToggleAlerts = async (item: DashboardItem, nextNotifyLive: boolean) => {
     const prev = followOverrides[item.id];
-    setFollowOverrides((c) => ({ ...c, [item.id]: { ...c[item.id], notifyLive: nextNotifyLive } }));
+    setFollowOverrides((c) =>
+      applyFollowOverride(c, item.id, { notifyLive: nextNotifyLive }),
+    );
     try { await runMutation(item.id, async () => { await updateFollowAlerts(item.id, nextNotifyLive); }); } catch {
-      setFollowOverrides((c) => { const n = { ...c }; if (prev) n[item.id] = prev; else delete n[item.id]; return n; });
+      setFollowOverrides((c) => restoreFollowOverride(c, item.id, prev));
     }
   };
 
   const planRideFor = (item?: DashboardItem | null, options?: { useRecentStage?: boolean }) => {
-    seedPlannerStorage(plannerContext, {
+    const search = persistPlannerHandoff(plannerContext, {
       ...(item || undefined),
       stageId: options?.useRecentStage && item?.recentSighting?.stage_id ? item.recentSighting.stage_id : undefined,
       stageName: options?.useRecentStage && item?.stageLabel ? item.stageLabel : undefined,
     });
     if (options?.useRecentStage && item?.stageLabel) {
-      addToast(`Planner set to ${item.stageLabel} on ${item.corridorName} for ${item.name}.`, "info");
+      addToast(
+        buildPlannerStageToastMessage({
+          corridorName: item.corridorName,
+          stageName: item.stageLabel,
+          name: item.name,
+        }),
+        "info",
+      );
     }
-    navigate({ to: "/", search: { corridor: item?.corridorId || plannerContext.toPlace?.corridor_id || plannerContext.toPlace?.id || undefined } as any });
+    navigate({ to: "/", search: search as never });
   };
 
   const canTrackItem = (item: DashboardItem) => canTrackWithPlannerContext(plannerContext, item);
@@ -181,7 +215,7 @@ export function useFollowingDashboard(data: {
   };
 
   const handleSecondaryAction = (item: DashboardItem) => {
-    if (item.status === "OFFLINE" && item.notifyLive) { navigate({ to: "/discover", search: { corridor: item.corridorId || undefined, vibe: item.tags[0] || undefined } as any }); return; }
+    if (item.status === "OFFLINE" && item.notifyLive) { navigate({ to: "/discover", search: { corridor: item.corridorId || undefined, vibe: item.tags[0] || undefined } as never }); return; }
     planRideFor(item);
   };
 

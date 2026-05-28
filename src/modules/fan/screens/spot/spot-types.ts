@@ -1,4 +1,9 @@
-import type { Dispatch, SetStateAction } from "react";
+import type {
+  FanCorridorRecord,
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 
 export type SpotStep = "where" | "which" | "evidence" | "confirm";
 export type SignalQuality = "HIGH" | "MEDIUM" | "LOW";
@@ -20,6 +25,20 @@ export interface StageMatch {
   name: string;
   distance_m: number;
 }
+
+export interface SpotCandidate extends FanNganyaRecord {
+  id: string;
+  corridorName: string;
+  liveCue: FanLiveNganyaRecord | null;
+  recentCue: FanRecentSightingRecord | null;
+  isFollowed: boolean;
+  lastSeenAt: string | null;
+  rank: number;
+}
+
+export type SpotSelectedCorridor = FanCorridorRecord | null;
+export type SpotSelectedNganya = FanNganyaRecord | null;
+export type SpotDuplicateSighting = FanRecentSightingRecord | null;
 
 export interface SpotDraft {
   corridorId: string | null;

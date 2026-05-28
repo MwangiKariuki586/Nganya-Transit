@@ -3,15 +3,21 @@ import Chip from "@/components/ui/Chip";
 import { LoadingButton } from "@/components/ui/loading";
 import { ResponsiveNganyaImage } from "@/components/ui/ResponsiveNganyaImage";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
-import type { QualitySummary, SpotDraft } from "./spot-types";
+import type {
+  QualitySummary,
+  SpotDraft,
+  SpotDuplicateSighting,
+  SpotSelectedCorridor,
+  SpotSelectedNganya,
+} from "./spot-types";
 
 interface SpotConfirmStepProps {
   draft: SpotDraft;
-  selectedNganyaData: any;
-  selectedCorridor: any;
+  selectedNganyaData: SpotSelectedNganya;
+  selectedCorridor: SpotSelectedCorridor;
   qualitySummary: QualitySummary;
   corroborationMinutes: number | null;
-  duplicateWindowSighting: any;
+  duplicateWindowSighting: SpotDuplicateSighting;
   corridorWarning: string | null;
   submitError: string | null;
   isSubmitting: boolean;

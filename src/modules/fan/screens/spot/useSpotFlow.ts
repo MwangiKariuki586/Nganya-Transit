@@ -4,8 +4,20 @@ import { getUserMessage, toAppError } from "@/shared/errors/app-error";
 import { useToast } from "@/components/ui/ToastContainer";
 import { postSighting } from "@/lib/queries/sightings";
 import { useGeolocation } from "@/modules/crew/hooks/useGeolocation";
+import type {
+  FanCorridorRecord,
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 import type { SpotRouteData } from "@/modules/fan/services/route-data";
-import type { SpotStep, CorridorSuggestion, SpotDraft, QualitySummary } from "./spot-types";
+import type {
+  SpotStep,
+  CorridorSuggestion,
+  SpotDraft,
+  QualitySummary,
+  SpotCandidate,
+} from "./spot-types";
 import {
   getPlannerSuggestion,
   getDirectionOptions,
@@ -25,7 +37,6 @@ export function useSpotFlow(data: SpotRouteData) {
   const [isDetectingCorridor, setIsDetectingCorridor] = useState(false);
   const [routeFitDistance, setRouteFitDistance] = useState<number | null>(null);
   const [routeFitStageId, setRouteFitStageId] = useState<string | null>(null);
-  const [routeFitStageName, setRouteFitStageName] = useState<string | null>(null);
   const [routeFitChecked, setRouteFitChecked] = useState(false);
   const [confirmationChecked] = useState(true);
   const [selectedPhotoName, setSelectedPhotoName] = useState<string | null>(null);
@@ -49,24 +60,37 @@ export function useSpotFlow(data: SpotRouteData) {
   useEffect(() => { return () => { if (selectedPhotoPreviewUrl) URL.revokeObjectURL(selectedPhotoPreviewUrl); }; }, [selectedPhotoPreviewUrl]);
 
   useEffect(() => {
-    setRouteFitDistance(null); setRouteFitStageId(null); setRouteFitStageName(null);
+    setRouteFitDistance(null); setRouteFitStageId(null);
     setRouteFitChecked(false); setIsCorridorBlocking(false); setCorridorWarning(null);
   }, [draft.corridorId]);
 
-  const corridorById = useMemo(() => new Map(corridors.map((c: any) => [c.id, c])), [corridors]);
-  const liveByNganyaId = useMemo(() => new Map<string, any>((liveNganyas || []).map((r: any) => [r.nganya_id, r])), [liveNganyas]);
+  const corridorById = useMemo(
+    () => new Map(corridors.map((c) => [c.id, c] as const)),
+    [corridors],
+  );
+  const liveByNganyaId = useMemo(
+    () =>
+      new Map<string, FanLiveNganyaRecord>(
+        (liveNganyas || [])
+          .filter((row): row is FanLiveNganyaRecord & { nganya_id: string } => Boolean(row.nganya_id))
+          .map((row) => [row.nganya_id, row]),
+      ),
+    [liveNganyas],
+  );
   const recentByNganyaId = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const s of recentSightings || []) { if (!m.has(s.nganya_id)) m.set(s.nganya_id, s); }
+    const m = new Map<string, FanRecentSightingRecord>();
+    for (const s of recentSightings || []) {
+      if (s.nganya_id && !m.has(s.nganya_id)) m.set(s.nganya_id, s);
+    }
     return m;
   }, [recentSightings]);
 
   const selectedCorridor = draft.corridorId ? corridorById.get(draft.corridorId) || null : null;
-  const selectedNganyaData = draft.nganyaId ? nganyas.find((n: any) => n.id === draft.nganyaId) || null : null;
+  const selectedNganyaData = draft.nganyaId ? nganyas.find((n) => n.id === draft.nganyaId) || null : null;
 
   const corroboratingSighting = useMemo(() => {
     if (!draft.nganyaId) return null;
-    return recentSightings.find((s: any) => s.nganya_id === draft.nganyaId) || null;
+    return recentSightings.find((s) => s.nganya_id === draft.nganyaId) || null;
   }, [draft.nganyaId, recentSightings]);
 
   const corroborationMinutes = useMemo(() => {
@@ -76,7 +100,7 @@ export function useSpotFlow(data: SpotRouteData) {
 
   const duplicateWindowSighting = useMemo(() => {
     if (!draft.nganyaId) return null;
-    return (mySightings || []).find((s: any) => {
+    return (mySightings || []).find((s) => {
       if (s.nganya_id !== draft.nganyaId) return false;
       return Date.now() - new Date(s.created_at).getTime() <= 5 * 60 * 1000;
     }) || null;
@@ -89,19 +113,25 @@ export function useSpotFlow(data: SpotRouteData) {
     corroborationMinutes, duplicatePenalty: Boolean(duplicateWindowSighting),
   }), [selectedCorridor?.name, draft.direction, selectedPhotoName, draft.evidenceTags, geolocation.permissionStatus, routeFitChecked, isCorridorBlocking, routeFitDistance, corroborationMinutes, duplicateWindowSighting]);
 
-  const spotCandidates = useMemo(() => {
+  const spotCandidates = useMemo<SpotCandidate[]>(() => {
     const cId = draft.corridorId;
     const q = searchQuery.trim().toLowerCase();
-    const unique = Array.from(new Map((nganyas || []).map((n: any) => [n.id, n])).values());
-    const scoped = unique.filter((n: any) => !cId || n.corridor_id === cId).map((n: any) => {
+    const unique = Array.from(
+      new Map(
+        (nganyas || [])
+          .filter((n): n is FanNganyaRecord & { id: string } => Boolean(n.id))
+          .map((n) => [n.id, n] as const),
+      ).values(),
+    );
+    const scoped = unique.filter((n) => !cId || n.corridor_id === cId).map((n) => {
       const liveCue = liveByNganyaId.get(n.id) || null;
       const recentCue = recentByNganyaId.get(n.id) || null;
       const cn = n.corridors?.name || "Unknown route";
       const isFollowed = followedIds.has(n.id);
       const textScore = q ? (n.name?.toLowerCase().includes(q) ? 1000 : cn.toLowerCase().includes(q) ? 400 : 0) : 0;
       return { ...n, corridorName: cn, liveCue, recentCue, isFollowed, lastSeenAt: liveCue?.last_ping_at || recentCue?.created_at || null, rank: (liveCue ? 3000 : recentCue ? 1800 : 0) + (isFollowed ? 800 : 0) + textScore };
-    }).filter((c: any) => !q || c.name?.toLowerCase().includes(q) || c.corridorName?.toLowerCase().includes(q));
-    return scoped.sort((a: any, b: any) => b.rank - a.rank);
+    }).filter((candidate) => !q || candidate.name?.toLowerCase().includes(q) || candidate.corridorName?.toLowerCase().includes(q));
+    return scoped.sort((a, b) => b.rank - a.rank);
   }, [draft.corridorId, nganyas, searchQuery, liveByNganyaId, recentByNganyaId, followedIds]);
 
   const directionOptions = getDirectionOptions(selectedCorridor?.name || null);
@@ -111,10 +141,17 @@ export function useSpotFlow(data: SpotRouteData) {
     setIsDetectingCorridor(true);
     try {
       const coords = await geolocation.getCurrentPosition();
-      const candidates = await Promise.all(corridors.map(async (c: any) => ({ corridor: c, nearest: (await findClosestStagesForCorridor(c.id, coords.lat, coords.lng))[0] || null })));
+      const candidates = await Promise.all(
+        corridors.map(async (c: FanCorridorRecord) => ({
+          corridor: c,
+          nearest:
+            (await findClosestStagesForCorridor(c.id, coords.lat, coords.lng))[0] ||
+            null,
+        })),
+      );
       const best = candidates.filter((i) => i.nearest).sort((a, b) => (a.nearest?.distance_m || Infinity) - (b.nearest?.distance_m || Infinity))[0];
       if (best?.corridor) { setLocationSuggestion({ corridorId: best.corridor.id, corridorName: best.corridor.name, source: "location" }); setDraft((c) => ({ ...c, corridorId: c.corridorId || best.corridor.id })); }
-    } catch (err: any) { addToast(getUserMessage(toAppError(err)), "error"); } finally { setIsDetectingCorridor(false); }
+    } catch (err) { addToast(getUserMessage(toAppError(err)), "error"); } finally { setIsDetectingCorridor(false); }
   };
 
   const goBack = () => { if (step === "which") setStep("where"); else if (step === "evidence") setStep("which"); else if (step === "confirm") setStep("evidence"); };
@@ -130,7 +167,7 @@ export function useSpotFlow(data: SpotRouteData) {
     const stages = await findClosestStagesForCorridor(corridorId, lat, lng);
     const nearest = stages[0] || null;
     const dist = nearest?.distance_m ?? null;
-    setRouteFitDistance(dist); setRouteFitStageId(nearest?.id || null); setRouteFitStageName(nearest?.name || null); setRouteFitChecked(true);
+    setRouteFitDistance(dist); setRouteFitStageId(nearest?.id || null); setRouteFitChecked(true);
     if (dist === null || dist > 1500) {
       setIsCorridorBlocking(true);
       const msg = "Your location does not seem to match this route. Change route or cancel.";
@@ -147,7 +184,7 @@ export function useSpotFlow(data: SpotRouteData) {
       const fit = await verifyCorridorFit(draft.corridorId, coords.lat, coords.lng);
       if (!fit.valid) return;
       setStep("which");
-    } catch (err: any) {
+    } catch (err) {
       const msg = getUserMessage(toAppError(err)) || "Allow live location so we can verify this route before you continue.";
       setCorridorWarning(msg); addToast(msg, "error");
     } finally { setIsValidatingRoute(false); }
@@ -164,7 +201,7 @@ export function useSpotFlow(data: SpotRouteData) {
       await postSighting({ nganya_id: draft.nganyaId, corridor_id: draft.corridorId, stage_id: routeFitStageId, location: `POINT(${coords.lng} ${coords.lat})`, direction: draft.direction, note: [draft.evidenceTags.join(" - "), draft.note.trim()].filter(Boolean).join("\n") });
       addToast("Sighting posted. You just boosted this live signal.", "success");
       setSubmittedNganyaName(selectedNganyaData?.name || null); setSubmittedQuality(qualitySummary); setSubmittedCorroborationMinutes(corroborationMinutes);
-    } catch (err: any) { showFlowError(getUserMessage(toAppError(err))); } finally { setIsSubmitting(false); }
+    } catch (err) { showFlowError(getUserMessage(toAppError(err))); } finally { setIsSubmitting(false); }
   };
 
   return {

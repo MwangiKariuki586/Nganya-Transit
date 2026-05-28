@@ -4,7 +4,7 @@ import { ResponsiveNganyaImage } from "@/components/ui/ResponsiveNganyaImage";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
 import SearchInput from "@/components/ui/SearchInput";
 import { LoadingButton } from "@/components/ui/loading";
-import type { SpotDraft } from "./spot-types";
+import type { SpotCandidate, SpotDraft } from "./spot-types";
 import { getSignalCue } from "./spot-domain";
 
 interface SpotWhichStepProps {
@@ -12,7 +12,7 @@ interface SpotWhichStepProps {
   setDraft: Dispatch<SetStateAction<SpotDraft>>;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  spotCandidates: any[];
+  spotCandidates: SpotCandidate[];
   onContinue: () => void;
 }
 
@@ -34,11 +34,8 @@ export default function SpotWhichStep({
 
       <div className="max-h-[460px] overflow-y-auto overscroll-contain space-y-2 pr-0.5">
         {spotCandidates.length > 0 ? (
-          spotCandidates.map((candidate: any) => {
+          spotCandidates.map((candidate) => {
             const selected = draft.nganyaId === candidate.id;
-            const lastSeen = candidate.lastSeenAt
-              ? candidate.lastSeenAt
-              : null;
             return (
               <button
                 key={candidate.id}

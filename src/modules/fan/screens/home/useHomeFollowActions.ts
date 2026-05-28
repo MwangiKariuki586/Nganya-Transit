@@ -4,6 +4,10 @@ import { useToast } from "@/components/ui/ToastContainer";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
 import { toAppError } from "@/shared/errors/app-error";
 import type { PlannerRideOption } from "@/modules/fan/services/planner-assist";
+import {
+  addFollowedId,
+  toggleFollowedIdSet,
+} from "@/modules/fan/services/follow-optimistic";
 
 export function useHomeFollowActions(initialFollowedIds: Set<string>) {
   const router = useRouter();
@@ -27,15 +31,9 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
   const toggleFollow = useCallback(
     async (id: string) => {
       const wasFollowing = localFollowedIds.has(id);
-      setLocalFollowedIds((current) => {
-        const next = new Set(current);
-        if (wasFollowing) {
-          next.delete(id);
-        } else {
-          next.add(id);
-        }
-        return next;
-      });
+      setLocalFollowedIds((current) =>
+        toggleFollowedIdSet(current, id, wasFollowing),
+      );
 
       try {
         if (wasFollowing) {
@@ -44,15 +42,9 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
           await followNganya(id);
         }
       } catch {
-        setLocalFollowedIds((current) => {
-          const next = new Set(current);
-          if (wasFollowing) {
-            next.add(id);
-          } else {
-            next.delete(id);
-          }
-          return next;
-        });
+        setLocalFollowedIds((current) =>
+          toggleFollowedIdSet(current, id, !wasFollowing),
+        );
         showErrorToast("Failed to update follow.");
       }
     },
@@ -64,7 +56,7 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
       try {
         await followNganya(ride.nganya_id);
         setPlannerAlertIds((current) => new Set(current).add(ride.nganya_id));
-        setLocalFollowedIds((current) => new Set(current).add(ride.nganya_id));
+        setLocalFollowedIds((current) => addFollowedId(current, ride.nganya_id));
         addToast(`Alerts on for ${ride.nganya_name}.`, "success");
       } catch (error) {
         const appError = toAppError(error);

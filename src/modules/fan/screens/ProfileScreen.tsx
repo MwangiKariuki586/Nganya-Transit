@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import MediaLightbox from "@/components/ui/MediaLightbox";
+import { FanSection } from "@/modules/fan/components/FanSection";
 import {
   Check,
   ChevronLeft,
@@ -34,6 +35,11 @@ import InlineSpinner from "@/components/ui/InlineSpinner";
 import { UploadProgressBar } from "@/components/ui/UploadProgressBar";
 import type { ProfileRouteData } from "@/modules/fan/services/route-data";
 import { mapNganyaRecordToCardData } from "@/modules/fan/lib/nganya-card";
+import type {
+  FanFollowRecord,
+  FanLiveNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 
 interface ProfileScreenProps {
   data: ProfileRouteData;
@@ -116,8 +122,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
       setOriginalData(formData);
       setIsEditing(false);
       await router.invalidate();
-    } catch (err: any) {
-      setEditError(err?.message || "Failed to save changes.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to save changes.";
+      setEditError(message);
     } finally {
       setIsSaving(false);
     }
@@ -136,12 +144,14 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
   );
 
   const { freshSightings, expiredSightings } = useMemo(() => {
-    const fresh: any[] = [];
-    const expired: any[] = [];
+    const fresh: FanRecentSightingRecord[] = [];
+    const expired: FanRecentSightingRecord[] = [];
     userSightings.forEach((s) => {
-      getSignalStrength(s.created_at) === "expired"
-        ? expired.push(s)
-        : fresh.push(s);
+      if (getSignalStrength(s.created_at) === "expired") {
+        expired.push(s);
+      } else {
+        fresh.push(s);
+      }
     });
     return { freshSightings: fresh, expiredSightings: expired };
   }, [userSightings]);
@@ -149,10 +159,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
   const sortedFollowedNganyas = useMemo(() => {
     return [...followedNganyas].sort((a, b) => {
       const aSignal = getNganyaActivitySignal(
-        liveNganyas.filter((l: any) => l.nganya_id === (a.nganyas?.id || a.id)),
+        liveNganyas.filter((l: FanLiveNganyaRecord) => l.nganya_id === (a.nganyas?.id || a.id)),
       );
       const bSignal = getNganyaActivitySignal(
-        liveNganyas.filter((l: any) => l.nganya_id === (b.nganyas?.id || b.id)),
+        liveNganyas.filter((l: FanLiveNganyaRecord) => l.nganya_id === (b.nganyas?.id || b.id)),
       );
       if (aSignal.isFresh && !bSignal.isFresh) return -1;
       if (!aSignal.isFresh && bSignal.isFresh) return 1;
@@ -171,13 +181,13 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
     : sortedFollowedNganyas.slice(0, ITEMS_PER_PAGE);
   const hasMoreFollowing = sortedFollowedNganyas.length > ITEMS_PER_PAGE;
 
-  const mapSupabaseToCardProps = (dbNganya: any) => {
+  const mapSupabaseToCardProps = (dbNganya: FanFollowRecord) => {
     if (!dbNganya) return null;
     const nganyaData = dbNganya.nganyas || dbNganya;
     const nganyaId = nganyaData.id || nganyaData.nganya_id;
-    const isLive = liveNganyas.some((l: any) => l.nganya_id === nganyaId);
+    const isLive = liveNganyas.some((l) => l.nganya_id === nganyaId);
     const activitySignal = getNganyaActivitySignal(
-      liveNganyas.filter((l: any) => l.nganya_id === nganyaId),
+      liveNganyas.filter((l) => l.nganya_id === nganyaId),
     );
     return mapNganyaRecordToCardData(nganyaData, {
       liveNganyas,
@@ -424,10 +434,12 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Profile Details (inline edit) ────────────────────────────── */}
-        <section className="mt-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-h3">Profile Details</h2>
-            {!isEditing ? (
+        <FanSection
+          title="Profile Details"
+          className="space-y-6"
+          withDivider={false}
+          headerContent={
+            !isEditing ? (
               <button
                 type="button"
                 aria-label="Edit profile details"
@@ -475,8 +487,9 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
                   )}
                 </button>
               </div>
-            )}
-          </div>
+            )
+          }
+        >
 
           <div>
             <label
@@ -544,13 +557,16 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
               {editError}
             </p>
           )}
-        </section>
+        </FanSection>
 
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Your Sightings ───────────────────────────────────────────── */}
-        <section className="mt-8">
-          <h2 className="text-h3 !mb-3">Your Sightings</h2>
+        <FanSection
+          title="Your Sightings"
+          titleClassName="!mb-3"
+          withDivider={false}
+        >
           {userSightings.length > 0 ? (
             <>
               <div className="space-y-2">
@@ -623,13 +639,17 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
               onAction={() => navigate({ to: "/spot" })}
             />
           )}
-        </section>
+        </FanSection>
 
         <div className="mt-8 border-t border-[var(--color-line)]" />
 
         {/* ── Following ────────────────────────────────────────────────── */}
-        <section className="mt-8 pb-10 md:pb-16">
-          <h2 className="text-h3 !mb-3">Following</h2>
+        <FanSection
+          title="Following"
+          titleClassName="!mb-3"
+          className="pb-10 md:pb-16"
+          withDivider={false}
+        >
           {followedNganyas.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -639,7 +659,7 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
                   return (
                     <Card
                       key={cardProps.id}
-                      nganya={cardProps as any}
+                      nganya={cardProps}
                       variant="standard"
                       isFollowing
                     />
@@ -668,7 +688,7 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
               onAction={() => navigate({ to: "/discover" })}
             />
           )}
-        </section>
+        </FanSection>
       </div>
 
       <MediaLightbox

@@ -10,6 +10,12 @@ import {
 } from "@/components/ui/Card";
 import { formatRelativeTime, toNganyaSlug } from "@/lib/formatters";
 import { pickPrimaryNganyaImageUrl } from "@/lib/images/nganya-images";
+import type { Nganya } from "@/lib/mockData";
+import type {
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 import { readPlannerStorageContext } from "@/modules/fan/services/planner-storage";
 import {
   RECENT_WINDOW_MS,
@@ -97,10 +103,10 @@ export function getSignalText(
 }
 
 export function buildDashboardItem(
-  source: any,
+  source: FanNganyaRecord,
   options: {
-    liveById: Map<string, any>;
-    recentById: Map<string, any>;
+    liveById: Map<string, FanLiveNganyaRecord>;
+    recentById: Map<string, FanRecentSightingRecord>;
     plannerContext: PlannerContext;
     followMeta?: { notifyLive?: boolean; createdAt?: string | null } | null;
   },
@@ -220,10 +226,10 @@ export function sortDashboardItems(items: DashboardItem[]) {
 }
 
 export function buildRecommendation(
-  candidate: any,
+  candidate: FanNganyaRecord,
   params: {
-    liveById: Map<string, any>;
-    recentById: Map<string, any>;
+    liveById: Map<string, FanLiveNganyaRecord>;
+    recentById: Map<string, FanRecentSightingRecord>;
     plannerContext: PlannerContext;
     followedItems: DashboardItem[];
     followedCorridorCounts: Map<string, number>;
@@ -331,7 +337,7 @@ export function mapDashboardItemToCardProps(item: DashboardItem) {
       isNewBuild: item.tags.includes("NEW_BUILD"),
       imageUrl: item.imageUrl,
       description: "",
-    } as any,
+    } satisfies Nganya,
     subtitle: item.matchLabel || item.corridorName,
     imageBadge: {
       label: signalText,

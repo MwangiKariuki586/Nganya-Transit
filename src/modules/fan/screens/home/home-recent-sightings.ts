@@ -4,6 +4,10 @@ import {
   toNganyaSlug,
 } from "@/lib/formatters";
 import type {
+  FanCorridorRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
+import type {
   AggregatedRecentSightingRow,
   RecentSightingFilter,
 } from "./home-types";
@@ -28,7 +32,7 @@ export function getRecencyLabel(minutes: number, isoDate: string) {
 }
 
 export function filterRecentSightingsByCorridor(params: {
-  recentSightings: any[];
+  recentSightings: FanRecentSightingRecord[];
   activeCorridor: string | null;
   activeCorridorName: string | null;
 }) {
@@ -36,7 +40,7 @@ export function filterRecentSightingsByCorridor(params: {
   if (!activeCorridor) return recentSightings;
 
   const routeName = (activeCorridorName || "").toLowerCase();
-  return recentSightings.filter((s: any) => {
+  return recentSightings.filter((s) => {
     if (s.corridor_id) return s.corridor_id === activeCorridor;
     const label = (s.corridor || s.corridor_name || "").toLowerCase();
     if (!routeName) return false;
@@ -45,14 +49,14 @@ export function filterRecentSightingsByCorridor(params: {
 }
 
 export function aggregateRecentSightings(params: {
-  sightings: any[];
+  sightings: FanRecentSightingRecord[];
   activeCorridor: string | null;
-  corridors: any[];
+  corridors: FanCorridorRecord[];
 }) {
   const grouped = new Map<string, AggregatedRecentSightingRow>();
   const recentUserKeysByGroup = new Map<string, Set<string>>();
   const corridorNameById = new Map(
-    (params.corridors || []).map((corridor: any) => [
+    (params.corridors || []).map((corridor) => [
       corridor.id,
       corridor.name,
     ]),

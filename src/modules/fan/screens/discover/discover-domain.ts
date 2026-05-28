@@ -1,16 +1,29 @@
 import type { DiscoverFilters, DiscoverSort } from "./discover-types";
-import { mapNganyaRecordToCardData } from "@/modules/fan/lib/nganya-card";
+import {
+  mapNganyaRecordToCardData,
+  type FanCardData,
+} from "@/modules/fan/lib/nganya-card";
+import type {
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+} from "@/modules/fan/lib/fan-data";
 
 /**
  * Maps a raw Supabase nganya row to the shape expected by the Card component.
  * Requires the current liveNganyas list to derive isLive status.
  */
-export function mapNganyaToCardProps(dbNganya: any, liveNganyas: any[]): any | null {
+export function mapNganyaToCardProps(
+  dbNganya: FanNganyaRecord,
+  liveNganyas: FanLiveNganyaRecord[],
+): FanCardData | null {
   return mapNganyaRecordToCardData(dbNganya, { liveNganyas });
 }
 
 /** Sorts a nganyas array in-place by the given DiscoverSort key. Returns new array. */
-export function sortNganyas(nganyas: any[], sort: DiscoverSort): any[] {
+export function sortNganyas(
+  nganyas: FanNganyaRecord[],
+  sort: DiscoverSort,
+): FanNganyaRecord[] {
   const copy = [...nganyas];
   switch (sort) {
     case "trending":

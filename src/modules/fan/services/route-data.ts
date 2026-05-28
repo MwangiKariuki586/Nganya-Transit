@@ -18,12 +18,22 @@ import {
 } from "@/lib/queries/sightings";
 import { getStableClientSession } from "@/shared/auth/client-session";
 import { enrichNganyaImageFields } from "@/modules/fan/lib/nganya-card";
+import type {
+  FanCorridorRecord,
+  FanFollowRecord,
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
+
+type AuthUserRecord = Awaited<ReturnType<typeof getCurrentAuthUser>>;
+type ProfileRecord = Awaited<ReturnType<typeof getCurrentUserProfile>>;
 
 // ── Shared data loaded once at the fan layout level ─────────────────
 
 export interface FanSharedData {
-  corridors: any[];
-  liveNganyas: any[];
+  corridors: FanCorridorRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
 }
 
 export async function loadFanSharedData(): Promise<FanSharedData> {
@@ -40,21 +50,21 @@ export interface FanHomeRouteData {
   search: string;
   activeCorridor: string | null;
   activeVibe: string | null;
-  corridors: any[];
-  nganyas: any[];
-  liveNganyas: any[];
-  recentSightings: any[];
+  corridors: FanCorridorRecord[];
+  nganyas: FanNganyaRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
+  recentSightings: FanRecentSightingRecord[];
   followedIds: Set<string>;
 }
 
 export interface DiscoverRouteData {
   corridors: DiscoverCorridorSummary[];
   /** Up to 6 live nganyas for the curated strip — sourced from shared liveNganyas. */
-  featuredLive: any[];
+  featuredLive: FanLiveNganyaRecord[];
   /** First server-loaded page for the catalogue. */
-  initialNganyas: any[];
+  initialNganyas: FanNganyaRecord[];
   /** All live nganyas, required for isLive card state. */
-  liveNganyas: any[];
+  liveNganyas: FanLiveNganyaRecord[];
   followedIds: Set<string>;
   totalCount: number;
   initialHasMore: boolean;
@@ -69,7 +79,7 @@ export interface DiscoverCorridorSummary {
 }
 
 export interface DiscoverCataloguePageData {
-  nganyas: any[];
+  nganyas: FanNganyaRecord[];
   hasMore: boolean;
   nextOffset: number;
   totalCount: number;
@@ -77,35 +87,35 @@ export interface DiscoverCataloguePageData {
 
 export interface FollowingRouteData {
   isAuthenticated: boolean;
-  followedNganyas: any[];
-  nganyas: any[];
-  liveNganyas: any[];
-  recentSightings: any[];
+  followedNganyas: FanFollowRecord[];
+  nganyas: FanNganyaRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
+  recentSightings: FanRecentSightingRecord[];
 }
 
 export interface ProfileRouteData {
-  authUser: any | null;
-  profile: any | null;
-  followedNganyas: any[];
-  liveNganyas: any[];
-  userSightings: any[];
+  authUser: AuthUserRecord | null;
+  profile: ProfileRecord | null;
+  followedNganyas: FanFollowRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
+  userSightings: FanRecentSightingRecord[];
 }
 
 export interface SpotRouteData {
   isAuthenticated: boolean;
-  corridors: any[];
-  nganyas: any[];
-  liveNganyas: any[];
-  recentSightings: any[];
-  mySightings: any[];
+  corridors: FanCorridorRecord[];
+  nganyas: FanNganyaRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
+  recentSightings: FanRecentSightingRecord[];
+  mySightings: FanRecentSightingRecord[];
   followedIds: Set<string>;
 }
 
-function toFollowedIds(follows: any[]) {
-  return new Set(follows.map((follow: any) => follow.nganya_id));
+function toFollowedIds(follows: FanFollowRecord[]) {
+  return new Set(follows.map((follow) => follow.nganya_id));
 }
 
-async function getOptionalFollows() {
+async function getOptionalFollows(): Promise<FanFollowRecord[]> {
   const session = await getStableClientSession();
   if (!session?.user?.id) {
     return [];
@@ -129,17 +139,19 @@ export async function loadFanHomeRouteData(
   const activeCorridor = input.corridorId || null;
   const activeVibe = input.vibe || null;
 
-  const [nganyas, follows] = await Promise.all([
+  const [nganyas, follows] = (await Promise.all([
     searchHomepageNganyas(search, activeCorridor || undefined),
     getOptionalFollows(),
-  ]);
+  ])) as [FanNganyaRecord[], FanFollowRecord[]];
 
   const nganyasById = new Map(
-    nganyas.map((nganya: any) => [nganya.id || nganya.nganya_id, nganya]),
+    nganyas
+      .map((nganya) => [nganya.id || nganya.nganya_id, nganya] as const)
+      .filter((entry): entry is [string, FanNganyaRecord] => Boolean(entry[0])),
   );
-  const enrichedLiveNganyas = liveNganyas.map((live: any) =>
+  const enrichedLiveNganyas = liveNganyas.map((live) =>
     enrichNganyaImageFields(live, nganyasById),
-  );
+  ) as FanLiveNganyaRecord[];
 
   const recentSightings = activeCorridor
     ? await getCorridorSightings(activeCorridor)
@@ -164,41 +176,54 @@ export async function loadDiscoverRouteData(
 
   const featuredLiveBase = liveNganyas.slice(0, 6);
   const featuredLiveIds = featuredLiveBase
-    .map((live: any) => live.nganya_id || live.id)
-    .filter(Boolean);
+    .map((live) => live.nganya_id || live.id)
+    .filter((id): id is string => Boolean(id));
 
-  const [initialCatalogue, follows, totalCount, featuredNganyas, corridorCounts] =
-    await Promise.all([
-      loadDiscoverCataloguePage({ limit: 12 }),
-      getOptionalFollows(),
-      countNganyas(),
-      getNganyasByIds(featuredLiveIds),
-      Promise.all(
-        corridors.map(async (corridor: any) => ({
-          id: corridor.id,
-          count: await countNganyas(corridor.id),
-        })),
-      ),
-    ]);
+  const [
+    initialCatalogue,
+    follows,
+    totalCount,
+    featuredNganyas,
+    corridorCounts,
+  ] = (await Promise.all([
+    loadDiscoverCataloguePage({ limit: 12 }),
+    getOptionalFollows(),
+    countNganyas(),
+    getNganyasByIds(featuredLiveIds),
+    Promise.all(
+      corridors.map(async (corridor) => ({
+        id: corridor.id,
+        count: await countNganyas(corridor.id),
+      })),
+    ),
+  ])) as [
+    DiscoverCataloguePageData,
+    FanFollowRecord[],
+    number,
+    FanNganyaRecord[],
+    { id: string; count: number }[],
+  ];
 
   const corridorCountById = new Map(
     corridorCounts.map((entry) => [entry.id, entry.count]),
   );
   const corridorSummaries: DiscoverCorridorSummary[] = corridors.map(
-    (c: any) => ({
+    (c) => ({
       id: c.id,
       name: c.name,
       nganyaCount: corridorCountById.get(c.id) || 0,
-      liveCount: liveNganyas.filter((n: any) => n.corridor_id === c.id).length,
+      liveCount: liveNganyas.filter((n) => n.corridor_id === c.id).length,
     }),
   );
 
   const featuredNganyasById = new Map(
-    featuredNganyas.map((n: any) => [n.id, n]),
+    featuredNganyas
+      .map((n) => [n.id || n.nganya_id, n] as const)
+      .filter((entry): entry is [string, FanNganyaRecord] => Boolean(entry[0])),
   );
-  const featuredLive = featuredLiveBase.map((live: any) =>
+  const featuredLive = featuredLiveBase.map((live) =>
     enrichNganyaImageFields(live, featuredNganyasById),
-  );
+  ) as FanLiveNganyaRecord[];
 
   return {
     corridors: corridorSummaries,
@@ -228,39 +253,40 @@ export async function loadDiscoverCataloguePage(input: {
 
   // This still uses the existing client query surface, but only fetches a bounded
   // working set for the current page/filter state instead of the full catalogue.
-  let nganyas = await searchNganyas(
+  let nganyas = (await searchNganyas(
     search,
     input.corridorId || undefined,
     fetchLimit,
-  );
+  )) as FanNganyaRecord[];
 
   if (input.vibe) {
-    nganyas = nganyas.filter((n: any) => n.tags?.includes(input.vibe));
+    const vibe = input.vibe;
+    nganyas = nganyas.filter((n) => n.tags?.includes(vibe));
   }
   if (input.verifiedOnly) {
-    nganyas = nganyas.filter((n: any) => Boolean(n.is_verified));
+    nganyas = nganyas.filter((n) => Boolean(n.is_verified));
   }
 
   const sort = input.sort ?? "trending";
   if (sort === "trending") {
     nganyas.sort(
-      (a: any, b: any) =>
+      (a, b) =>
         ((b.follower_count || 0) + (b.sighting_count_today || 0)) -
         ((a.follower_count || 0) + (a.sighting_count_today || 0)),
     );
   } else if (sort === "popular") {
     nganyas.sort(
-      (a: any, b: any) => (b.follower_count || 0) - (a.follower_count || 0),
+      (a, b) => (b.follower_count || 0) - (a.follower_count || 0),
     );
   } else if (sort === "newest") {
     nganyas.sort(
-      (a: any, b: any) =>
+      (a, b) =>
         new Date(b.created_at || 0).getTime() -
         new Date(a.created_at || 0).getTime(),
     );
   } else if (sort === "active") {
     nganyas.sort(
-      (a: any, b: any) =>
+      (a, b) =>
         (b.sighting_count_today || 0) - (a.sighting_count_today || 0),
     );
   }
@@ -292,16 +318,16 @@ export async function loadFollowingRouteData(
     };
   }
 
-  const [followedNganyas, nganyas] = await Promise.all([
+  const [followedNganyas, nganyas] = (await Promise.all([
     getMyFollows(),
     searchNganyas(""),
-  ]);
+  ])) as [FanFollowRecord[], FanNganyaRecord[]];
 
   const corridorIds = Array.from(
     new Set(
       followedNganyas
-        .map((follow: any) => follow.nganyas?.corridor_id)
-        .filter(Boolean),
+        .map((follow) => follow.nganyas?.corridor_id)
+        .filter((id): id is string => Boolean(id)),
     ),
   );
 
@@ -339,12 +365,12 @@ export async function loadProfileRouteData(
   }
 
   const [authUser, profile, followedNganyas, userSightings] =
-    await Promise.all([
+    (await Promise.all([
       getCurrentAuthUser(),
       getCurrentUserProfile(),
       getMyFollows(),
       getMySightings(),
-    ]);
+    ])) as [any, any, FanFollowRecord[], FanRecentSightingRecord[]];
 
   return {
     authUser,
@@ -373,11 +399,11 @@ export async function loadSpotRouteData(
     };
   }
 
-  const [nganyas, follows, mySightings] = await Promise.all([
+  const [nganyas, follows, mySightings] = (await Promise.all([
     searchNganyas(""),
     getOptionalFollows(),
     getMySightings(),
-  ]);
+  ])) as [FanNganyaRecord[], FanFollowRecord[], FanRecentSightingRecord[]];
   const recentSightings = await getHomepageRecentSightings(80, {
     includeConfidence: false,
   });

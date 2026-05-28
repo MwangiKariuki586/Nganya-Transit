@@ -1,10 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { supabase } from "@/lib/supabase";
+import type { FanCorridorRecord } from "@/modules/fan/lib/fan-data";
 import type {
   PlannerPlace,
   CorridorSuggestion,
   StageMatch,
+  SpotCandidate,
   SpotDraft,
   SignalQuality,
   QualitySummary,
@@ -21,7 +23,9 @@ export function readStoredJson<T>(key: string): T | null {
   }
 }
 
-export function getPlannerSuggestion(corridors: any[]): CorridorSuggestion {
+export function getPlannerSuggestion(
+  corridors: FanCorridorRecord[],
+): CorridorSuggestion {
   const place = readStoredJson<PlannerPlace>("whereto_toPlace");
   if (!place) return { corridorId: null, corridorName: null, source: null };
 
@@ -43,7 +47,7 @@ export function getDirectionOptions(corridorName: string | null) {
   ];
 }
 
-export function getSignalCue(candidate: any) {
+export function getSignalCue(candidate: SpotCandidate) {
   if (candidate.liveCue) return "Live on this route";
   if (candidate.lastSeenAt)
     return `Seen ${formatRelativeTime(candidate.lastSeenAt)}`;
@@ -164,7 +168,7 @@ export async function findClosestStagesForCorridor(
   lat: number,
   lng: number,
 ) {
-  const { data, error } = await (supabase.rpc as any)("closest_stages", {
+  const { data, error } = await supabase.rpc("closest_stages", {
     p_corridor_id: corridorId,
     p_lat: lat,
     p_lng: lng,

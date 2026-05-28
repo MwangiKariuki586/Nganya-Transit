@@ -1,5 +1,7 @@
 import Card from "@/components/ui/Card";
 import { TrendingUp } from "lucide-react";
+import type { FanCardData } from "@/modules/fan/lib/nganya-card";
+import type { FanLiveNganyaRecord } from "@/modules/fan/lib/fan-data";
 import {
   canTrackWithPlannerContext,
   type PlannerStorageContext,
@@ -9,14 +11,14 @@ import type { BrowseCardActionItem } from "./home-types";
 interface HomeLiveRouteSectionProps {
   activeCorridor: string;
   activeCorridorName: string | null;
-  filteredLiveNganyas: any[];
-  featuredLiveCardData: any;
-  consolidatedLiveRouteCards: any[];
+  filteredLiveNganyas: FanLiveNganyaRecord[];
+  featuredLiveCardData: FanCardData;
+  consolidatedLiveRouteCards: FanLiveNganyaRecord[];
   plannerContext: PlannerStorageContext;
   isFollowingNganya: (nganyaId: string) => boolean;
   onToggleFollow: (nganyaId: string) => void | Promise<void>;
   onBrowseCardAction: (item: BrowseCardActionItem) => void;
-  mapSupabaseToCardProps: (dbNganya: any) => any;
+  mapSupabaseToCardProps: (dbNganya: FanLiveNganyaRecord) => FanCardData | null;
 }
 
 export function HomeLiveRouteSection({
@@ -56,7 +58,7 @@ export function HomeLiveRouteSection({
       <div className="space-y-6">
         <div className="hidden md:block">
           <Card
-            nganya={featuredLiveCardData as any}
+            nganya={featuredLiveCardData}
             variant="feature"
             isFollowing={isFollowingNganya(featuredLiveCardData.id)}
             onFollow={onToggleFollow}
@@ -64,7 +66,7 @@ export function HomeLiveRouteSection({
             primaryAction={{
               label: canTrackWithPlannerContext(
                 plannerContext,
-                featuredLiveCardData as any,
+                featuredLiveCardData,
               )
                 ? "Track"
                 : "Plan ride",
@@ -81,7 +83,7 @@ export function HomeLiveRouteSection({
         </div>
         <div className="md:hidden">
           <Card
-            nganya={featuredLiveCardData as any}
+            nganya={featuredLiveCardData}
             variant="standard"
             isFollowing={isFollowingNganya(featuredLiveCardData.id)}
             onFollow={onToggleFollow}
@@ -89,7 +91,7 @@ export function HomeLiveRouteSection({
             primaryAction={{
               label: canTrackWithPlannerContext(
                 plannerContext,
-                featuredLiveCardData as any,
+                featuredLiveCardData,
               )
                 ? "Track"
                 : "Plan ride",
@@ -113,18 +115,18 @@ export function HomeLiveRouteSection({
               return (
                 <Card
                   key={cardData.id}
-                  nganya={cardData as any}
+                  nganya={cardData}
                   variant="standard"
                   isFollowing={isFollowingNganya(cardData.id)}
                   onFollow={onToggleFollow}
-                  onCardClick={() => onBrowseCardAction(cardData)}
+                  onCardClick={() => onBrowseCardAction(cardData as any)}
                   primaryAction={{
                     label:
                       cardData.isLive &&
                       canTrackWithPlannerContext(plannerContext, cardData)
                         ? "Track"
                         : "Plan ride",
-                    onClick: () => onBrowseCardAction(cardData),
+                    onClick: () => onBrowseCardAction(cardData as any),
                   }}
                   secondaryAction={{
                     label: isFollowingNganya(cardData.id)

@@ -54,7 +54,7 @@ export default function FollowingRecommendations({
                   search: {
                     corridor: item.corridorId || undefined,
                     vibe: item.sharedTag || item.tags[0] || undefined,
-                  } as any,
+                  } as never,
                 }),
               variant: "secondary",
             }}

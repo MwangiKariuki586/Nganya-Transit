@@ -6,7 +6,12 @@ import type {
 } from "@/components/features/WhereToCard";
 import { getTrackingSignalState } from "@/lib/tracking-signal";
 import type { JourneyResult } from "@/lib/types/journey";
+import { useCorridorRealtimeRefresh } from "@/modules/fan/hooks/useCorridorRealtimeRefresh";
 import { usePlannerFilters } from "@/modules/fan/hooks/usePlannerFilters";
+import type {
+  FanCorridorRecord,
+  FanLiveNganyaRecord,
+} from "@/modules/fan/lib/fan-data";
 import { deriveVisibleNganyaIds } from "@/modules/fan/services/derive-visible-nganya-ids";
 import {
   applyPlannerSeed,
@@ -14,6 +19,7 @@ import {
   getPlannerCorridorId,
   reconcilePlannerContext,
 } from "@/modules/fan/services/planner-storage";
+import { buildPlannerSeedToastMessage } from "@/modules/fan/services/planner-handoff";
 import {
   getPlannerAssistStatus,
   sortPlannerRideOptions,
@@ -33,8 +39,8 @@ import type {
 
 interface UseHomePlannerOptions {
   activeCorridor: string | null;
-  corridors: any[];
-  liveNganyas: any[];
+  corridors: FanCorridorRecord[];
+  liveNganyas: FanLiveNganyaRecord[];
   onCorridorChange: (corridorId: string | null) => void;
 }
 
@@ -101,9 +107,6 @@ export function useHomePlanner({
 
   const plannerRouteAbortRef = useRef<AbortController | null>(null);
   const plannerRouteKeyRef = useRef<string | null>(null);
-  const plannerRealtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
   const plannerMapSectionRef = useRef<HTMLElement>(null);
   const rideWatchSectionRef = useRef<HTMLElement>(null);
   const plannerJourneyKeyRef = useRef<string | null>(null);
@@ -280,76 +283,22 @@ export function useHomePlanner({
     plannerStageId,
   ]);
 
-  useEffect(() => {
-    if (
-      !plannerJourneyKey ||
-      !plannerCorridorId ||
-      !plannerContext.fromStage ||
-      !plannerContext.toPlace
-    ) {
-      return;
-    }
-
-    const scheduleRefresh = () => {
-      if (plannerRealtimeTimerRef.current) {
-        clearTimeout(plannerRealtimeTimerRef.current);
-      }
-      plannerRealtimeTimerRef.current = setTimeout(() => {
-        loadPlannerJourneyResults(plannerJourneyKey, { preserveExisting: true });
-      }, 1500);
-    };
-
-    let isCancelled = false;
-    let disposeChannel: (() => void) | null = null;
-
-    void loadSupabaseModule()
-      .then(({ supabase }) => {
-        if (isCancelled) return;
-
-        const channel = supabase
-          .channel(`home_planner_${plannerCorridorId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "live_sessions",
-              filter: `corridor_id=eq.${plannerCorridorId}`,
-            },
-            scheduleRefresh,
-          )
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "sightings",
-              filter: `corridor_id=eq.${plannerCorridorId}`,
-            },
-            scheduleRefresh,
-          )
-          .subscribe();
-
-        disposeChannel = () => {
-          supabase.removeChannel(channel);
-        };
-      })
-      .catch(() => {});
-
-    return () => {
-      isCancelled = true;
-      if (plannerRealtimeTimerRef.current) {
-        clearTimeout(plannerRealtimeTimerRef.current);
-        plannerRealtimeTimerRef.current = null;
-      }
-      disposeChannel?.();
-    };
-  }, [
-    plannerContext.fromStage,
-    plannerContext.toPlace,
-    plannerCorridorId,
-    plannerJourneyKey,
-  ]);
+  useCorridorRealtimeRefresh({
+    enabled: Boolean(
+      plannerJourneyKey &&
+        plannerCorridorId &&
+        plannerContext.fromStage &&
+        plannerContext.toPlace,
+    ),
+    corridorIds: plannerCorridorId ? [plannerCorridorId] : [],
+    channelPrefix: "home_planner",
+    debounceMs: 1500,
+    onRefresh: () => {
+      if (!plannerJourneyKey) return;
+      loadPlannerJourneyResults(plannerJourneyKey, { preserveExisting: true });
+    },
+    loadClient: loadSupabaseModule,
+  });
 
   const plannerRideOptions = useMemo(
     () => sortPlannerRideOptions(plannerResults),
@@ -441,10 +390,7 @@ export function useHomePlanner({
     );
     setPlannerSeed((current) => current + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    addToast(
-      `Route set to ${target.corridorName}. Pick your pickup stage to plan with ${target.name}.`,
-      "info",
-    );
+    addToast(buildPlannerSeedToastMessage(target), "info");
   };
 
   const handleBrowseCardAction = (item: BrowseCardActionItem) => {
@@ -553,7 +499,7 @@ export function useHomePlanner({
         Number.isFinite(route.distanceMeters) ? route.distanceMeters : null,
       );
     } catch (error) {
-      if ((error as any)?.name === "AbortError") return;
+      if (error instanceof Error && error.name === "AbortError") return;
       if (!stagePos || !nganyaPos) {
         setPlannerRouteLine(null);
         setPlannerRouteEtaSeconds(null);

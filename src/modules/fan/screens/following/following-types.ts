@@ -1,5 +1,9 @@
 import type { PlannerStorageContext } from "@/modules/fan/services/planner-storage";
 import type { FollowingRouteData } from "@/modules/fan/services/route-data";
+import type {
+  FanLiveNganyaRecord,
+  FanRecentSightingRecord,
+} from "@/modules/fan/lib/fan-data";
 
 export const RECENT_WINDOW_MS = 90 * 60 * 1000;
 
@@ -23,8 +27,8 @@ export interface DashboardItem {
   statusLabel: string;
   trustLabel: string;
   statusAt: string | null;
-  liveSession: any | null;
-  recentSighting: any | null;
+  liveSession: FanLiveNganyaRecord | null;
+  recentSighting: FanRecentSightingRecord | null;
   directionLabel: string | null;
   matchLabel: string | null;
   stageLabel: string | null;

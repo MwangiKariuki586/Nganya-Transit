@@ -3,13 +3,14 @@ import { AlertTriangle, MapPin } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Chip from "@/components/ui/Chip";
 import { LoadingButton } from "@/components/ui/loading";
+import type { FanCorridorRecord } from "@/modules/fan/lib/fan-data";
 import type { CorridorSuggestion, SpotDraft } from "./spot-types";
 import { getRouteFitMessage } from "./spot-domain";
 
 interface SpotWhereStepProps {
   draft: SpotDraft;
   setDraft: Dispatch<SetStateAction<SpotDraft>>;
-  corridors: any[];
+  corridors: FanCorridorRecord[];
   locationSuggestion: CorridorSuggestion;
   isDetectingCorridor: boolean;
   routeFitChecked: boolean;
@@ -111,7 +112,7 @@ export default function SpotWhereStep({
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        {corridors.map((corridor: any) => {
+        {corridors.map((corridor) => {
           const selected = draft.corridorId === corridor.id;
           const suggested = locationSuggestion.corridorId === corridor.id;
           return (

@@ -7,10 +7,15 @@ import {
 } from "react";
 import { useToast } from "@/components/ui/ToastContainer";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
+import { toggleFollowedIdSet } from "@/modules/fan/services/follow-optimistic";
 import {
   loadDiscoverCataloguePage,
   type DiscoverCorridorSummary,
 } from "@/modules/fan/services/route-data";
+import type {
+  FanLiveNganyaRecord,
+  FanNganyaRecord,
+} from "@/modules/fan/lib/fan-data";
 import {
   buildResultLabel,
   mapNganyaToCardProps,
@@ -25,12 +30,12 @@ import {
 const SEARCH_DEBOUNCE_MS = 300;
 
 interface UseDiscoverCatalogueOptions {
-  initialNganyas: any[];
+  initialNganyas: FanNganyaRecord[];
   initialHasMore: boolean;
   initialNextOffset: number;
   totalCount: number;
   initialFollowedIds: Set<string>;
-  liveNganyas: any[];
+  liveNganyas: FanLiveNganyaRecord[];
   corridors: DiscoverCorridorSummary[];
   initialCorridorId?: string | null;
 }
@@ -202,22 +207,12 @@ export function useDiscoverCatalogue({
   const toggleFollow = useCallback(
     async (id: string) => {
       const wasFollowing = followedIds.has(id);
-      setFollowedIds((prev) => {
-        const next = new Set(prev);
-        if (wasFollowing) next.delete(id);
-        else next.add(id);
-        return next;
-      });
+      setFollowedIds((prev) => toggleFollowedIdSet(prev, id, wasFollowing));
       try {
         if (wasFollowing) await unfollowNganya(id);
         else await followNganya(id);
       } catch {
-        setFollowedIds((prev) => {
-          const next = new Set(prev);
-          if (wasFollowing) next.add(id);
-          else next.delete(id);
-          return next;
-        });
+        setFollowedIds((prev) => toggleFollowedIdSet(prev, id, !wasFollowing));
         showErrorToast("Failed to update follow.");
       }
     },
