@@ -1,5 +1,4 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getServiceRoleSupabaseClient } from '@/server/supabase/service-role.server'
 
 export const getCrewNotificationsServerFn = createServerFn({ method: 'POST' })
   .inputValidator((data: { accessToken: string }) => data)
@@ -79,9 +78,10 @@ export const sendCrewNotificationServerFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const adminModule = await import('@/server/admin/dashboard.server')
+    const serviceRoleModule = await import('@/server/supabase/service-role.server')
     const adminCtx = await adminModule.requireAdminDashboardAccess(data.accessToken)
 
-    const serviceSupabase = getServiceRoleSupabaseClient()
+    const serviceSupabase = serviceRoleModule.getServiceRoleSupabaseClient()
 
     const { error } = await (serviceSupabase
       .from('crew_notifications') as any)

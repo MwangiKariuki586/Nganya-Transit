@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import ProfileScreen from "@/modules/fan/screens/ProfileScreen";
 import { loadProfileRouteData } from "@/modules/fan/services/route-data";
 import type { FanSharedData } from "@/modules/fan/services/route-data";
-import { ProfileSkeleton } from "@/components/ui/loading";
+import { ProfileSkeleton } from "@/shared/route-components";
 
 export const Route = createFileRoute("/(fan)/profile")({
   loader: async ({ context }) => {

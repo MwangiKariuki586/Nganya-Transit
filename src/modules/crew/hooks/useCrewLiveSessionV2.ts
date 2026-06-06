@@ -182,7 +182,7 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
     if (mine.length > 0) {
       void ping(mine[mine.length - 1].payload)
     }
-  }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id])
 
   // ── Position history for movement detection ────────────────────────────────
 
@@ -247,7 +247,7 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
         locationRuntime.stopWatching()
       }
     }
-  }, [session?.status, locationRuntime.readiness, locationRuntime.isWatching]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.status, locationRuntime.readiness, locationRuntime.isWatching])
 
   // ── Wake Lock ──────────────────────────────────────────────────────────────
 
@@ -313,7 +313,7 @@ export function useCrewLiveSessionV2(options: UseCrewLiveSessionV2Options) {
     setSession((current: any) =>
       current ? { ...current, status: 'OFF', ended_at: new Date().toISOString() } : current,
     )
-  }, [session?.id, locationRuntime]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, locationRuntime])
 
   return {
     session,

@@ -1,7 +1,7 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { AdminRouteFrame } from '@/modules/admin/components/AdminRouteFrame'
 import { requireAdminRouteAccess } from '@/modules/admin/services/route-access'
-import { RouteErrorFallback } from '@/components/error/RouteErrorFallback'
+import { RouteErrorFallback } from '@/shared/route-components'
 
 export const Route = createFileRoute('/(admin)/admin')({
   beforeLoad: async () => {

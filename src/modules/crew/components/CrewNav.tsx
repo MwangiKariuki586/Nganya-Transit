@@ -94,7 +94,7 @@ export function CrewNav({ session, profile }: NavProps) {
           </div>
           <div className="min-w-0">
             <span className="font-display text-lg font-bold text-[var(--color-text-primary)] tracking-tight group-hover:text-[var(--color-accent)] transition-colors">
-              MATWANA Crew
+              NGANYA TRANSIT
             </span>
             <div className="text-caption text-[var(--color-text-tertiary)]">
               Operations

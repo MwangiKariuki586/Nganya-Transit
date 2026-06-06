@@ -1,7 +1,7 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { FanRouteFrame } from '@/modules/fan/components/FanRouteFrame'
 import { requireFanRouteAccess } from '@/modules/fan/services/route-access'
-import { RouteErrorFallback } from '@/components/error/RouteErrorFallback'
+import { RouteErrorFallback } from '@/shared/route-components'
 import { loadFanSharedData } from '@/modules/fan/services/route-data'
 import type { FanSharedData } from '@/modules/fan/services/route-data'
 

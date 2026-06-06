@@ -221,12 +221,10 @@ export function useTracking({
   const etaMinutes = useMemo(() => {
     const elapsedMin = (Date.now() - etaBaseTimestampRef.current) / 60_000
     return Math.max(1, Math.round(etaBaseRef.current - elapsedMin))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, lastUpdateAt])
 
   const freshnessSec = useMemo(
     () => Math.floor((Date.now() - lastUpdateAt.getTime()) / 1_000),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tick, lastUpdateAt],
   )
 

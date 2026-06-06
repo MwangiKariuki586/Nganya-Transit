@@ -16,6 +16,8 @@ const {
   mockHomeScreen: vi.fn(),
 }));
 
+type OnCorridorChange = (corridorId: string | null) => void;
+
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: Record<string, unknown>) => ({
     ...config,
@@ -153,7 +155,7 @@ describe("fan home route", () => {
     const props = mockHomeScreen.mock.calls.at(-1)?.[0] as Record<string, unknown>;
 
     act(() => {
-      (props.onCorridorChange as Function)("corridor-5");
+      (props.onCorridorChange as OnCorridorChange)("corridor-5");
     });
 
     const setCall = mockNavigate.mock.calls[0][0];
@@ -164,7 +166,7 @@ describe("fan home route", () => {
     });
 
     act(() => {
-      (props.onCorridorChange as Function)(null);
+      (props.onCorridorChange as OnCorridorChange)(null);
     });
 
     const clearCall = mockNavigate.mock.calls[1][0];

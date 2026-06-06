@@ -3,7 +3,7 @@ import { z } from "zod";
 import DiscoverScreen from "@/modules/fan/screens/DiscoverScreen";
 import { loadDiscoverRouteData } from "@/modules/fan/services/route-data";
 import type { FanSharedData } from "@/modules/fan/services/route-data";
-import { DiscoverSkeleton } from "@/components/ui/loading";
+import { DiscoverSkeleton } from "@/shared/route-components";
 
 const discoverSearchSchema = z.object({
   corridorId: z.string().optional(),

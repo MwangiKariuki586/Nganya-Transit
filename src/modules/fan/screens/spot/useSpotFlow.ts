@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { getUserMessage, toAppError } from "@/shared/errors/app-error";
 import { useToast } from "@/components/ui/ToastContainer";
 import { postSighting } from "@/lib/queries/sightings";
-import { useGeolocation } from "@/modules/crew/hooks/useGeolocation";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import type {
   FanCorridorRecord,
   FanLiveNganyaRecord,

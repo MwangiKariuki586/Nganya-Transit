@@ -2,7 +2,7 @@ import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { CrewShellSkeleton } from '@/modules/crew/components/CrewShellSkeleton'
 import { CrewRouteFrame } from '@/modules/crew/components/CrewRouteFrame'
 import { requireCrewRouteAccess } from '@/modules/crew/services/route-access'
-import { RouteErrorFallback } from '@/components/error/RouteErrorFallback'
+import { RouteErrorFallback } from '@/shared/route-components'
 
 export const Route = createFileRoute('/(crew)/crew')({
   beforeLoad: async ({ location }) => {

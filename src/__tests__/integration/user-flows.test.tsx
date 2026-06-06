@@ -87,7 +87,15 @@ describe("Integration Tests - User Flows", () => {
 
     // Reset all stores
     useNganyaStore.getState().invalidateAll();
-    useFollowStore.getState().invalidate();
+    useFollowStore.setState({
+      followedNganyas: [],
+      followedIds: new Set(),
+      lastFetchedAt: null,
+      isLoading: false,
+      error: null,
+      optimisticFollows: new Set(),
+      optimisticUnfollows: new Set(),
+    });
     useProfileStore.getState().invalidate();
     useAuthStore.setState({ session: null, role: null });
     useCrewStore.getState().invalidateBootstrap();

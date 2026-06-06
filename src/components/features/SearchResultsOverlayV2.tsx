@@ -137,7 +137,6 @@ export default function SearchResultsOverlayV2({
     if (isOpen) {
       loadResults(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, corridorId, fromStage.id, preference, preferredNganya?.id]);
 
   useEffect(() => {
@@ -176,7 +175,6 @@ export default function SearchResultsOverlayV2({
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, corridorId, fromStage.id, preference, preferredNganya?.id]);
 
   useEffect(() => {

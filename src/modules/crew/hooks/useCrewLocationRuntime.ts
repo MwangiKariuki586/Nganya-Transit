@@ -226,7 +226,7 @@ export function useCrewLocationRuntime(): UseCrewLocationRuntimeReturn {
         permissionStatusRef.current.onchange = null
       }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── requestPermission ──────────────────────────────────────────────────────
 
@@ -255,7 +255,7 @@ export function useCrewLocationRuntime(): UseCrewLocationRuntimeReturn {
         const { readiness: r, message } = classifyError(fastErr)
         setReadiness(r)
         setError(message)
-        throw new Error(message)
+        throw new Error(message, { cause: fastErr })
       }
       // TIMEOUT or POSITION_UNAVAILABLE — retry with high-accuracy GPS
       try {
@@ -269,7 +269,7 @@ export function useCrewLocationRuntime(): UseCrewLocationRuntimeReturn {
         const { readiness: r, message } = classifyError(slowErr)
         setReadiness(r)
         setError(message)
-        throw new Error(message)
+        throw new Error(message, { cause: slowErr })
       }
     }
   }, [parsePosition, classifyError])

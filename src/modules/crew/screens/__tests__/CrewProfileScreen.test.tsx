@@ -136,7 +136,12 @@ describe("CrewProfileScreen", () => {
     expect(screen.getByAltText("Cover").getAttribute("src")).toBe(
       "blob:cover-preview",
     );
-    expect(screen.getByText(/you have unsaved changes/i)).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /save cover photo/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /discard cover change/i }),
+    ).toBeTruthy();
   });
 
   it("uploads avatar independently after confirmation", async () => {
@@ -221,7 +226,7 @@ describe("CrewProfileScreen", () => {
     });
   });
 
-  it("lets the user drag the cover image to reposition it", () => {
+  it("discards a selected cover change", () => {
     mockUseLoaderData.mockReturnValue({
       profile: {
         id: "profile-1",
@@ -245,40 +250,22 @@ describe("CrewProfileScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
 
-    const coverImage = screen.getByAltText("Cover");
-    Object.defineProperty(coverImage, "naturalWidth", {
-      configurable: true,
-      value: 1600,
-    });
-    Object.defineProperty(coverImage, "naturalHeight", {
-      configurable: true,
-      value: 1200,
-    });
+    const coverInput = screen.getByLabelText(/change cover/i);
+    const coverFile = new File(["cover"], "cover.jpg", { type: "image/jpeg" });
 
-    fireEvent.load(coverImage);
+    fireEvent.change(coverInput, { target: { files: [coverFile] } });
+    expect(screen.getByAltText("Cover").getAttribute("src")).toBe(
+      "blob:cover-preview",
+    );
 
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      width: 400,
-      height: 200,
-      top: 0,
-      left: 0,
-      right: 400,
-      bottom: 200,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    });
+    fireEvent.click(screen.getByRole("button", { name: /discard cover change/i }));
 
-    fireEvent.pointerDown(coverImage, { clientX: 100, clientY: 60 });
-    fireEvent.pointerMove(window, { clientX: 108, clientY: 80 });
-    fireEvent.pointerUp(window, { clientX: 108, clientY: 80 });
-
-    expect((coverImage as HTMLImageElement).style.objectPosition).toBe(
-      "25% 15.870967741935484%",
+    expect(screen.getByAltText("Cover").getAttribute("src")).toBe(
+      "https://example.com/cover.jpg",
     );
   });
 
-  it("shows a zoom control in edit mode", () => {
+  it("uploads cover media independently after confirmation", async () => {
     mockUseLoaderData.mockReturnValue({
       profile: {
         id: "profile-1",
@@ -298,157 +285,48 @@ describe("CrewProfileScreen", () => {
       },
     });
 
-    render(<CrewProfileScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
-
-    const slider = screen.getByLabelText(/cover zoom/i);
-    expect((slider as HTMLInputElement).value).toBe("1.08");
-
-    fireEvent.change(slider, { target: { value: "1.18" } });
-
-    expect((slider as HTMLInputElement).value).toBe("1.18");
-    expect(screen.getByText("118%")).toBeTruthy();
-  });
-
-  it("resets cover framing and supports nudge controls", () => {
-    mockUseLoaderData.mockReturnValue({
-      profile: {
-        id: "profile-1",
-        handle: "matwana",
-        full_name: "Matwana Crew",
-        avatar_url: null,
-        bio: null,
-        role: "crew",
-        created_at: "2026-01-01T00:00:00.000Z",
-        updated_at: null,
-        cover_media_url: "https://example.com/cover.jpg",
-        cover_media_type: "image",
-        cover_poster_url: null,
-        cover_position_x: 50,
-        cover_position_y: 32,
-        cover_scale: 1.08,
-      },
-    });
-
-    render(<CrewProfileScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
-
-    const coverImage = screen.getByAltText("Cover") as HTMLImageElement;
-    const slider = screen.getByLabelText(/zoom/i);
-
-    fireEvent.click(screen.getByRole("button", { name: /nudge cover right/i }));
-    fireEvent.click(screen.getByRole("button", { name: /nudge cover down/i }));
-    fireEvent.change(slider, { target: { value: "1.2" } });
-
-    expect(coverImage.style.objectPosition).toBe("52% 34%");
-    expect(screen.getByText("120%")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: /reset framing/i }));
-
-    expect(coverImage.style.objectPosition).toBe("50% 32%");
-    expect((slider as HTMLInputElement).value).toBe("1.08");
-    expect(screen.getByText("108%")).toBeTruthy();
-  });
-
-  it("supports keyboard nudging only while the cover editor is active", () => {
-    mockUseLoaderData.mockReturnValue({
-      profile: {
-        id: "profile-1",
-        handle: "matwana",
-        full_name: "Matwana Crew",
-        avatar_url: null,
-        bio: null,
-        role: "crew",
-        created_at: "2026-01-01T00:00:00.000Z",
-        updated_at: null,
-        cover_media_url: "https://example.com/cover.jpg",
-        cover_media_type: "image",
-        cover_poster_url: null,
-        cover_position_x: 50,
-        cover_position_y: 32,
-        cover_scale: 1.08,
-      },
-    });
-
-    render(<CrewProfileScreen />);
-
-    const coverImage = screen.getByAltText("Cover") as HTMLImageElement;
-    fireEvent.keyDown(coverImage, { key: "ArrowRight" });
-    expect(coverImage.style.objectPosition).toBe("50% 32%");
-
-    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
-
-    coverImage.focus();
-    fireEvent.keyDown(coverImage, { key: "ArrowRight" });
-    fireEvent.keyDown(coverImage, { key: "ArrowDown", shiftKey: true });
-
-    expect(coverImage.style.objectPosition).toBe("52% 38%");
-  });
-
-  it("cleans up dragging after pointer cancellation", () => {
-    mockUseLoaderData.mockReturnValue({
-      profile: {
-        id: "profile-1",
-        handle: "matwana",
-        full_name: "Matwana Crew",
-        avatar_url: null,
-        bio: null,
-        role: "crew",
-        created_at: "2026-01-01T00:00:00.000Z",
-        updated_at: null,
-        cover_media_url: "https://example.com/cover.jpg",
-        cover_media_type: "image",
-        cover_poster_url: null,
-        cover_position_x: 50,
-        cover_position_y: 32,
-        cover_scale: 1.08,
-      },
-    });
-
-    render(<CrewProfileScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
-
-    const coverImage = screen.getByAltText("Cover");
-    Object.defineProperty(coverImage, "naturalWidth", {
-      configurable: true,
-      value: 1600,
-    });
-    Object.defineProperty(coverImage, "naturalHeight", {
-      configurable: true,
-      value: 1200,
-    });
-
-    fireEvent.load(coverImage);
-
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      width: 400,
-      height: 200,
-      top: 0,
-      left: 0,
-      right: 400,
-      bottom: 200,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    });
-
-    fireEvent.pointerDown(coverImage, {
-      clientX: 100,
-      clientY: 60,
-      pointerId: 1,
-    });
-    fireEvent.pointerCancel(coverImage, { pointerId: 1 });
-    fireEvent.pointerMove(window, {
-      clientX: 140,
-      clientY: 100,
-      pointerId: 1,
-    });
-
-    expect((coverImage as HTMLImageElement).style.objectPosition).toBe(
-      "50% 32%",
+    const { retryWithBackoff } = await import("@/lib/utils/retry");
+    const { compressImage } = await import("@/lib/utils/image-compress");
+    const { replaceCoverMedia } = await import("@/lib/storage/profile-media");
+    const { updateCrewProfileServerFn } = await import(
+      "@/shared/server-fns/crew-profile"
     );
+
+    vi.mocked(retryWithBackoff).mockImplementation(async (fn: any) => fn());
+    vi.mocked(compressImage).mockResolvedValue(
+      new File(["cover"], "cover.jpg", { type: "image/jpeg" }),
+    );
+    vi.mocked(replaceCoverMedia).mockResolvedValue({
+      url: "https://example.com/uploaded-cover.jpg",
+      path: "covers/user-1/cover.jpg",
+      type: "image",
+    });
+    vi.mocked(updateCrewProfileServerFn).mockResolvedValue(undefined as never);
+
+    render(<CrewProfileScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
+
+    const coverInput = screen.getByLabelText(/change cover/i);
+    const coverFile = new File(["cover"], "cover.jpg", { type: "image/jpeg" });
+
+    fireEvent.change(coverInput, { target: { files: [coverFile] } });
+    fireEvent.click(screen.getByRole("button", { name: /save cover photo/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /save cover photo/i })).toBeNull();
+      expect(screen.getByAltText("Cover").getAttribute("src")).toBe(
+        "https://example.com/uploaded-cover.jpg",
+      );
+      expect(replaceCoverMedia).toHaveBeenCalled();
+      expect(updateCrewProfileServerFn).toHaveBeenCalledWith({
+        data: {
+          accessToken: "token-1",
+          cover_media_url: "https://example.com/uploaded-cover.jpg",
+          cover_media_type: "image",
+        },
+      });
+      expect(mockInvalidate).toHaveBeenCalled();
+    });
   });
 });

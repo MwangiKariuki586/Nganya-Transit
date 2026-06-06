@@ -4,7 +4,7 @@ import {
   loadCrewProfileRouteData,
   type CrewProfileRouteData,
 } from "@/modules/crew/services/profile-route";
-import { ProfileSkeleton } from "@/components/ui/loading";
+import { ProfileSkeleton } from "@/shared/route-components";
 
 export const Route = createFileRoute("/(crew)/crew/profile")({
   loader: async (): Promise<CrewProfileRouteData> => loadCrewProfileRouteData(),

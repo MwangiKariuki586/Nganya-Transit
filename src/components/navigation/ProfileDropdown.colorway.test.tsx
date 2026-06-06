@@ -34,12 +34,16 @@ describe("ProfileDropdown colorway picker", () => {
       </MatwanaThemeProvider>,
     );
 
-    expect(
-      screen.getByText("Choose your MATWANA colorway."),
-    ).toBeTruthy();
+    expect(screen.getByText("MATWANA Colorway")).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Choose Optimus Prime colorway" }),
+      screen.getByRole("button", {
+        name: "MATWANA Colorway: Moxy. Activate to change.",
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("option", { name: "Choose Optimus Prime colorway" }),
     );
 
     await waitFor(() => {

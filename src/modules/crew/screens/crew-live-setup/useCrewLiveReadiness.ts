@@ -121,7 +121,7 @@ export function useCrewLiveReadiness(
         addToast(err?.message || "Failed to load your assigned nganya.", "error");
       });
     return () => { active = false; };
-  }, [bootstrapRequest?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bootstrapRequest?.id]);
 
   // Load corridor stages
   useEffect(() => {
