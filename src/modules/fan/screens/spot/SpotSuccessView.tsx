@@ -46,7 +46,7 @@ export default function SpotSuccessView({
       <Button
         variant="primary"
         className="mt-6"
-        onClick={() => navigate({ to: "/" })}
+        onClick={() => navigate({ to: "/", search: {} })}
       >
         Back Home
       </Button>

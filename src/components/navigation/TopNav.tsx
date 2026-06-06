@@ -63,7 +63,7 @@ export default function TopNav({ session, profile }: NavProps) {
             <Zap className="w-4.5 h-4.5 text-white" />
           </div>
           <span className="font-display text-lg font-bold text-[var(--color-text-primary)] tracking-tight group-hover:text-[var(--color-accent)] transition-colors">
-            MATWANA
+            NGANYA TRANSIT
           </span>
         </Link>
 

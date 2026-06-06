@@ -6,7 +6,7 @@ import {
   enrichNganyaImageFields,
   mapNganyaRecordToCardData,
 } from "@/modules/fan/lib/nganya-card";
-import type { FanLiveNganyaRecord } from "@/modules/fan/lib/fan-data";
+import type { FanLiveNganyaRecord, FanNganyaRecord } from "@/modules/fan/lib/fan-data";
 import {
   aggregateRecentSightings,
   countHighActivityRecentSightings,
@@ -258,7 +258,7 @@ export default function HomeScreen({
           onToggleShowAllRecent={() =>
             router.navigate({
               to: "/",
-              search: (current: Record<string, unknown>) => ({
+              search: (current: any) => ({
                 ...current,
                 recent: showAllRecent ? undefined : "all",
               }),

@@ -91,5 +91,8 @@ export function mapNganyaRecordToCardData(
     followers: options.followers ?? source.follower_count ?? 0,
     sightingsToday: options.sightingsToday ?? source.sighting_count_today ?? 0,
     lastSeen: options.lastSeen ?? source.last_seen ?? "Recently",
+    lastSeenMinutes: 0,
+    confidence: "high",
+    description: source.description || "",
   };
 }

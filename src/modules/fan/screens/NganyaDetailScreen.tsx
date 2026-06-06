@@ -114,14 +114,14 @@ export default function NganyaDetailScreen() {
           crewGallery,
           crewProfileData,
         ] = await Promise.all([
-          getLiveNow(data.corridor_id),
-          getCorridorSightings(data.corridor_id),
-          getNganyasByCorridor(data.corridor_id, data.id),
+          getLiveNow(data.corridor_id || ""),
+          getCorridorSightings(data.corridor_id || ""),
+          getNganyasByCorridor(data.corridor_id || "", data.id || ""),
           getMyFollows().catch(() => []),
-          getNganyaCrewGalleryServerFn({ data: { nganyaId: data.id } }).catch(
+          getNganyaCrewGalleryServerFn({ data: { nganyaId: data.id || "" } }).catch(
             () => [],
           ),
-          getNganyaCrewProfileServerFn({ data: { nganyaId: data.id } }).catch(
+          getNganyaCrewProfileServerFn({ data: { nganyaId: data.id || "" } }).catch(
             () => null,
           ),
         ]);
@@ -132,17 +132,17 @@ export default function NganyaDetailScreen() {
 
         setIsLive(
           (liveRes || []).some(
-            (liveNganya: FanLiveNganyaRecord) => liveNganya.nganya_id === data.id,
+            (liveNganya: FanLiveNganyaRecord) => liveNganya.nganya_id === (data.id || ""),
           ) || data.status === "LIVE",
         );
         setNganyaSightings(
           ((corridorSightings || []) as NganyaDetailSightingRecord[]).filter(
-            (sighting) => sighting.nganya_id === data.id,
+            (sighting) => sighting.nganya_id === (data.id || ""),
           ),
         );
         setRelatedNganyas((related || []) as FanNganyaRecord[]);
         setIsFollowing(
-          (myFollows || []).some((follow) => follow.nganya_id === data.id),
+          ((myFollows || []) as any[]).some((follow) => follow.nganya_id === (data.id || "")),
         );
       } catch (error) {
         console.error("Failed to load nganya data", error);
@@ -254,7 +254,7 @@ export default function NganyaDetailScreen() {
           The route exists, but this build is not resolving from the current
           slug.
         </p>
-        <Link to="/">
+        <Link to="/" search={{}}>
           <Button variant="secondary">Back to Discover</Button>
         </Link>
       </div>
@@ -335,6 +335,7 @@ export default function NganyaDetailScreen() {
 
         <Link
           to="/"
+          search={{}}
           className="absolute top-4 left-4 md:top-6 md:left-6 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors no-underline"
         >
           <ChevronLeft className="w-5 h-5" />

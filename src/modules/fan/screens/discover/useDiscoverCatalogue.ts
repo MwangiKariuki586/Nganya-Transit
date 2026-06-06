@@ -74,7 +74,7 @@ export function useDiscoverCatalogue({
     () =>
       queryState.items
         .map((n) => mapNganyaToCardProps(n, liveNganyas))
-        .filter(Boolean),
+        .filter((n): n is NonNullable<typeof n> => Boolean(n)),
     [queryState.items, liveNganyas],
   );
 

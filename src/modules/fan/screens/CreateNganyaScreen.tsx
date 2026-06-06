@@ -6,7 +6,7 @@ export default function CreateNganyaScreen() {
   return (
     <div className="page-container max-w-2xl py-8 md:py-12">
       <div className="mb-6 flex items-center gap-4">
-        <Link to="/" className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
+        <Link to="/" search={{}} className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
           <ChevronLeft className="h-4 w-4" />
         </Link>
         <div>
@@ -29,7 +29,7 @@ export default function CreateNganyaScreen() {
             <ArrowRight className="h-4 w-4" />
             Sign in with a crew account
           </Button>
-          <Link to="/" className="inline-flex min-h-[48px] items-center justify-center rounded-[18px] border border-[var(--glass-border)] px-4 text-sm font-semibold text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
+          <Link to="/" search={{}} className="inline-flex min-h-[48px] items-center justify-center rounded-[18px] border border-[var(--glass-border)] px-4 text-sm font-semibold text-[var(--color-text-primary)] no-underline transition-all hover:border-[var(--glass-border-hover)]">
             Back to discovery
           </Link>
         </div>
