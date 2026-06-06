@@ -36,6 +36,7 @@ const {
 }));
 
 vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mockRouterNavigate,
   useRouter: () => ({
     navigate: mockRouterNavigate,
     invalidate: mockRouterInvalidate,
@@ -216,6 +217,7 @@ function seedPlannerContext(context?: {
 
 function makeHomeData(overrides: Partial<FanHomeRouteData> = {}): FanHomeRouteData {
   return {
+    isAuthenticated: true,
     search: "",
     activeCorridor: null,
     activeVibe: null,
@@ -757,13 +759,7 @@ describe("HomeScreen", () => {
         last_seen_at: "2026-05-01T11:59:40.000Z",
       },
     ]);
-    mockFollowNganya.mockRejectedValueOnce({
-      code: "AUTH_REQUIRED",
-      message: "Sign in to continue.",
-      retryable: false,
-    });
-
-    renderHome({ activeCorridor: "corridor-1" });
+    renderHome({ activeCorridor: "corridor-1" }, { isAuthenticated: false });
 
     await waitFor(() => {
       expect(
@@ -778,7 +774,35 @@ describe("HomeScreen", () => {
         "Sign in to keep ride alerts on.",
         "info",
       );
-      expect(mockRouterNavigate).toHaveBeenCalledWith({ to: "/signin" });
+      expect(mockRouterNavigate).toHaveBeenCalledWith({
+        to: "/signin",
+        search: { returnTo: "/" },
+      });
+      expect(mockFollowNganya).not.toHaveBeenCalled();
+    });
+  });
+
+  it("sends unauthenticated live tracking actions to sign-in", async () => {
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+
+    renderHome({ activeCorridor: "corridor-1" }, { isAuthenticated: false });
+
+    fireEvent.click(await screen.findByText("map-track"));
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith(
+        "Sign in to track live rides.",
+        "info",
+      );
+      expect(mockRouterNavigate).toHaveBeenCalledWith({
+        to: "/signin",
+        search: { returnTo: "/" },
+      });
+      expect(mockFetchOsrmRoute).not.toHaveBeenCalled();
     });
   });
 

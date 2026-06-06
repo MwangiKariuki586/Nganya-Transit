@@ -13,7 +13,7 @@ export const Route = createFileRoute("/(fan)/profile")({
       throw redirect({
         to: "/signin",
         search: {
-          redirect: "/profile",
+          returnTo: "/profile",
         },
       });
     }

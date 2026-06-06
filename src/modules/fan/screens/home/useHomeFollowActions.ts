@@ -9,7 +9,10 @@ import {
   toggleFollowedIdSet,
 } from "@/modules/fan/services/follow-optimistic";
 
-export function useHomeFollowActions(initialFollowedIds: Set<string>) {
+export function useHomeFollowActions(
+  initialFollowedIds: Set<string>,
+  isAuthenticated: boolean,
+) {
   const router = useRouter();
   const { showErrorToast, addToast } = useToast();
   const [localFollowedIds, setLocalFollowedIds] = useState<Set<string>>(
@@ -30,6 +33,12 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
 
   const toggleFollow = useCallback(
     async (id: string) => {
+      if (!isAuthenticated) {
+        addToast("Sign in to follow nganyas.", "info");
+        router.navigate({ to: "/signin", search: { returnTo: "/" } });
+        return;
+      }
+
       const wasFollowing = localFollowedIds.has(id);
       setLocalFollowedIds((current) =>
         toggleFollowedIdSet(current, id, wasFollowing),
@@ -48,11 +57,17 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
         showErrorToast("Failed to update follow.");
       }
     },
-    [localFollowedIds, showErrorToast],
+    [addToast, isAuthenticated, localFollowedIds, router, showErrorToast],
   );
 
   const turnOnPlannerAlerts = useCallback(
     async (ride: PlannerRideOption) => {
+      if (!isAuthenticated) {
+        addToast("Sign in to keep ride alerts on.", "info");
+        router.navigate({ to: "/signin", search: { returnTo: "/" } });
+        return;
+      }
+
       try {
         await followNganya(ride.nganya_id);
         setPlannerAlertIds((current) => new Set(current).add(ride.nganya_id));
@@ -68,7 +83,7 @@ export function useHomeFollowActions(initialFollowedIds: Set<string>) {
         showErrorToast("Failed to turn on ride alerts.");
       }
     },
-    [addToast, router, showErrorToast],
+    [addToast, isAuthenticated, router, showErrorToast],
   );
 
   const handlePlannerAlertAction = useCallback(

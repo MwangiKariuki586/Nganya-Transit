@@ -47,6 +47,7 @@ export async function loadFanSharedData(): Promise<FanSharedData> {
 // ── Per-route data types ────────────────────────────────────────────
 
 export interface FanHomeRouteData {
+  isAuthenticated: boolean;
   search: string;
   activeCorridor: string | null;
   activeVibe: string | null;
@@ -58,6 +59,7 @@ export interface FanHomeRouteData {
 }
 
 export interface DiscoverRouteData {
+  isAuthenticated: boolean;
   corridors: DiscoverCorridorSummary[];
   /** Up to 6 live nganyas for the curated strip — sourced from shared liveNganyas. */
   featuredLive: FanLiveNganyaRecord[];
@@ -124,6 +126,21 @@ async function getOptionalFollows(): Promise<FanFollowRecord[]> {
   return getMyFollows();
 }
 
+async function getOptionalFollowState(): Promise<{
+  isAuthenticated: boolean;
+  follows: FanFollowRecord[];
+}> {
+  const session = await getStableClientSession();
+  if (!session?.user?.id) {
+    return { isAuthenticated: false, follows: [] };
+  }
+
+  return {
+    isAuthenticated: true,
+    follows: await getMyFollows(),
+  };
+}
+
 // ── Per-route loaders (receive shared data from parent context) ─────
 
 export async function loadFanHomeRouteData(
@@ -139,10 +156,13 @@ export async function loadFanHomeRouteData(
   const activeCorridor = input.corridorId || null;
   const activeVibe = input.vibe || null;
 
-  const [nganyas, follows] = (await Promise.all([
+  const [nganyas, followState] = (await Promise.all([
     searchHomepageNganyas(search, activeCorridor || undefined),
-    getOptionalFollows(),
-  ])) as [FanNganyaRecord[], FanFollowRecord[]];
+    getOptionalFollowState(),
+  ])) as [
+    FanNganyaRecord[],
+    { isAuthenticated: boolean; follows: FanFollowRecord[] },
+  ];
 
   const nganyasById = new Map(
     nganyas
@@ -158,6 +178,7 @@ export async function loadFanHomeRouteData(
     : await getHomepageRecentSightings(80, { includeConfidence: false });
 
   return {
+    isAuthenticated: followState.isAuthenticated,
     search,
     activeCorridor,
     activeVibe,
@@ -165,7 +186,7 @@ export async function loadFanHomeRouteData(
     nganyas,
     liveNganyas: enrichedLiveNganyas,
     recentSightings,
-    followedIds: toFollowedIds(follows),
+    followedIds: toFollowedIds(followState.follows),
   };
 }
 
@@ -181,13 +202,13 @@ export async function loadDiscoverRouteData(
 
   const [
     initialCatalogue,
-    follows,
+    followState,
     totalCount,
     featuredNganyas,
     corridorCounts,
   ] = (await Promise.all([
     loadDiscoverCataloguePage({ limit: 12 }),
-    getOptionalFollows(),
+    getOptionalFollowState(),
     countNganyas(),
     getNganyasByIds(featuredLiveIds),
     Promise.all(
@@ -198,7 +219,7 @@ export async function loadDiscoverRouteData(
     ),
   ])) as [
     DiscoverCataloguePageData,
-    FanFollowRecord[],
+    { isAuthenticated: boolean; follows: FanFollowRecord[] },
     number,
     FanNganyaRecord[],
     { id: string; count: number }[],
@@ -226,11 +247,12 @@ export async function loadDiscoverRouteData(
   ) as FanLiveNganyaRecord[];
 
   return {
+    isAuthenticated: followState.isAuthenticated,
     corridors: corridorSummaries,
     featuredLive,
     initialNganyas: initialCatalogue.nganyas,
     liveNganyas,
-    followedIds: toFollowedIds(follows),
+    followedIds: toFollowedIds(followState.follows),
     totalCount,
     initialHasMore: initialCatalogue.hasMore,
     initialNextOffset: initialCatalogue.nextOffset,

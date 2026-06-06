@@ -35,3 +35,52 @@ describe("requireFanRouteAccess", () => {
     });
   });
 });
+
+describe("requireAuthenticatedFanRouteAccess", () => {
+  beforeEach(() => {
+    resolveCurrentRole.mockReset();
+  });
+
+  it("allows authenticated fans through account-only fan routes", async () => {
+    resolveCurrentRole.mockResolvedValue("fan");
+
+    const { requireAuthenticatedFanRouteAccess } = await import(
+      "@/modules/fan/services/route-access"
+    );
+
+    await expect(
+      requireAuthenticatedFanRouteAccess("/following"),
+    ).resolves.toBe("fan");
+  });
+
+  it("redirects guests to sign-in with the original fan route", async () => {
+    resolveCurrentRole.mockResolvedValue(null);
+
+    const { requireAuthenticatedFanRouteAccess } = await import(
+      "@/modules/fan/services/route-access"
+    );
+
+    await expect(
+      requireAuthenticatedFanRouteAccess("/spot"),
+    ).rejects.toMatchObject({
+      options: {
+        to: "/signin",
+        search: { returnTo: "/spot" },
+      },
+    });
+  });
+
+  it("redirects authenticated non-fan roles to their home route", async () => {
+    resolveCurrentRole.mockResolvedValue("admin");
+
+    const { requireAuthenticatedFanRouteAccess } = await import(
+      "@/modules/fan/services/route-access"
+    );
+
+    await expect(
+      requireAuthenticatedFanRouteAccess("/following"),
+    ).rejects.toMatchObject({
+      options: { to: "/admin" },
+    });
+  });
+});

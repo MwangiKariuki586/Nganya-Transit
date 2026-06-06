@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useToast } from "@/components/ui/ToastContainer";
 import type {
   PlannerFiltersValue,
@@ -40,6 +41,7 @@ import type {
 interface UseHomePlannerOptions {
   activeCorridor: string | null;
   corridors: FanCorridorRecord[];
+  isAuthenticated: boolean;
   liveNganyas: FanLiveNganyaRecord[];
   onCorridorChange: (corridorId: string | null) => void;
 }
@@ -76,9 +78,11 @@ function loadSupabaseModule() {
 export function useHomePlanner({
   activeCorridor,
   corridors,
+  isAuthenticated,
   liveNganyas,
   onCorridorChange,
 }: UseHomePlannerOptions) {
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const { plannerContext, setPlannerContext, clearPlannerContext } =
     usePlannerFilters();
@@ -393,8 +397,16 @@ export function useHomePlanner({
     addToast(buildPlannerSeedToastMessage(target), "info");
   };
 
+  const requireAuthForTracking = () => {
+    if (isAuthenticated) return true;
+    addToast("Sign in to track live rides.", "info");
+    navigate({ to: "/signin", search: { returnTo: "/" } });
+    return false;
+  };
+
   const handleBrowseCardAction = (item: BrowseCardActionItem) => {
     if (item.isLive && canTrackWithPlannerContext(plannerContext, item)) {
+      if (!requireAuthForTracking()) return;
       setTrackingNganya(item);
       return;
     }
@@ -412,6 +424,7 @@ export function useHomePlanner({
       row.lastSeenMinutes <= 15 &&
       canTrackWithPlannerContext(plannerContext, row)
     ) {
+      if (!requireAuthForTracking()) return;
       setTrackingRow(row);
       return;
     }
@@ -443,6 +456,10 @@ export function useHomePlanner({
   };
 
   const trackPlannerRideOnMap = async (ride: JourneyResult) => {
+    if (!isAuthenticated) {
+      requireAuthForTracking();
+      return;
+    }
     if (!plannerContext.fromStage?.id) return;
     if (!mapCorridorId) return;
 
@@ -534,6 +551,7 @@ export function useHomePlanner({
   };
 
   const watchPlannerRide = (ride: PlannerRideOption) => {
+    if (!requireAuthForTracking()) return;
     const isAlreadyWatched = watchedRideId === ride.nganya_id;
     setWatchedRideId(ride.nganya_id);
     setDismissedRiskKey(null);
@@ -548,6 +566,7 @@ export function useHomePlanner({
   };
 
   const switchToPlannerRide = (ride: PlannerRideOption) => {
+    if (!requireAuthForTracking()) return;
     setWatchedRideId(ride.nganya_id);
     setDismissedRiskKey(null);
     scrollToPlannerMap();

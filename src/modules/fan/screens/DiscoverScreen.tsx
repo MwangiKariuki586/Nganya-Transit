@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import SearchInput from "@/components/ui/SearchInput";
@@ -37,6 +38,7 @@ function DiscoverScreen({
   initialCorridorId = null,
 }: DiscoverScreenProps) {
   const {
+    isAuthenticated,
     corridors,
     featuredLive,
     initialNganyas,
@@ -47,12 +49,14 @@ function DiscoverScreen({
     initialNextOffset,
   } = data;
 
+  const navigate = useNavigate();
   const { addToast } = useToast();
 
   const catalogue = useDiscoverCatalogue({
     initialNganyas,
     initialHasMore,
     initialNextOffset,
+    isAuthenticated,
     totalCount,
     initialFollowedIds: followedIds,
     liveNganyas,
@@ -72,6 +76,12 @@ function DiscoverScreen({
   const handleCardAction = (cardData: FanCardData) => {
     const plannerContext = readPlannerStorageContext();
     if (shouldTrackPlannerHandoffTarget(plannerContext, cardData)) {
+      if (!isAuthenticated) {
+        addToast("Sign in to track live rides.", "info");
+        navigate({ to: "/signin", search: { returnTo: "/discover" } });
+        return;
+      }
+
       // Navigate to home where the tracker lives
       window.location.href = "/";
       return;

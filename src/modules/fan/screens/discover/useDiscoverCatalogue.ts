@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useToast } from "@/components/ui/ToastContainer";
 import { followNganya, unfollowNganya } from "@/lib/queries/follows";
 import { toggleFollowedIdSet } from "@/modules/fan/services/follow-optimistic";
@@ -33,6 +34,7 @@ interface UseDiscoverCatalogueOptions {
   initialNganyas: FanNganyaRecord[];
   initialHasMore: boolean;
   initialNextOffset: number;
+  isAuthenticated: boolean;
   totalCount: number;
   initialFollowedIds: Set<string>;
   liveNganyas: FanLiveNganyaRecord[];
@@ -44,12 +46,14 @@ export function useDiscoverCatalogue({
   initialNganyas,
   initialHasMore,
   initialNextOffset,
+  isAuthenticated,
   totalCount,
   initialFollowedIds,
   liveNganyas,
   corridors,
   initialCorridorId = null,
 }: UseDiscoverCatalogueOptions) {
+  const navigate = useNavigate();
   const { showErrorToast } = useToast();
 
   const [filters, setFilters] = useState<DiscoverFilters>(() => ({
@@ -206,6 +210,11 @@ export function useDiscoverCatalogue({
 
   const toggleFollow = useCallback(
     async (id: string) => {
+      if (!isAuthenticated) {
+        navigate({ to: "/signin", search: { returnTo: "/discover" } });
+        return;
+      }
+
       const wasFollowing = followedIds.has(id);
       setFollowedIds((prev) => toggleFollowedIdSet(prev, id, wasFollowing));
       try {
@@ -216,7 +225,7 @@ export function useDiscoverCatalogue({
         showErrorToast("Failed to update follow.");
       }
     },
-    [followedIds, showErrorToast],
+    [followedIds, isAuthenticated, navigate, showErrorToast],
   );
 
   const activeCorridorName = useMemo(

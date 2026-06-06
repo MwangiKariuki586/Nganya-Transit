@@ -45,6 +45,7 @@ export default function HomeScreen({
   const router = useRouter();
   const [recentFilter, setRecentFilter] = useState<RecentSightingFilter>("ALL");
   const {
+    isAuthenticated,
     corridors,
     nganyas,
     liveNganyas,
@@ -57,11 +58,12 @@ export default function HomeScreen({
     handlePlannerAlertAction,
     isFollowingNganya,
     toggleFollow,
-  } = useHomeFollowActions(followedIds);
+  } = useHomeFollowActions(followedIds, isAuthenticated);
 
   const planner = useHomePlanner({
     activeCorridor,
     corridors,
+    isAuthenticated,
     liveNganyas,
     onCorridorChange,
   });
