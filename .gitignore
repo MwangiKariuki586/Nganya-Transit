@@ -19,7 +19,7 @@ todos.json
 migrations
 playwright-report
 test-results
-
+.playwright-mcp/
 
 # Ignore Cursor MCP configs (contains sensitive token)
 .cursor/mcp.json

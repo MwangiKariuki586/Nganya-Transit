@@ -27,6 +27,49 @@ interface HomeRideWatchSectionProps {
   onWatchRide: (ride: PlannerRideOption) => void;
 }
 
+function SeatsBadge({ seatsLeft }: { seatsLeft: number | null | undefined }) {
+  if (!Number.isFinite(seatsLeft)) return null;
+
+  const count = Number(seatsLeft);
+  const isFull = count <= 0;
+  const isLow = count > 0 && count <= 3;
+
+  return (
+    <span
+      className={[
+        "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+        isFull
+          ? "border border-red-500/40 bg-red-500/18 text-red-200"
+          : isLow
+            ? "border border-amber-400/40 bg-amber-400/18 text-amber-100"
+            : "border border-emerald-400/35 bg-emerald-400/15 text-emerald-100",
+      ].join(" ")}
+    >
+      {isFull ? "Full" : `${count} seats left`}
+    </span>
+  );
+}
+
+function SeatsAvailabilityPanel({
+  seatsLeft,
+}: {
+  seatsLeft: number | null | undefined;
+}) {
+  const hasSeats = Number.isFinite(seatsLeft);
+  const count = hasSeats ? Number(seatsLeft) : null;
+
+  return (
+    <div className="w-full text-left md:text-right">
+      <p className="text-4xl font-black leading-none text-[var(--color-text-primary)] md:text-5xl">
+        {hasSeats ? count : "--"}
+      </p>
+      <p className="mt-1 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
+        {count === 1 ? "seat" : "seats"}
+      </p>
+    </div>
+  );
+}
+
 export function HomeRideWatchSection({
   rideWatchSectionRef,
   rideWatchScrollMargin,
@@ -117,8 +160,8 @@ export function HomeRideWatchSection({
       ) : null}
 
       {recommendedRide ? (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 md:p-6">
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(180px,240px)] md:items-start">
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-[var(--color-accent-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-accent)]">
@@ -145,23 +188,31 @@ export function HomeRideWatchSection({
               />
             </div>
 
-            <div className="flex flex-col gap-2 md:min-w-[220px]">
-              <Button onClick={() => onWatchRide(recommendedRide)}>
-                {watchedRide?.nganya_id === recommendedRide.nganya_id
-                  ? "Refresh on map"
-                  : "Watch on map"}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => onPlannerAlertAction(recommendedRide)}
-              >
-                <BellRing className="h-4 w-4" />
-                {isFollowingNganya(recommendedRide.nganya_id) ||
-                plannerAlertIds.has(recommendedRide.nganya_id)
-                  ? "Alerts on"
-                  : "Follow route alerts"}
-              </Button>
+            <div className="flex flex-col md:items-end">
+              <SeatsAvailabilityPanel seatsLeft={recommendedRide.seats_left} />
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              className="w-full sm:w-auto sm:min-w-[190px]"
+              onClick={() => onWatchRide(recommendedRide)}
+            >
+              {watchedRide?.nganya_id === recommendedRide.nganya_id
+                ? "Refresh on map"
+                : "Watch on map"}
+            </Button>
+            <Button
+              className="w-full sm:w-auto sm:min-w-[190px]"
+              variant="ghost"
+              onClick={() => onPlannerAlertAction(recommendedRide)}
+            >
+              <BellRing className="h-4 w-4" />
+              {isFollowingNganya(recommendedRide.nganya_id) ||
+              plannerAlertIds.has(recommendedRide.nganya_id)
+                ? "Alerts on"
+                : "Follow route alerts"}
+            </Button>
           </div>
         </div>
       ) : null}
@@ -190,6 +241,7 @@ export function HomeRideWatchSection({
                     <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {ride.nganya_name}
                     </p>
+                    <SeatsBadge seatsLeft={ride.seats_left} />
                     <TrackingSignalBadge
                       signalType={ride.signalType}
                       freshnessSeconds={ride.freshnessSeconds ?? undefined}

@@ -601,6 +601,7 @@ describe("HomeScreen", () => {
         corridor_name: "Thika Road",
         tags: ["NEW_BUILD"],
         eta_minutes: 6,
+        seats_left: 0,
         confidence_level: "HIGH",
         source: "LIVE",
         last_seen_at: "2026-05-01T11:59:40.000Z",
@@ -612,6 +613,7 @@ describe("HomeScreen", () => {
         corridor_name: "Thika Road",
         tags: [],
         eta_minutes: 8,
+        seats_left: 3,
         confidence_level: "MEDIUM",
         source: "SIGHTING",
         last_seen_at: "2026-05-01T11:57:00.000Z",
@@ -625,6 +627,9 @@ describe("HomeScreen", () => {
       expect(screen.getByText("Best ride now")).toBeTruthy();
       expect(screen.getAllByText("Matwana Express").length).toBeGreaterThan(0);
       expect(screen.getByText("Backup rides")).toBeTruthy();
+      expect(screen.getByText("0")).toBeTruthy();
+      expect(screen.getByText("seats")).toBeTruthy();
+      expect(screen.getByText("3 seats left")).toBeTruthy();
     });
 
     expect(screen.getByText("map-corridor:corridor-1").closest("section")?.getAttribute("style")).toContain(
@@ -647,6 +652,51 @@ describe("HomeScreen", () => {
       expect(screen.getByText("route-line:2")).toBeTruthy();
       expect(screen.getByText("route-eta:240")).toBeTruthy();
       expect(screen.getByText("route-distance:3500")).toBeTruthy();
+    });
+  });
+
+  it("shows seat counts from live sessions when the planner RPC omits them", async () => {
+    seedPlannerContext({
+      toPlace: { id: "corridor-1", corridor_id: "corridor-1", name: "Thika Road" },
+      fromStage: { id: "stage-1", name: "Muthaiga" },
+      preference: "ANY",
+    });
+    mockSearchNganyaJourney.mockResolvedValue([
+      {
+        nganya_id: "nganya-1",
+        nganya_name: "Matwana Express",
+        corridor_id: "corridor-1",
+        corridor_name: "Thika Road",
+        tags: ["NEW_BUILD"],
+        eta_minutes: 6,
+        confidence_level: "HIGH",
+        source: "LIVE",
+        last_seen_at: "2026-05-01T11:59:40.000Z",
+      },
+    ]);
+
+    renderHome(
+      { activeCorridor: "corridor-1" },
+      {
+        liveNganyas: [
+          {
+            id: "live-1",
+            nganya_id: "nganya-1",
+            nganya_name: "Matwana Express",
+            corridor_id: "corridor-1",
+            corridor_name: "Thika Road",
+            last_ping_at: "2026-05-01T11:58:00.000Z",
+            profile_photo_url: "https://example.com/live.jpg",
+            tags: ["NEW_BUILD"],
+            seats_left: 4,
+          },
+        ],
+      },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("4")).toBeTruthy();
+      expect(screen.getByText("seats")).toBeTruthy();
     });
   });
 

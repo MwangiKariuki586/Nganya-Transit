@@ -126,6 +126,22 @@ export function useHomePlanner({
     [activeCorridor, liveNganyas],
   );
 
+  const liveSeatsByNganyaId = useMemo(
+    () =>
+      new Map<string, number>(
+        filteredLiveNganyas
+          .map((nganya) => {
+            const nganyaId = nganya.nganya_id || nganya.id;
+            const seatsLeft = nganya.seats_left;
+            return nganyaId && Number.isFinite(seatsLeft)
+              ? [nganyaId, Number(seatsLeft)]
+              : null;
+          })
+          .filter((entry): entry is [string, number] => Boolean(entry)),
+      ),
+    [filteredLiveNganyas],
+  );
+
   const mapCorridorId = useMemo(
     () =>
       plannerContext.toPlace?.corridor_id ||
@@ -154,8 +170,20 @@ export function useHomePlanner({
     plannerContext.toPlace?.name,
   ]);
 
+  const plannerResultsWithLiveSeats = useMemo(
+    () =>
+      plannerResults.map((result) => ({
+        ...result,
+        seats_left:
+          Number.isFinite(result.seats_left)
+            ? result.seats_left
+            : liveSeatsByNganyaId.get(result.nganya_id) ?? null,
+      })),
+    [liveSeatsByNganyaId, plannerResults],
+  );
+
   const mapJourneyResults = useMemo((): JourneyResult[] => {
-    if (plannerResults.length > 0) return plannerResults;
+    if (plannerResultsWithLiveSeats.length > 0) return plannerResultsWithLiveSeats;
 
     const corridorId = mapCorridorId ?? "";
     const corridorName = mapCorridorName;
@@ -166,16 +194,22 @@ export function useHomePlanner({
       corridor_name: n.corridor_name || n.corridors?.name || corridorName,
       tags: n.tags ?? null,
       eta_minutes: 5,
+      seats_left: Number.isFinite(n.seats_left) ? Number(n.seats_left) : null,
       confidence_level: "HIGH",
       source: "LIVE",
       last_seen_at: n.last_ping_at ?? null,
       profile_photo_url: n.profile_photo_url ?? null,
     }));
-  }, [filteredLiveNganyas, mapCorridorId, mapCorridorName, plannerResults]);
+  }, [
+    filteredLiveNganyas,
+    mapCorridorId,
+    mapCorridorName,
+    plannerResultsWithLiveSeats,
+  ]);
 
   const visibleNganyaIds = useMemo(
-    () => deriveVisibleNganyaIds(plannerContext, plannerResults),
-    [plannerContext, plannerResults],
+    () => deriveVisibleNganyaIds(plannerContext, plannerResultsWithLiveSeats),
+    [plannerContext, plannerResultsWithLiveSeats],
   );
 
   const plannerCorridorId = useMemo(
@@ -305,8 +339,8 @@ export function useHomePlanner({
   });
 
   const plannerRideOptions = useMemo(
-    () => sortPlannerRideOptions(plannerResults),
-    [plannerResults],
+    () => sortPlannerRideOptions(plannerResultsWithLiveSeats),
+    [plannerResultsWithLiveSeats],
   );
 
   const watchedRide = useMemo(
