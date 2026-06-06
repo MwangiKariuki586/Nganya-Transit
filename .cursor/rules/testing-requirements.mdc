@@ -1,0 +1,66 @@
+---
+description: Testing requirements for MATWANA server functions and critical flows
+globs: "**/*.test.ts,**/*.test.tsx,src/server/**/*.ts"
+alwaysApply: false
+---
+
+# Testing Requirements
+
+## Admin Server Functions Must Have Tests
+
+Every admin action (suspend, delete, role change, session terminate) must have test coverage verifying:
+1. Happy path works correctly
+2. Non-admin callers are rejected with `FORBIDDEN`
+3. Missing auth throws `AUTH_REQUIRED`
+4. Invalid input throws `VALIDATION_ERROR`
+
+## Auth Enforcement Must Have Tests
+
+Every `requireXAccess` function must have a test that verifies:
+- Missing token → `AUTH_REQUIRED`
+- Wrong role → `FORBIDDEN`
+- Valid token + correct role → success
+
+## Test File Location
+
+Co-locate tests next to source in `__tests__/` directories:
+
+```
+src/server/admin/
+  dashboard.server.ts
+  __tests__/
+    dashboard.server.test.ts
+```
+
+## Mocking Supabase
+
+Use `vi.mock` for Supabase clients:
+
+```typescript
+vi.mock('@/server/supabase/service-role.server', () => ({
+  getServiceRoleSupabaseClient: vi.fn(),
+}));
+vi.mock('@/server/supabase/user-client.server', () => ({
+  getUserScopedSupabaseClient: vi.fn(),
+}));
+```
+
+Build chainable mock builders for Supabase query chains:
+
+```typescript
+function mockSupabaseChain(result: { data?: any; error?: any }) {
+  const chain = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue(result),
+    insert: vi.fn().mockResolvedValue(result),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+  };
+  return { from: vi.fn(() => chain), auth: { admin: { /* ... */ } } };
+}
+```
+
+## Coverage Target
+
+Target 60%+ coverage on server modules. Track with Vitest coverage config.

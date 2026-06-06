@@ -1,0 +1,46 @@
+---
+description: React component, screen, and state management patterns for MATWANA
+globs: "**/*.tsx"
+alwaysApply: false
+---
+
+# React Component & Screen Patterns
+
+## Screen Files Under 400 Lines
+
+Screen files must stay under 400 lines. Extract:
+- **Domain logic** → co-located hook (e.g., `useSpotFlow.ts`, `useFollowingDashboard.ts`)
+- **Sub-components** → module's `components/` folder
+- **Shared utilities** → `src/lib/` or `src/hooks/`
+
+```
+modules/fan/screens/
+  SpotScreen.tsx          ← 140 lines (orchestrator)
+  spot/
+    useSpotFlow.ts        ← domain logic hook
+    SpotConfirmStep.tsx   ← sub-component
+    SpotWhereStep.tsx     ← sub-component
+```
+
+## State Ownership
+
+- **Zustand** for client-only state (auth session, UI preferences)
+- **Route loaders** for server data
+- **No state duplication** — if data can be derived, use `useMemo`. Do not store `followedIds` alongside `followedNganyas`
+- **Store types must match database types** — no `any[]` in store interfaces
+
+## No `console.log` in Production
+
+ESLint `no-console` is enforced. Use `console.warn` or `console.error` only. Replace analytics placeholders with `// TODO: wire analytics event`.
+
+## Shared Patterns Must Be Extracted
+
+If a UI pattern appears in 2+ places, extract it:
+- Upload logic → `useProfileMediaUpload` hook
+- Direction labels → `formatDirectionLabel` utility
+- Loading spinners → `InlineSpinner` component
+- Error displays → `InlineErrorState` component
+
+## No Magic Constants
+
+Extract hardcoded values to named constants or config. No inline TTLs, thresholds, or endpoint strings scattered across files.

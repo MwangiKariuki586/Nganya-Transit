@@ -1,0 +1,89 @@
+[    9405ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:20102
+[ 4839201ms] [ERROR] %o
+
+%s
+
+%s
+ TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard (http://127.0.0.1:4173/src/components/features/WhereToCard.tsx?t=1777552744239:29:11)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:18509:20)
+    at renderWithHooks (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:5654:24)
+    at updateFunctionComponent (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7475:21)
+    at beginWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:8525:20)
+    at runWithFiberInDEV (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:997:72)
+    at performUnitOfWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12561:98)
+    at workLoopSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12424:43)
+    at renderRootSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12408:13)
+    at performWorkOnRoot (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:11827:37) The above error occurred in the <WhereToCard> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl. @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7000
+[ 4839209ms] [WARNING] Warning: Error in route match: /(fan)/ @ http://127.0.0.1:4173/node_modules/tiny-warning/dist/tiny-warning.esm.js?v=be11d0a2:8
+[ 4839214ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 4839216ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 4866889ms] [ERROR] %o
+
+%s
+
+%s
+ TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard (http://127.0.0.1:4173/src/components/features/WhereToCard.tsx?t=1777552771924:29:11)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:18509:20)
+    at renderWithHooks (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:5654:24)
+    at updateFunctionComponent (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7475:21)
+    at beginWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:8525:20)
+    at runWithFiberInDEV (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:997:72)
+    at performUnitOfWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12561:98)
+    at workLoopSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12424:43)
+    at renderRootSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12408:13)
+    at performWorkOnRoot (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:11827:37) The above error occurred in the <WhereToCard> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl. @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7000
+[ 4866890ms] [WARNING] Warning: Error in route match: /(fan)/ @ http://127.0.0.1:4173/node_modules/tiny-warning/dist/tiny-warning.esm.js?v=be11d0a2:8
+[ 4866891ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 4927893ms] [ERROR] %o
+
+%s
+
+%s
+ TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard (http://127.0.0.1:4173/src/components/features/WhereToCard.tsx?t=1777552771924:29:11)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:18509:20)
+    at renderWithHooks (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:5654:24)
+    at updateFunctionComponent (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7475:21)
+    at beginWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:8525:20)
+    at runWithFiberInDEV (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:997:72)
+    at performUnitOfWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12561:98)
+    at workLoopSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12424:43)
+    at renderRootSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12408:13)
+    at performWorkOnRoot (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:11827:37) The above error occurred in the <WhereToCard> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl. @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7000
+[ 4927893ms] [WARNING] Warning: Error in route match: /(fan)/ @ http://127.0.0.1:4173/node_modules/tiny-warning/dist/tiny-warning.esm.js?v=be11d0a2:8
+[ 4927895ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 4938789ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:20102
+[ 4939136ms] [ERROR] %o
+
+%s
+
+%s
+ TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard (http://127.0.0.1:4173/src/components/features/WhereToCard.tsx?t=1777552771924:29:11)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:18509:20)
+    at renderWithHooks (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:5654:24)
+    at updateFunctionComponent (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7475:21)
+    at beginWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:8525:20)
+    at runWithFiberInDEV (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:997:72)
+    at performUnitOfWork (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12561:98)
+    at workLoopSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12424:43)
+    at renderRootSync (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:12408:13)
+    at performWorkOnRoot (http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:11827:37) The above error occurred in the <WhereToCard> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl. @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:7000
+[ 4939137ms] [WARNING] Warning: Error in route match: /(fan)/ @ http://127.0.0.1:4173/node_modules/tiny-warning/dist/tiny-warning.esm.js?v=be11d0a2:8
+[ 4939140ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 4939142ms] [ERROR] [35mLOG[39m [94m/src/shared/errors/reporting.ts:12:3 - http://localhost:4173/__tsd/open-source?source=%2Fsrc%2Fshared%2Ferrors%2Freporting.ts%3A12%3A3[39m
+ →  [app-error] {area: route, routeId: (fan), error: Object, cause: TypeError: Cannot destructure property 'toPlace' of 'value' as it is undefined.
+    at WhereToCard …} @ http://127.0.0.1:4173/src/shared/errors/reporting.ts:3
+[ 5073187ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=be11d0a2:20102

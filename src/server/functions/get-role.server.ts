@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getServerRole } from '@/server/auth/role.server'
+import { normalizeRole } from '@/shared/auth/roles'
+import { sessionMiddleware } from '@/server/auth/session-middleware.server'
 
-export const getRoleServerFn = createServerFn({ method: 'GET' }).handler(async () => {
-  return getServerRole()
-})
+export const getRoleServerFn = createServerFn({ method: 'GET' })
+  .middleware([sessionMiddleware])
+  .handler(async ({ context }) => {
+    return normalizeRole(context.session.role)
+  })

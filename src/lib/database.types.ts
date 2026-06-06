@@ -15,24 +15,48 @@ export interface Database {
                     handle: string
                     full_name: string | null
                     avatar_url: string | null
+                    bio: string | null
                     role: 'fan' | 'crew' | 'admin'
                     created_at: string
+                    updated_at: string | null
+                    cover_media_url: string | null
+                    cover_media_type: 'image' | 'video' | null
+                    cover_poster_url: string | null
+                    cover_position_x: number
+                    cover_position_y: number
+                    cover_scale: number
                 }
                 Insert: {
                     id: string
                     handle: string
                     full_name?: string | null
                     avatar_url?: string | null
+                    bio?: string | null
                     role?: 'fan' | 'crew' | 'admin'
                     created_at?: string
+                    updated_at?: string | null
+                    cover_media_url?: string | null
+                    cover_media_type?: 'image' | 'video' | null
+                    cover_poster_url?: string | null
+                    cover_position_x?: number
+                    cover_position_y?: number
+                    cover_scale?: number
                 }
                 Update: {
                     id?: string
                     handle?: string
                     full_name?: string | null
                     avatar_url?: string | null
+                    bio?: string | null
                     role?: 'fan' | 'crew' | 'admin'
                     created_at?: string
+                    updated_at?: string | null
+                    cover_media_url?: string | null
+                    cover_media_type?: 'image' | 'video' | null
+                    cover_poster_url?: string | null
+                    cover_position_x?: number
+                    cover_position_y?: number
+                    cover_scale?: number
                 }
             }
             corridors: {
@@ -133,6 +157,117 @@ export interface Database {
                     created_at?: string
                 }
             }
+            profile_media: {
+                Row: {
+                    id: string
+                    user_id: string
+                    media_url: string
+                    media_type: 'image' | 'video'
+                    storage_path: string
+                    sort_order: number
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    media_url: string
+                    media_type: 'image' | 'video'
+                    storage_path: string
+                    sort_order?: number
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    media_url?: string
+                    media_type?: 'image' | 'video'
+                    storage_path?: string
+                    sort_order?: number
+                    created_at?: string
+                }
+            }
+            nganya_registration_requests: {
+                Row: {
+                    id: string
+                    created_by: string
+                    corridor_id: string
+                    proposed_name: string
+                    plate_last4: string | null
+                    plate_hash: string | null
+                    sacco: string | null
+                    tags: string[]
+                    status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO'
+                    approved_nganya_id: string | null
+                    reviewed_by: string | null
+                    review_notes: string | null
+                    submitted_at: string | null
+                    reviewed_at: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    created_by: string
+                    corridor_id: string
+                    proposed_name: string
+                    plate_last4?: string | null
+                    plate_hash?: string | null
+                    sacco?: string | null
+                    tags?: string[]
+                    status?: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO'
+                    approved_nganya_id?: string | null
+                    reviewed_by?: string | null
+                    review_notes?: string | null
+                    submitted_at?: string | null
+                    reviewed_at?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    created_by?: string
+                    corridor_id?: string
+                    proposed_name?: string
+                    plate_last4?: string | null
+                    plate_hash?: string | null
+                    sacco?: string | null
+                    tags?: string[]
+                    status?: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO'
+                    approved_nganya_id?: string | null
+                    reviewed_by?: string | null
+                    review_notes?: string | null
+                    submitted_at?: string | null
+                    reviewed_at?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            nganya_registration_request_media: {
+                Row: {
+                    id: string
+                    request_id: string
+                    storage_path: string
+                    media_url: string
+                    sort_order: number
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    request_id: string
+                    storage_path: string
+                    media_url: string
+                    sort_order?: number
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    request_id?: string
+                    storage_path?: string
+                    media_url?: string
+                    sort_order?: number
+                    created_at?: string
+                }
+            }
             follows: {
                 Row: {
                     user_id: string
@@ -156,6 +291,23 @@ export interface Database {
                     notify_live?: boolean
                     notify_near?: boolean
                     notify_stage?: boolean
+                    created_at?: string
+                }
+            }
+            crew_nganyas: {
+                Row: {
+                    crew_user_id: string
+                    nganya_id: string
+                    created_at: string
+                }
+                Insert: {
+                    crew_user_id: string
+                    nganya_id: string
+                    created_at?: string
+                }
+                Update: {
+                    crew_user_id?: string
+                    nganya_id?: string
                     created_at?: string
                 }
             }
@@ -304,10 +456,21 @@ export interface Database {
         }
     }
     Functions: {
-        [_ in never]: never
+        approve_nganya_registration_request: {
+            Args: {
+                p_request_id: string
+                p_review_notes?: string | null
+            }
+            Returns: string
+        }
+        crew_bootstrap: {
+            Args: Record<PropertyKey, never>
+            Returns: Json
+        }
     }
     Enums: {
-        [_ in never]: never
+        app_role: 'fan' | 'crew' | 'admin'
+        nganya_registration_request_status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO'
     }
     CompositeTypes: {
         [_ in never]: never

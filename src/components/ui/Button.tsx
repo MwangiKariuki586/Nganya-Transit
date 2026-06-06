@@ -8,7 +8,7 @@ import type { ReactNode, ButtonHTMLAttributes } from 'react'
  */
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'secondary' | 'ghost'
+    variant?: 'primary' | 'primaryOutline' | 'secondary' | 'ghost'
     size?: 'sm' | 'md' | 'lg'
     iconOnly?: boolean
     isLoading?: boolean
@@ -17,19 +17,31 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<string, string> = {
     primary: [
-        'bg-[var(--color-accent)] text-white font-semibold',
+        'bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-semibold',
         'shadow-[var(--glow-accent-sm)]',
         'hover:bg-[var(--color-accent-hover)] hover:shadow-[var(--glow-accent)]',
         'active:scale-95',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none',
     ].join(' '),
-    secondary: [
-        'bg-[var(--glass-bg)] text-[var(--color-text-primary)]',
-        'border border-[var(--glass-border)]',
-        'backdrop-blur-md',
-        'hover:bg-[var(--glass-bg-strong)] hover:border-[var(--glass-border-hover)]',
+    primaryOutline: [
+        'bg-transparent text-[var(--color-accent)] font-semibold',
+        'border border-[var(--color-accent)]',
+        'hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]',
+        'hover:shadow-[var(--glow-accent-sm)]',
         'active:scale-95',
-        'disabled:opacity-40 disabled:cursor-not-allowed',
+        'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-accent)] disabled:hover:shadow-none',
+    ].join(' '),
+    secondary: [
+        'bg-[var(--glass-bg)] text-[var(--color-text-primary)] font-medium',
+        'border border-[var(--color-accent)]/20',
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)]',
+        'backdrop-blur-md',
+        'transition-all duration-200',
+        'hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-accent-soft)]',
+        'hover:shadow-[0_0_22px_-10px_var(--theme-accent-shadow-strong)]',
+        'hover:-translate-y-px',
+        'active:scale-[0.98] active:translate-y-0',
+        'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0',
     ].join(' '),
     ghost: [
         'bg-transparent text-[var(--color-text-secondary)]',

@@ -1,7 +1,15 @@
-/**
- * Server-only service-role client placeholder.
- * Keep service key access out of client bundles.
- */
-export function getServiceRoleSupabase() {
-  throw new Error('Not implemented: wire service-role Supabase client in server runtime.')
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
+import { getServerSupabaseServiceRoleEnv } from '@/shared/supabase/env'
+
+export function getServiceRoleSupabaseClient() {
+  const { url, serviceRoleKey } = getServerSupabaseServiceRoleEnv()
+
+  return createClient<Database>(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
 }

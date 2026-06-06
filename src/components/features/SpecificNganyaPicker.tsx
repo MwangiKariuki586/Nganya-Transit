@@ -4,6 +4,7 @@ import BottomSheet from '../ui/BottomSheet'
 import SearchInput from '../ui/SearchInput'
 import { searchNganyas } from '../../lib/queries/discover'
 import { BusFront } from 'lucide-react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 interface SpecificNganyaPickerProps {
     isOpen: boolean
@@ -13,18 +14,12 @@ interface SpecificNganyaPickerProps {
 }
 
 export default function SpecificNganyaPicker({ isOpen, onClose, corridorId, onSelect }: SpecificNganyaPickerProps) {
-    const [isMobile, setIsMobile] = useState(false)
+    const isMobile = useIsMobile()
     const [nganyas, setNganyas] = useState<any[]>([])
     const [search, setSearch] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [recentNganyas, setRecentNganyas] = useState<Array<{ id: string, name: string }>>([])
 
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-        checkMobile()
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
 
     useEffect(() => {
         if (isOpen) {

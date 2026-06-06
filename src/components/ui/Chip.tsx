@@ -26,10 +26,10 @@ export default function Chip({
 
     const variants: Record<string, string> = {
         route: `
-      px-3 py-1.5 text-xs min-h-[32px]
+      px-3 py-1.5 text-xs min-h-[32px] backdrop-blur-md
       ${isActive
-                ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border border-[var(--color-accent)]'
-                : 'bg-[var(--glass-bg)] text-[var(--color-text-secondary)] border border-[var(--glass-border)] hover:border-[var(--glass-border-hover)] hover:text-[var(--color-text-primary)]'
+                ? 'bg-[var(--glass-bg)] text-[var(--color-text-primary)] border border-[var(--color-accent)]/60 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)]'
+                : 'bg-[rgba(255,255,255,0.02)] text-[var(--color-text-secondary)] border border-[var(--glass-border)] hover:border-[var(--color-accent)]/25 hover:text-[var(--color-text-primary)]'
             }
     `,
         status: `

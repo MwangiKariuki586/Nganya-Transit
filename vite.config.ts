@@ -8,15 +8,21 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
-
 const config = defineConfig({
+  server: {
+    host: true,
+  },
   plugins: [
-    devtools(),
+    devtools({ eventBusConfig: { enabled: false } }),
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
     contentCollections(),
     tsconfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        routeFileIgnorePattern: "\\.test\\.(ts|tsx)$",
+      },
+    }),
     viteReact(),
   ],
 })

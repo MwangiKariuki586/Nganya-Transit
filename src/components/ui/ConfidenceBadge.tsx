@@ -4,7 +4,7 @@
  */
 
 interface ConfidenceBadgeProps {
-    level: 'low' | 'med' | 'high'
+    level: 'low' | 'med' | 'high' | 'LOW' | 'MED' | 'HIGH' | string
     className?: string
 }
 
@@ -15,7 +15,8 @@ const config = {
 }
 
 export default function ConfidenceBadge({ level, className = '' }: ConfidenceBadgeProps) {
-    const { label, color, bg } = config[level]
+    const normalizedLevel = String(level || 'high').toLowerCase()
+    const { label, color, bg } = config[normalizedLevel as keyof typeof config] ?? config.high
 
     return (
         <span

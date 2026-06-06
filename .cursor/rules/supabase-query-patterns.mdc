@@ -1,0 +1,60 @@
+---
+description: Supabase query safety and performance rules
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: false
+---
+
+# Supabase Query & RPC Patterns
+
+## No `select('*')` in Production
+
+Always specify needed columns. Over-fetching wastes bandwidth and leaks schema details.
+
+```typescript
+// ✅ GOOD
+const { data } = await supabase.from('nganyas').select('id, name, slug, corridor_id');
+
+// ❌ BAD
+const { data } = await supabase.from('nganyas').select('*');
+```
+
+## No Client-Side Full-Table Filtering
+
+If you need to find a row by a non-PK field, use a DB-side filter or RPC. Never load all rows and `.find()`.
+
+```typescript
+// ✅ GOOD — filter in DB
+const { data } = await supabase.from('nganyas').select('id, name').eq('slug', slug).single();
+
+// ❌ BAD — load all, filter in JS
+const { data } = await supabase.from('nganyas').select('*');
+const match = data?.find(n => n.slug === slug);
+```
+
+## All List Queries Must Have a LIMIT
+
+If the UI shows a list, the query must have pagination (cursor or offset). Unbounded queries become production incidents at scale.
+
+```typescript
+// ✅ GOOD
+const { data } = await supabase.from('sightings').select('*').order('created_at', { ascending: false }).limit(50);
+
+// ❌ BAD — unbounded
+const { data } = await supabase.from('sightings').select('*');
+```
+
+## Parameterized Inputs Only
+
+Never interpolate user input into PostgREST filter strings. Use `.eq()`, `.ilike()`, or RPC parameters.
+
+```typescript
+// ✅ GOOD
+const { data } = await supabase.from('nganyas').select('id, name').ilike('name', `%${query}%`);
+
+// ❌ BAD — string interpolation in filter
+const { data } = await supabase.from('nganyas').select('id, name').or(`name.ilike.%${query}%`);
+```
+
+## Regenerate Types
+
+`database.types.ts` must be regenerated before every PR. Types must match the live schema.

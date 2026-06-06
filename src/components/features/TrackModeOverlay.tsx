@@ -40,7 +40,7 @@ export default function TrackModeOverlay({ isOpen, onClose, nganya, stage }: Pro
     }, [isOpen, nganya.nganya_id, latestEta])
 
     const handleConfirm = (action: 'BOARDED' | 'MISSED') => {
-        console.log(`Analytics: ${action.toLowerCase()}_confirmed`, { nganya_id: nganya.nganya_id })
+        // TODO: wire analytics event for board/miss confirmation
         onClose()
     }
 
