@@ -57,6 +57,7 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryDelayRef = useRef(pingInterval)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const queuedUpdatesRef = useRef<QueuedUpdate[]>([])
 
   // Monitor ping age and update connection status
   useEffect(() => {
@@ -106,6 +107,7 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
         retryDelayRef.current = pingInterval
         
         // Clear queue on success
+        queuedUpdatesRef.current = []
         setQueuedUpdates([])
         
         if (retryTimeoutRef.current) {
@@ -124,17 +126,9 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
           retryCount: 0,
         }
         
-        setQueuedUpdates((prev) => {
-          // Merge with existing queue, keeping only latest values
-          const merged = [...prev, queuedUpdate]
-          
-          // Compress queue: keep only the most recent update
-          if (merged.length > 1) {
-            return [merged[merged.length - 1]]
-          }
-          
-          return merged
-        })
+        // Latest-only queue: retry the freshest update, not a stale closure.
+        queuedUpdatesRef.current = [queuedUpdate]
+        setQueuedUpdates([queuedUpdate])
 
         onError?.(error)
 
@@ -147,15 +141,14 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
         retryDelayRef.current = Math.min(retryDelayRef.current * 2, maxRetryDelay)
         
         retryTimeoutRef.current = setTimeout(() => {
-          if (queuedUpdates.length > 0) {
-            void ping(queuedUpdates[0])
-          }
+          const latest = queuedUpdatesRef.current[0]
+          if (latest) void ping(latest)
         }, retryDelay)
       } finally {
         setIsPinging(false)
       }
     },
-    [sessionId, isActive, onPing, onSuccess, onError, pingInterval, maxRetryDelay, queuedUpdates],
+    [sessionId, isActive, onPing, onSuccess, onError, pingInterval, maxRetryDelay],
   )
 
   const retryNow = useCallback(async () => {
@@ -164,14 +157,16 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
       retryTimeoutRef.current = null
     }
 
-    if (queuedUpdates.length > 0) {
-      await ping(queuedUpdates[0])
+    const latest = queuedUpdatesRef.current[0]
+    if (latest) {
+      await ping(latest)
     } else {
       await ping()
     }
-  }, [queuedUpdates, ping])
+  }, [ping])
 
   const clearQueue = useCallback(() => {
+    queuedUpdatesRef.current = []
     setQueuedUpdates([])
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current)
@@ -220,7 +215,7 @@ export function useSessionPing(options: UseSessionPingOptions): UseSessionPingRe
   // Handle online/offline events
   useEffect(() => {
     const handleOnline = () => {
-      if (queuedUpdates.length > 0) {
+      if (queuedUpdatesRef.current.length > 0) {
         void retryNow()
       } else {
         setConnectionStatus('healthy')

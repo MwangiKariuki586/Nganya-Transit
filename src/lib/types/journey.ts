@@ -16,6 +16,7 @@ export interface JourneyResult {
   corridor_name: string;
   tags: string[] | null;
   eta_minutes: number;
+  seats_left?: number | null;
   confidence_level: ConfidenceLevel;
   source: JourneySource;
   last_seen_at: string | null;
