@@ -1,5 +1,18 @@
 import { createServerFn } from '@tanstack/react-start'
 
+type LocationUploadPoint = {
+  lat: number
+  lng: number
+  accuracy_m: number | null
+  speed_mps: number | null
+  heading: number | null
+  captured_at: string
+}
+
+function toPostgisPoint(point: Pick<LocationUploadPoint, 'lat' | 'lng'>) {
+  return `POINT(${point.lng} ${point.lat})`
+}
+
 export const getCrewAccessServerFn = createServerFn({ method: 'POST' })
   .inputValidator((data: { accessToken: string }) => data)
   .handler(async ({ data }) => {
@@ -137,6 +150,78 @@ export const pingCrewSessionServerFn = createServerFn({ method: 'POST' })
     }
 
     return access.getCrewSessionById(context, data.sessionId)
+  })
+
+export const ingestCrewLocationServerFn = createServerFn({ method: 'POST' })
+  .inputValidator((data: {
+    accessToken: string
+    sessionId: string
+    nganyaId: string
+    point: LocationUploadPoint
+    clientState: 'foreground' | 'backgrounded' | 'recovered' | 'offline'
+    seatsLeft: number
+    direction: string | null
+  }) => data)
+  .handler(async ({ data }) => {
+    const access = await import('@/server/crew/access.server')
+    const { getServerSupabaseUserEnv } = await import('@/shared/supabase/env')
+    const context = await access.requireCrewAccess(data.accessToken)
+    await access.assertMappedNganya(context, data.nganyaId)
+    await access.getCrewSessionById(context, data.sessionId)
+
+    const { url, anonKey } = getServerSupabaseUserEnv()
+    const body = {
+      session_id: data.sessionId,
+      nganya_id: data.nganyaId,
+      points: [data.point],
+      client_state: data.clientState,
+    }
+
+    try {
+      const res = await fetch(`${url}/functions/v1/live-location-ingest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${data.accessToken}`,
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText)
+        throw new Error(`live-location-ingest ${res.status}: ${text}`)
+      }
+
+      return res.json()
+    } catch (error) {
+      // Keep the live session fresh even when the Edge Function is unavailable.
+      const { error: pingError } = await context.supabase.rpc('update_live_session_ping', {
+        p_session_id: data.sessionId,
+        p_seats_left: data.seatsLeft,
+        p_last_location: toPostgisPoint(data.point),
+        p_direction: data.direction || null,
+      })
+
+      if (pingError) {
+        throw pingError
+      }
+
+      return {
+        ok: true,
+        accepted: true,
+        rejected_reason: null,
+        server_received_at: new Date().toISOString(),
+        freshness_state: 'LIVE',
+        accepted_point: {
+          lat: data.point.lat,
+          lng: data.point.lng,
+          accuracy_m: data.point.accuracy_m,
+          captured_at: data.point.captured_at,
+        },
+        fallback_reason: error instanceof Error ? error.message : String(error),
+      }
+    }
   })
 
 export const stopCrewSessionServerFn = createServerFn({ method: 'POST' })

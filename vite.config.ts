@@ -11,6 +11,7 @@ import { nitro } from 'nitro/vite'
 const config = defineConfig({
   server: {
     host: true,
+    port: 3000,
   },
   plugins: [
     devtools({ eventBusConfig: { enabled: false } }),

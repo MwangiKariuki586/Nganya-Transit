@@ -2,6 +2,7 @@ import { getLiveNow, subscribeToLive } from '@/lib/queries/live'
 import {
   getActiveCrewSessionServerFn,
   getCrewSessionServerFn,
+  ingestCrewLocationServerFn,
   listCrewSessionHistoryServerFn,
   pingCrewSessionServerFn,
   startCrewSessionServerFn,
@@ -13,6 +14,7 @@ export const liveSessionRepository = {
   subscribe: subscribeToLive,
   getActiveCrewSession: getActiveCrewSessionServerFn,
   getCrewSessionById: getCrewSessionServerFn,
+  ingestCrewLocation: ingestCrewLocationServerFn,
   listCrewHistory: listCrewSessionHistoryServerFn,
   startCrewSession: startCrewSessionServerFn,
   pingCrewSession: pingCrewSessionServerFn,
